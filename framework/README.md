@@ -5,3 +5,5 @@
 Публічний API експортується з `src/index.ts`: schemas, operation, resource/capability, module, application, results, HTTP/OpenAPI, Stand, JSON-RPC, queue, schedule, client та test harness.
 
 З кореня репозиторію: `npm install`, `npm run dev`, `npm test`. Детальні приклади та межі реалізації — у кореневому README.md. У власному застосунку встановіть цей каталог як локальну залежність `"@arc/framework": "file:../arc/framework"` та експортуйте application із `src/app.ts`.
+
+Повна документація: [посібник ARC](../docs/README.md), [архітектура](../docs/architecture.md), [написання коду](../docs/writing-code.md), [API](../docs/api.md).

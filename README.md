@@ -57,6 +57,10 @@ curl -X POST http://localhost:3000/orders \
 
 `GET /openapi.json` повертає OpenAPI 3.1 із тих самих контрактів. Авторизація в прикладі демонстраційна: Bearer містить UUID наявного користувача; це не перевірка JWT. Дані прикладу зберігаються в пам’яті й скидаються при перезапуску.
 
+## Документація
+
+Повний посібник: [docs/README.md](docs/README.md). Окремі розділи: [архітектура](docs/architecture.md), [як писати код](docs/writing-code.md), [довідник API](docs/api.md), [тести та Stand](docs/testing-and-stand.md). Є [готовий приклад модуля завдань](docs/examples/tasks.ts) із [тестами](docs/examples/tasks.test.ts).
+
 ## Операції та ресурси
 
 ```ts
