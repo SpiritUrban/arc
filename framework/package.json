@@ -1,0 +1,22 @@
+{
+  "name": "@arc/framework",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "arc": "./arc.mjs"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "dependencies": {
+    "tsx": "^4.20.0"
+  },
+  "files": [
+    "src",
+    "arc.mjs",
+    "README.md"
+  ]
+}
