@@ -18,6 +18,7 @@
     "tests/**/*.ts",
     "docs/examples/**/*.ts",
     "benchmarks/**/*.ts",
-    "scripts/**/*.ts"
+    "scripts/**/*.ts",
+    "examples/**/*.ts"
   ]
 }

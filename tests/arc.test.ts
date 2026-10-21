@@ -245,8 +245,9 @@ test("Stand graph, run, saved tests, load and failure injection", async () => {
       }),
     );
   assert.equal(
-    (await (await fetch(new Request("http://localhost/api/graph"))).json())
-      .nodes.length,
+    (
+      await (await fetch(new Request("http://localhost/api/graph"))).json()
+    ).nodes.filter((n: any) => n.kind === "operation").length,
     1,
   );
   assert.deepEqual(

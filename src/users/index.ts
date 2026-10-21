@@ -8,11 +8,8 @@ import {
   ok,
   error,
 } from "@arc/framework";
-export const User = s.object({
-  id: s.uuid(),
-  name: s.string({ min: 2, max: 100 }),
-  email: s.email(),
-});
+import { User, ListUsers, CreateUser } from "./contracts.ts";
+export { User } from "./contracts.ts";
 type User = ReturnType<typeof User.parse>;
 export const usersRepository = resource({
   id: "users.repository",
@@ -54,20 +51,15 @@ export const getUser = operation({
   },
 });
 export const createUser = operation({
-  id: "users.create",
-  input: s.object({ name: s.string({ min: 2, max: 100 }), email: s.email() }),
-  output: User,
+  ...CreateUser,
   needs: { users: usersRepository },
-  errors: { EMAIL_EXISTS: 409 },
   run: async ({ input, users }) => {
     const user = await users.create(input.name, input.email);
     return user ? ok(user) : error("EMAIL_EXISTS");
   },
 });
 export const listUsers = operation({
-  id: "users.list",
-  input: s.object({}),
-  output: User.array(),
+  ...ListUsers,
   needs: { users: usersRepository },
   run: async ({ users }) => ok(await users.list()),
 });

@@ -1,4 +1,4 @@
-# Архітектура ARC 0.2
+# Архітектура ARC 0.3
 
 [← Зміст](README.md) · [Аудит і міграція](audit/README.md)
 
@@ -16,13 +16,13 @@ try {
 }
 ```
 
-`compile()` збирає транзитивні `needs` та `calls`, перевіряє унікальність ID, цикли, scopes, підтриману структуру схем, error mappings і маршрути. Будує dependency-ready execution plans та Architecture IR v2. Не викликає `open`, `run`, `sample`, schedule input або validation callbacks. `graph()` та `inspect` читають тільки метадані. Сам імпорт користувацького entrypoint все ще виконує його top-level JavaScript: не відкривайте DB на рівні модуля.
+`compile()` збирає транзитивні `needs` та `calls`, перевіряє унікальність ID, цикли, scopes, підтриману структуру схем, error mappings і маршрути. Будує dependency-ready execution plans та Architecture IR v3. Не викликає `open`, `run`, `sample`, schedule input або validation callbacks. `graph()` та `inspect` читають тільки метадані. Сам імпорт користувацького entrypoint все ще виконує його top-level JavaScript: не відкривайте DB на рівні модуля.
 
 `start()` послідовно відкриває application-ресурси у топологічному порядку, потім створює queue workers і запускає schedules. Одночасні start-виклики отримують один Promise; повторний start активного application не створює ресурси повторно. При partial failure відкриті ресурси закриваються; можна повторити start. Помилки activation і rollback зберігаються в AggregateError.
 
 `execute()` до start відхиляється. Прихованого auto-start немає. `close()` є idempotent, чекає start, якщо він триває, припиняє schedules і нові зовнішні виклики, дренує прийняті queue jobs та активні execution contexts, потім закриває application-ресурси. Зовнішні HTTP-сервери закриває їхній власник; CLI робить це сам. Після close application не перезапускається.
 
-## Architecture IR v2
+## Architecture IR v3
 
 | Node kind    | Значення                                                |
 | ------------ | ------------------------------------------------------- |
@@ -96,8 +96,14 @@ SSE `/api/events` передає operation, resource, queue/worker і metrics ev
 
 `graph.analysis` містить fanOut, dependencyCount, dependents/blastRadius, declaredEstimateMs, compilerDerivedCriticalPathMs, budgetMs і warnings.
 
-Estimate-модель: власна declared cost + max шлях залежностей/CALLS. Це структурна оцінка/нижня межа для графа; послідовні calls, умовні гілки та тривалість методів із JS не виводяться. Відсутня оцінка на шляху дає null. Budget warning порівнює саме цю модель із declared budget. Scope-review warning є рекомендацією, scope leak — compilation error. Це не runtime measurement і не прогноз пропускної здатності.
+Estimate-модель: власна declared cost + max шлях залежностей/CALLS. Це умовна структурна оцінка за метаданими, а не гарантована нижня межа runtime latency: application-вузли враховуються в графі, хоча їхній open не повторюється на кожний execution. Послідовні calls, умовні гілки та тривалість методів із JS не виводяться. Відсутня оцінка на шляху дає null. Budget warning порівнює саме цю модель із declared budget. Scope-review warning є рекомендацією, scope leak — compilation error. Це не runtime measurement і не прогноз пропускної здатності. Dependents/blastRadius зараз обходять тільки DEPENDS_ON/CALLS; route ingress і schedule TRIGGERS потребують окремого аналізу для повного operational impact.
 
 ## Карта реалізації
 
 `core.ts` — визначення, compiler/lifecycle/execution; `analysis.ts` — статичні оцінки; `metrics.ts` — accumulator; `runtime-adapters.ts` — workers/schedules; `schema.ts` та `generator.ts` — contracts/corpus; `http.ts`, `transports.ts` — адаптери; `stand.ts`, `load.ts`, `test-spec.ts`, `stand-ui.ts` — стенд.
+
+## Browser, server та shared: один IR v3
+
+Нейтральний compiler додає runtime targets і partitions до спільного graph. Нові kinds: contract, state, derived, web-resource, action, view, binding, remote-endpoint; relations DERIVES, BINDS, REMOTE_CALLS, INVALIDATES. Shared contracts мають estimateMs=0; server analysis не вдає аналіз JS bodies чи точне прогнозування browser render cost.
+
+Browser dataflow має microtask batching, dependency-first derived propagation і binding updates без повторного setup. [Scheduler](web/state-and-derived.md), [lifecycle view](web/views.md), [boundaries](fullstack/runtime-boundaries.md), [migration IR v3](migration-0.3.md). Server lifecycle вище застосовується до server partition; browser використовує start/mount/unmount/dispose.

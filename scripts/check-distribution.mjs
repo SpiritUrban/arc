@@ -56,11 +56,11 @@ export default application({operations:[operation({id:'ping',input:s.object({}),
       },
     ),
   );
-  assert.equal(graph.version, 2);
+  assert.equal(graph.version, 3);
   assert.ok(graph.nodes.some((n) => n.id === "offline-db"));
   await writeFile(
     join(temp, "check.mjs"),
-    `import {application,operation,s,ok} from '@arc/framework';const app=application({operations:[operation({id:'ping',input:s.object({}),output:s.string(),run:()=>ok('pong')})]});await app.compile();await app.start();console.log(JSON.stringify(await app.execute('ping',{})));await app.close();`,
+    `import {state} from '@arc/framework/web';import {remoteCall} from '@arc/framework/fullstack';import {compileArchitecture} from '@arc/framework/core';const local=state({id:'consumer.local',initial:1});if(compileArchitecture([local]).version!==3||typeof remoteCall!=='function')throw Error('subpath failure');local.dispose();import {application,operation,s,ok} from '@arc/framework';const app=application({operations:[operation({id:'ping',input:s.object({}),output:s.string(),run:()=>ok('pong')})]});await app.compile();await app.start();console.log(JSON.stringify(await app.execute('ping',{})));await app.close();`,
   );
   const output = execFileSync(process.execPath, ["check.mjs"], {
     cwd: temp,

@@ -1,51 +1,42 @@
 # ARC — Application Runtime Graph Compiler
 
-ARC описує backend як executable architecture graph із contracts, operations, resources/capabilities та explicit needs. Фреймворк — окремий workspace **framework/**, приклад застосунку — **src/**.
+ARC is an application graph framework/compiler for server, browser and fullstack applications. Архітектура — executable application graph; compiler визначає runtime targets, contracts і явні boundaries.
+
+| Режим         | API                                                       | Приклад                  |
+| ------------- | --------------------------------------------------------- | ------------------------ |
+| ARC Server    | operations, resources, HTTP/RPC/queue/schedule            | `docs/examples/tasks.ts` |
+| ARC Web       | state, derive, action, webResource, fine-grained bindings | `examples/web-counter/`  |
+| ARC Fullstack | один IR v3, remote boundaries, спільні contracts, traces  | `src/` (ARC Workspace)   |
 
 ```sh
 npm install
 npm run build
-npm run dev
+npm run dev # ARC Workspace: http://localhost:3000; Stand :3100
+# або npm run dev:web / npm run dev:fullstack для малих прикладів
 ```
 
-Node.js 22.18+. Application: http://localhost:3000; ARC Stand: http://localhost:3100.
+Node.js 22.18+. Фреймворк лежить окремо у `framework/`; feature-first application не залежить від обов’язкових client/server директорій.
 
-## Документація
-
-- [Посібник](docs/README.md), [початок роботи](docs/getting-started.md).
-- [Архітектура](docs/architecture.md), [написання коду](docs/writing-code.md), [API](docs/api.md).
-- [Stand, тести та навантаження](docs/testing-and-stand.md).
-- [Технічний аудит, міграція 0.1 → 0.2 та roadmap](docs/audit/README.md).
-- [Приклад модуля](docs/examples/tasks.ts) і [тести](docs/examples/tasks.test.ts).
-
-## Lifecycle
-
-```ts
-await app.compile(); // IR, invariants, plans, analysis — без resource.open
-await app.start(); // activation; activate() — alias
-try {
-  await app.execute("system.health", {});
-} finally {
-  await app.close();
-}
-```
-
-`arc graph` та `arc inspect` не активують зовнішні ресурси. Nested `ctx.call` має declared CALLS edges, shared request scope та parent-linked spans. Scheduler запускає dependency-ready вузли без бар’єрів рівнів. Errors типізуються через operation-local fail і можуть мати details schema.
-
-Stand показує IR v2, schema-aware input corpus, незалежні metrics, SSE activity, reusable JSON test specs, явні effect fault boundaries і три режими load testing. In-process/local-network результати не є benchmark продуктивності deployment.
-
-## Перевірки й запуск
+[Документація](docs/README.md) · [Початок роботи](docs/getting-started.md) · [Архітектура](docs/architecture.md) · [Звіт реалізації 0.3](docs/audit/web-fullstack-report.md)
 
 ```sh
 npm test
 npm run test:lifecycle
 npm run typecheck
+npm run typecheck:core
 npm run build
 npm run test:distribution
-npm run benchmark:scheduler
-npm run graph
-npm run inspect -- orders.create
-ARC_APP=dist/src/app.js node framework/arc.mjs start
+npm run build:web
+npm run build:fullstack
+npm run benchmark:web
 ```
 
-Compiled ESM package і CLI не потребують tsx. Development-скрипти працюють із TypeScript source. Repositories прикладу та queue — in-memory; auth — демонстраційний UUID token. Межі compile estimates, failure injection і roadmap описано в документації; `doc.md` лишається початковим обговоренням концепції.
+Server lifecycle: `compile → start → execute → close`. `graph`/`inspect` не відкривають ресурси. Browser lifecycle: `compile → start → mount → unmount → dispose`. View setup виконується один раз на mount; зміни оновлюють залежні DOM bindings без VDOM.
+
+Compiled ESM і declarations доступні через `@arc/framework/{core,server,web,fullstack,stand}`; кореневий import зберігає server API. Production JS не потребує tsx. Browser build tooling використовує optional peer esbuild. SSR, SSG, router, forms, advanced cache й optimistic mutations ще не реалізовані.
+
+## Кореневий застосунок: ARC Workspace
+
+`src/` тепер містить frontend і backend одного проєкту: користувачі, вибір активного користувача, створення та історія замовлень. Запуск — `npm run dev`, сторінка http://localhost:3000, Stand http://localhost:3100. `npm run build` компілює ESM та browser assets; `npm run build:app` збирає тільки frontend.
+
+[Посібник проєкту](docs/workspace-app.md). `examples/` залишаються малими навчальними прикладами.

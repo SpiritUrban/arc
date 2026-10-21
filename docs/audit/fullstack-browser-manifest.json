@@ -1,0 +1,77 @@
+{
+  "version": 3,
+  "entry": "examples/fullstack-tasks/browser.ts",
+  "partitions": {
+    "browser": [
+      "tasks.page",
+      "tasks.title-input",
+      "tasks.new-title",
+      "tasks.title-edit",
+      "tasks.add-click",
+      "tasks.add",
+      "tasks.create-boundary",
+      "tasks.current",
+      "tasks.current.remote",
+      "tasks.add-disabled",
+      "tasks.add.running",
+      "tasks.loading-text",
+      "tasks.current.loading",
+      "tasks.list-text",
+      "tasks.current.data",
+      "tasks.error-text",
+      "tasks.add.error",
+      "tasks.current.error"
+    ],
+    "server": [
+      "tasks.repository",
+      "tasks.list",
+      "tasks.create",
+      "tasks.repository.list",
+      "tasks.repository.create"
+    ],
+    "shared": [
+      "contract:tasks.list:input",
+      "contract:tasks.list:output",
+      "contract:tasks.create:input",
+      "contract:tasks.create:output"
+    ]
+  },
+  "boundaries": [
+    {
+      "from": "tasks.create-boundary",
+      "to": "tasks.create",
+      "transport": "arc-internal-v1"
+    },
+    {
+      "from": "tasks.current.remote",
+      "to": "tasks.list",
+      "transport": "arc-internal-v1"
+    },
+    {
+      "from": "tasks.current",
+      "to": "tasks.list",
+      "transport": "arc-internal-v1"
+    }
+  ],
+  "inputs": [
+    "framework/src/web/reactive.ts",
+    "framework/src/neutral/graph.ts",
+    "framework/src/neutral/protocol.ts",
+    "framework/src/web/view.ts",
+    "framework/src/web/async.ts",
+    "framework/src/web/runtime.ts",
+    "framework/src/web/index.ts",
+    "framework/src/fullstack/client.ts",
+    "framework/src/neutral/contracts.ts",
+    "framework/src/schema.ts",
+    "framework/src/generator.ts",
+    "framework/src/metrics.ts",
+    "framework/src/neutral/descriptor.ts",
+    "framework/src/core-entry.ts",
+    "examples/fullstack-tasks/contracts.ts",
+    "examples/fullstack-tasks/page.ts",
+    "examples/fullstack-tasks/browser.ts"
+  ],
+  "serverModules": [],
+  "browserBytes": 35508
+}

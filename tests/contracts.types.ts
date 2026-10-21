@@ -41,3 +41,37 @@ operation({
     return call("child", { n: 1 });
   },
 });
+
+import { operationContract } from "../framework/src/core-entry.ts";
+import { remoteCall, remote } from "../framework/src/fullstack/client.ts";
+const exposed = operationContract({
+  id: "typed.remote",
+  expose: { web: true },
+  input: s.object({ name: s.string() }),
+  output: s.int(),
+  errors: { EXISTS: { status: 409, details: s.object({ name: s.string() }) } },
+});
+async function remoteTypes() {
+  // @ts-expect-error remote input derives from contract
+  await remoteCall(exposed, { name: 1 });
+  const result = await remoteCall(exposed, { name: "name" });
+  if (result.kind === "business_error") {
+    const code: "EXISTS" = result.error;
+    const details: string = result.details.name;
+    void code;
+    void details;
+  }
+  if (result.kind === "success") {
+    const output: number = result.value;
+    void output;
+  }
+  const resource = remote(exposed, {
+    id: "typed.resource",
+    input: () => ({ name: "name" }),
+  });
+  const projected = resource.result.get();
+  if (projected?.kind === "business_error") {
+    const name: string = projected.details.name;
+    void name;
+  }
+}

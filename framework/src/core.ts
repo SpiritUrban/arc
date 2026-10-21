@@ -1,3 +1,4 @@
+import { BrowserMetrics } from "./neutral/browser-metrics.js";
 import { randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import {
@@ -13,29 +14,17 @@ import {
 import { MetricsAccumulator, type Outcome } from "./metrics.js";
 import { setTimeout as delay } from "node:timers/promises";
 import { analyzeGraph } from "./analysis.js";
-export type Result<T = unknown, E extends string = string> =
-  { ok: true; value: T } | { ok: false; error: E; details?: unknown };
-export const ok = <T>(value: T): { ok: true; value: T } => ({
-  ok: true,
-  value,
-});
-export const error = <E extends string>(
-  code: E,
-  details?: unknown,
-): { ok: false; error: E; details?: unknown } => ({
-  ok: false,
-  error: code,
-  details,
-});
-export class Fault extends Error {
-  constructor(
-    public code: string,
-    public status = 500,
-    public details?: unknown,
-  ) {
-    super(code);
-  }
-}
+export * from "./neutral/contracts.js";
+import {
+  ok,
+  error,
+  Fault,
+  errorStatus,
+  type Result,
+  type ErrorContracts,
+  type OperationResult,
+  type Fail,
+} from "./neutral/contracts.js";
 export type Needs = Record<string, Resource<any, any>>;
 type Values<N extends Needs> = {
   [K in keyof N]: N[K] extends Resource<infer T, any> ? T : never;
@@ -47,6 +36,7 @@ export type AsyncMethodKeys<T> = {
 }[keyof T & string];
 export interface Resource<T, N extends Needs = Needs> {
   kind: "resource";
+  runtime?: "server";
   id: string;
   scope: "application" | "request";
   needs: N;
@@ -66,30 +56,14 @@ export function resource<T, N extends Needs = {}>(
 ): Resource<T, N> {
   return Object.freeze({
     kind: "resource",
+    runtime: "server",
     scope: "application",
     needs: {} as N,
     ...def,
   });
 }
 export const capability = resource;
-export type ErrorDefinition =
-  number | { status: number; details?: Schema<any> };
-export type ErrorContracts = Record<string, ErrorDefinition>;
-export const errorStatus = (definition: ErrorDefinition) =>
-  typeof definition === "number" ? definition : definition.status;
-export type BusinessError<E extends ErrorContracts> = {
-  [K in keyof E & string]: E[K] extends { details: Schema<infer D> }
-    ? { ok: false; error: K; details: D }
-    : { ok: false; error: K; details?: unknown };
-}[keyof E & string];
-export type OperationResult<O, E extends ErrorContracts> =
-  { ok: true; value: O } | BusinessError<E>;
-export type Fail<E extends ErrorContracts> = <K extends keyof E & string>(
-  code: K,
-  ...details: E[K] extends { details: Schema<infer D> }
-    ? [details: D]
-    : [details?: unknown]
-) => Extract<BusinessError<E>, { error: K }>;
+export { errorStatus } from "./neutral/contracts.js";
 export type Calls = Record<string, Operation<any, any, any, any, any>>;
 export interface Operation<
   I = any,
@@ -99,6 +73,8 @@ export interface Operation<
   C extends Calls = Calls,
 > {
   kind: "operation";
+  runtime?: "server";
+  expose?: { web?: boolean };
   id: string;
   input: Schema<I>;
   output: Schema<O>;
@@ -135,6 +111,7 @@ export function operation<
 ): Operation<I, O, N, E, C> {
   return Object.freeze({
     kind: "operation",
+    runtime: "server",
     needs: {} as N,
     errors: {} as E,
     calls: {} as C,
@@ -156,34 +133,13 @@ export interface ScheduleDefinition {
   input: () => unknown;
   onError?: (error: unknown) => void;
 }
-export type NodeKind =
-  | "operation"
-  | "resource"
-  | "http-route"
-  | "queue"
-  | "worker"
-  | "schedule"
-  | "effect";
-export type EdgeKind =
-  "DEPENDS_ON" | "ROUTES_TO" | "CALLS" | "EMITS" | "CONSUMES" | "TRIGGERS";
-export interface GraphNode {
-  id: string;
-  kind: NodeKind;
-  [key: string]: any;
-}
-export interface GraphEdge {
-  from: string;
-  to: string;
-  kind: EdgeKind;
-  name?: string;
-}
-export interface ArchitectureIR {
-  version: 2;
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-  routes: { method: string; path: string; operation: string; status: number }[];
-  analysis?: ReturnType<typeof analyzeGraph>;
-}
+export * from "./neutral/graph.js";
+import {
+  compileArchitecture,
+  type ArchitectureIR,
+  type GraphNode,
+  type GraphDefinition,
+} from "./neutral/graph.js";
 export interface Route {
   method: string;
   path: string;
@@ -210,6 +166,7 @@ export const module = (def: {
   routes?: Route[];
   queues?: QueueDefinition[];
   schedules?: ScheduleDefinition[];
+  web?: { nodes: GraphDefinition[]; entry?: string; serverModules?: string[] };
 }) => def;
 export interface Span {
   node: string;
@@ -241,6 +198,7 @@ type AppOptions = {
   metricsWindowMs?: number;
   queues?: QueueDefinition[];
   schedules?: ScheduleDefinition[];
+  web?: { nodes: GraphDefinition[]; entry?: string; serverModules?: string[] };
 };
 export class Application {
   operations: Operation[];
@@ -268,6 +226,18 @@ export class Application {
   private accumulator: MetricsAccumulator;
   private active = new Set<Promise<any>>();
   traces: Trace[] = [];
+  browserMetrics = new BrowserMetrics();
+  browserEvents: import("./neutral/protocol.js").BrowserEvent[] = [];
+  ingestBrowserEvents(events: import("./neutral/protocol.js").BrowserEvent[]) {
+    this.browserEvents.push(...events);
+    if (this.browserEvents.length > 2000)
+      this.browserEvents.splice(0, this.browserEvents.length - 2000);
+    for (const event of events) {
+      this.browserMetrics.ingest(event);
+      this.publish("browser.event", event.node, event);
+    }
+  }
+
   faults = new Map<
     string,
     {
@@ -460,7 +430,7 @@ export class Application {
       need(r);
     this.needed = needed;
     this.compileOverrides = new Map(options.overrides);
-    const ir = this.makeGraph();
+    const ir = this.graph();
     const ids = new Set<string>();
     for (const node of ir.nodes) {
       if (ids.has(node.id))
@@ -700,7 +670,7 @@ export class Application {
   ): Promise<Result> {
     const started = performance.now();
     const trace: Trace = {
-      id: randomUUID(),
+      id: options.traceId ?? randomUUID(),
       operation: op.id,
       startedAt: new Date().toISOString(),
       duration: 0,
@@ -721,7 +691,7 @@ export class Application {
     let failure: unknown;
     let failed = false;
     try {
-      result = await this.invoke(op, input, scope, undefined, []);
+      result = await this.invoke(op, input, scope, options.parentSpanId, []);
     } catch (e) {
       failed = true;
       failure = e;
@@ -860,7 +830,7 @@ export class Application {
     if (scope.ended) throw new Error("Execution context is closed");
     if (stack.includes(op.id)) throw new Fault("RECURSIVE_CALL", 500);
     const metric = this.accumulator.begin(op.id);
-    if (!parentId) scope.rootMetric = metric;
+    if (!stack.length) scope.rootMetric = metric;
     let outcome: Outcome = "fault";
     this.publish("operation.started", op.id, { traceId: scope.trace.id });
     try {
@@ -953,7 +923,7 @@ export class Application {
       if (scope.options.signal?.aborted) outcome = "cancelled";
       throw e;
     } finally {
-      if (parentId) {
+      if (stack.length) {
         this.accumulator.end(metric, outcome);
         this.publish("operation.finished", op.id, {
           traceId: scope.trace.id,
@@ -965,7 +935,7 @@ export class Application {
   }
   private makeGraph(): ArchitectureIR {
     return {
-      version: 2,
+      version: 3,
       nodes: [
         ...[...this.nodes.values()].map((n): GraphNode => ({
           id: n.id,
@@ -989,6 +959,7 @@ export class Application {
                   ]),
                 ),
                 budgetMs: n.budgetMs ?? null,
+                expose: n.expose ?? {},
                 plan: {
                   scheduler: "dependency-ready",
                   resources: this.plans
@@ -1083,8 +1054,19 @@ export class Application {
       })),
     };
   }
+  webNodes(): GraphDefinition[] {
+    return [
+      ...(this.options.web?.nodes ?? []),
+      ...(this.options.modules ?? []).flatMap((m) => m.web?.nodes ?? []),
+    ];
+  }
+  webConfig() {
+    return (
+      this.options.web ?? this.options.modules?.find((m) => m.web?.entry)?.web
+    );
+  }
   graph(): ArchitectureIR {
-    const ir = this.makeGraph();
+    const ir = compileArchitecture(this.webNodes(), this.makeGraph());
     return { ...ir, analysis: analyzeGraph(ir) };
   }
   metrics() {
@@ -1120,6 +1102,8 @@ export interface RuntimeEvent {
   data?: unknown;
 }
 export interface ExecutionOptions {
+  traceId?: string;
+  parentSpanId?: string;
   request?: Request;
   signal?: AbortSignal;
   overrides?: Map<Resource<any, any>, unknown>;

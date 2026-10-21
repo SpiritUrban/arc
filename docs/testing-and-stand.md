@@ -1,4 +1,4 @@
-# Тести та ARC Stand 0.2
+# Тести та ARC Stand 0.3
 
 [← Зміст](README.md)
 
@@ -92,7 +92,7 @@ Authorization у Stand передається Request-capabilities в усіх �
 }
 ```
 
-Алгоритм підвищує/знижує RPS, а після появи passing/failing межі робить bisection. Повертає rounds із причинами та lastPassingRps/firstFailingRps. Без достатніх samples чи failing round не можна стверджувати, що межу знайдено. Поля constraints доступні через API; UI дає основні error-rate/p95 налаштування. Висновок стосується конкретного режиму, input і запуску.
+Алгоритм підвищує/знижує RPS, а після появи passing/failing межі робить bisection. Повертає rounds із причинами та lastPassingRps/firstFailingRps. Без достатніх samples чи failing round не можна стверджувати, що межу знайдено. Поля constraints доступні через API; UI дає основні error-rate/p95 налаштування. Висновок стосується конкретного режиму, input і запуску. `durationMs` і `count` застосовуються до кожного round; увесь breaking-point запуск може тривати довше за одне duration-вікно.
 
 ## Метрики та traces
 
@@ -132,7 +132,7 @@ Scratch tests лишаються в пам’яті. Export JSON, import та Sa
 
 Objects match subset fields, arrays — точну довжину й елементи. Доступні `$match: 'any'|'uuid'|'iso-date'|'type'` (для type ще поле type). Ігноруйте nondeterministic поля, пропускаючи їх у expected, або застосуйте matcher. Literal значення порівнюються через Object.is, не JSON.stringify.
 
-`stand(app, { testFile, hooks: { seed, reset }, networkBaseUrl })` налаштовує persistence і server-owned hooks. Setup виконується перед тестом, reset — у finally. Невідомий hook є помилкою. Hooks не виводяться автоматично з repository та не передаються кодом із браузера.
+`stand(app, { testFile, hooks: { seed, reset }, networkBaseUrl })` налаштовує persistence і server-owned hooks. Читання testFile починається під час створення handler, запити чекають його завершення. Файл містить масив versioned specs, а не один spec-об’єкт. Setup виконується перед тестом, reset — у finally. Невідомий hook є помилкою. Hooks не виводяться автоматично з repository та не передаються кодом із браузера.
 
 CLI зберігає файл `.arc/stand-tests.json` при явному Save to disk. Scratch tests самі не пишуться на диск. До versioned spec можна явно додати request.authorization/request.headers через Include authorization; типовий export і live payload прибирають request context. Для export із credentials використовуйте `?includeContext=1`. Файл і контекст можуть містити локальні credentials — зберігайте їх тільки з явним наміром. `.arc/` виключено з Git.
 
@@ -156,3 +156,9 @@ POST JSON:
 | `/api/test/run`              | {}                                                                                        |
 
 POST потребує application/json та same Origin, якщо Origin передано. SSE — operation.started/finished, resource.opened/closed, queue.state, worker.state, schedule.triggered, metrics.updated, graph.updated; без replay. Stand є локальним development tool, без production auth/RBAC або історичного сховища.
+
+Сторінка standalone API не виконує compile/start сама: перед `stand(app, options)` скомпілюйте й активуйте application. При програмному завершенні SSE можна зупинити `app.publish("application.stopping", "application")` перед очікуванням `closeServer`; CLI це вже робить.
+
+## ARC Web / Fullstack 0.3
+
+Цей розділ описує server API. Browser та fullstack: [Web guide](web/getting-started.md), [remote contracts](fullstack/remote-operations.md), [Stand graph і interaction traces](stand/README.md). Поточний unified IR має version 3; IR v2 приклади аудиту 0.2 є історичними.

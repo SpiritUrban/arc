@@ -45,7 +45,7 @@ test("compile/inspect graph never call open/sample; start is concurrent-idempote
   const app = application({ operations: [op] });
   await app.compile();
   assert.equal(opened, 0);
-  assert.equal(app.graph().version, 2);
+  assert.equal(app.graph().version, 3);
   assert.equal(opened, 0);
   await assert.rejects(app.execute("read", {}), /Start/);
   const starting = app.start();
@@ -344,7 +344,14 @@ test("queue/worker/ingress/schedule are compiled IR nodes, application owns drai
   await app.compile();
   assert.deepEqual(
     new Set(app.graph().nodes.map((n) => n.kind)),
-    new Set(["operation", "http-route", "queue", "worker", "schedule"]),
+    new Set([
+      "operation",
+      "http-route",
+      "queue",
+      "worker",
+      "schedule",
+      "contract",
+    ]),
   );
   await app.start();
   const results = [

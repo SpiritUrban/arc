@@ -1,3 +1,6 @@
+const monotonic = () =>
+  (globalThis as { performance?: { now(): number } }).performance?.now() ??
+  Date.now();
 export type Outcome = "ok" | "business_error" | "fault" | "cancelled";
 interface Meter {
   total: number;
@@ -35,7 +38,7 @@ export class MetricsAccumulator {
     meter.total++;
     meter.active++;
     meter.peak = Math.max(meter.peak, meter.active);
-    return { id, started: performance.now() };
+    return { id, started: monotonic() };
   }
   end(token: { id: string; started: number }, outcome: Outcome) {
     const meter = this.meter(token.id);
@@ -43,7 +46,7 @@ export class MetricsAccumulator {
     meter.outcomes[outcome]++;
     meter.recent.push({
       time: this.now(),
-      duration: performance.now() - token.started,
+      duration: monotonic() - token.started,
       outcome,
     });
     this.prune(meter);

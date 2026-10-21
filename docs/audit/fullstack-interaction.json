@@ -1,0 +1,134 @@
+{
+  "traceId": "a4350930-0976-478f-a8df-b72abecd7c09",
+  "browser": [
+    {
+      "source": "browser",
+      "type": "action.started",
+      "node": "browser.add",
+      "time": 1792565775678,
+      "traceId": "a4350930-0976-478f-a8df-b72abecd7c09",
+      "spanId": "b904e9f3-44e8-4612-9bb5-79d10e8b31a9"
+    },
+    {
+      "source": "browser",
+      "type": "remote.started",
+      "node": "browser.create",
+      "time": 1792565775679,
+      "traceId": "a4350930-0976-478f-a8df-b72abecd7c09",
+      "parentId": "b904e9f3-44e8-4612-9bb5-79d10e8b31a9",
+      "spanId": "1a29ea0b-c44e-4de8-a44a-83e5b5a9c983"
+    },
+    {
+      "source": "browser",
+      "type": "remote.finished",
+      "node": "browser.create",
+      "time": 1792565775681,
+      "traceId": "a4350930-0976-478f-a8df-b72abecd7c09",
+      "parentId": "b904e9f3-44e8-4612-9bb5-79d10e8b31a9",
+      "spanId": "1a29ea0b-c44e-4de8-a44a-83e5b5a9c983",
+      "outcome": "ok",
+      "duration": 1.9717239999999947
+    },
+    {
+      "source": "browser",
+      "type": "resource.started",
+      "node": "browser.list",
+      "time": 1792565775681,
+      "traceId": "a4350930-0976-478f-a8df-b72abecd7c09",
+      "parentId": "b904e9f3-44e8-4612-9bb5-79d10e8b31a9",
+      "spanId": "4de71f2d-af48-42d4-9bdc-ad4cb5cd53be"
+    },
+    {
+      "source": "browser",
+      "type": "remote.started",
+      "node": "browser.list.remote",
+      "time": 1792565775681,
+      "traceId": "a4350930-0976-478f-a8df-b72abecd7c09",
+      "parentId": "4de71f2d-af48-42d4-9bdc-ad4cb5cd53be",
+      "spanId": "2e8d5c4d-84e6-49de-b3f1-0a4851504409"
+    },
+    {
+      "source": "browser",
+      "type": "remote.finished",
+      "node": "browser.list.remote",
+      "time": 1792565775684,
+      "traceId": "a4350930-0976-478f-a8df-b72abecd7c09",
+      "parentId": "4de71f2d-af48-42d4-9bdc-ad4cb5cd53be",
+      "spanId": "2e8d5c4d-84e6-49de-b3f1-0a4851504409",
+      "outcome": "ok",
+      "duration": 3.126893999999993
+    },
+    {
+      "source": "browser",
+      "type": "resource.finished",
+      "node": "browser.list",
+      "time": 1792565775684,
+      "traceId": "a4350930-0976-478f-a8df-b72abecd7c09",
+      "parentId": "b904e9f3-44e8-4612-9bb5-79d10e8b31a9",
+      "spanId": "4de71f2d-af48-42d4-9bdc-ad4cb5cd53be",
+      "duration": 3.219229999999925,
+      "outcome": "ok"
+    },
+    {
+      "source": "browser",
+      "type": "binding.updated",
+      "node": "browser.count",
+      "time": 1792565775685,
+      "traceId": "a4350930-0976-478f-a8df-b72abecd7c09",
+      "parentId": "b904e9f3-44e8-4612-9bb5-79d10e8b31a9",
+      "duration": 0.0684800000000223,
+      "data": {
+        "view": "browser.page"
+      }
+    },
+    {
+      "source": "browser",
+      "type": "action.finished",
+      "node": "browser.add",
+      "time": 1792565775685,
+      "traceId": "a4350930-0976-478f-a8df-b72abecd7c09",
+      "spanId": "b904e9f3-44e8-4612-9bb5-79d10e8b31a9",
+      "outcome": "ok",
+      "duration": 6.274231999999984
+    }
+  ],
+  "server": [
+    {
+      "id": "a4350930-0976-478f-a8df-b72abecd7c09",
+      "operation": "create",
+      "startedAt": "2026-10-21T06:56:15.679Z",
+      "duration": 0.9192509999999174,
+      "status": "ok",
+      "spans": [
+        {
+          "id": "a8bed56b-19ee-42bd-a2d6-3a630098d45c",
+          "parentId": "1a29ea0b-c44e-4de8-a44a-83e5b5a9c983",
+          "node": "create",
+          "kind": "operation",
+          "start": 0.13765399999999772,
+          "duration": 0.744464999999991,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "id": "a4350930-0976-478f-a8df-b72abecd7c09",
+      "operation": "list",
+      "startedAt": "2026-10-21T06:56:15.682Z",
+      "duration": 2.2402020000000675,
+      "status": "ok",
+      "spans": [
+        {
+          "id": "7888113c-908a-4d4e-9ccc-d01d11d9eb6b",
+          "parentId": "2e8d5c4d-84e6-49de-b3f1-0a4851504409",
+          "node": "list",
+          "kind": "operation",
+          "start": 0.06507399999998142,
+          "duration": 0.5591440000000603,
+          "status": "ok"
+        }
+      ]
+    }
+  ],
+  "timingNote": "Browser clock timestamps and server durations are not clock-synchronized; remote span includes network + server, not isolated network latency."
+}

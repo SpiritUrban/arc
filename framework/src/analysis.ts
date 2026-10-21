@@ -1,4 +1,4 @@
-import type { ArchitectureIR } from "./core.js";
+import type { ArchitectureIR } from "./neutral/graph.js";
 /** All estimates are declared metadata plus structural derivation; no source-body inspection. */
 export function analyzeGraph(ir: ArchitectureIR) {
   const byId = new Map(ir.nodes.map((n) => [n.id, n]));

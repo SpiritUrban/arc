@@ -1,6 +1,6 @@
-# Початок роботи з ARC 0.2
+# Початок роботи з ARC 0.3
 
-[← Зміст](README.md)
+[← Зміст](README.md) · [Міграція 0.1 → 0.2](migration-0.2.md)
 
 Потрібен Node.js 22.18+. З кореня репозиторію:
 
@@ -87,3 +87,13 @@ import { application, operation, s, ok } from "@arc/framework";
 ```
 
 При локальній file-залежності спочатку зберіть framework: `npm run build --workspace @arc/framework`; після встановлення в іншому ESM-проєкті експортуйте application із вашого JS entrypoint і задайте ARC_APP. Чистий tarball install/import/CLI перевіряє `npm run test:distribution`.
+
+Якщо порти зайняті іншим прикладом, спочатку зупиніть попередній процес або задайте інші PORT/STAND_PORT. Після редагування source compiled package та CLI оновлюються лише через build; development scripts читають source напряму, але не перезапускають сервер автоматично.
+
+## Три runtime режими
+
+`npm run dev` запускає кореневий fullstack ARC Workspace, `npm run dev:web` — pure Web counter, `npm run dev:fullstack` — Tasks. Одночасно на default ports запускайте один приклад; PORT змінює application port, STAND_PORT — Stand. Web та internal transport мають один origin.
+
+`npm run build:app` збирає кореневий frontend; `npm run build:web` / `npm run build:fullstack` створюють browser assets навчальних прикладів у .arc/web. CLI `arc dev` compile/build/start/serve і відкриває Stand; це basic build на старті, без watch/HMR. [Web guide](web/getting-started.md), [Fullstack guide](fullstack/overview.md).
+
+Деталі кореневого UI та його graph: [ARC Workspace](workspace-app.md). Root `npm run build` включає browser build.

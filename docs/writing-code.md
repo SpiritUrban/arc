@@ -1,4 +1,4 @@
-# Як писати код на ARC
+# Як писати код на ARC 0.3
 
 [← Зміст](README.md)
 
@@ -247,7 +247,7 @@ async function loadRemote(url: string, signal?: AbortSignal) {
 }
 ```
 
-Для програмного виклику: `app.execute(id, input, { signal: AbortSignal.timeout(1000) })`. Executor перевіряє signal перед `run`, але не перериває довільний JavaScript і не скасовує вже початий `open` автоматично. Довгі операції та I/O мають самі реагувати на signal. HTTP bridge реагує на подію `aborted` вхідного Node-запиту; це не універсальна гарантія скасування при кожному розриві з’єднання.
+Для програмного виклику: `app.execute(id, input, { signal: AbortSignal.timeout(1000) })`. Executor перевіряє signal перед відкриттям request-ресурсів, перед і після `run`, успадковує його у nested calls та скасовує injected delays. Він не перериває довільний JavaScript і не скасовує вже початий `open` автоматично: I/O має саме реагувати на signal. HTTP bridge реагує на `aborted` вхідного Node-запиту та закриття response під час streaming; це не універсальна гарантія переривання будь-якої бізнес-операції.
 
 ## Правила для повсякденного коду
 
@@ -261,4 +261,48 @@ async function loadRemote(url: string, signal?: AbortSignal) {
 
 ## Вкладений сценарій
 
+```ts
+import { operation, s } from "@arc/framework";
+import { Task } from "./task.schema.ts";
+import { getTask } from "./get-task.ts";
+
+export const readTask = operation({
+  id: "tasks.read",
+  input: s.object({ id: s.uuid() }),
+  output: Task,
+  errors: getTask.errors,
+  calls: { getTask },
+  async run({ input, call }) {
+    return call("getTask", { id: input.id });
+  },
+});
+```
+
+Батьківська operation тут явно приймає child business errors через `errors: getTask.errors`. Для іншого публічного контракту перевірте child Result та перетворіть помилку через свій `fail`; невідомий батьківському контракту код не можна просто передати нагору.
+
 Оголосіть `calls: { getTask }`, а всередині run використовуйте `await call("getTask", { id })`. Child input/output виводяться зі схем; calls видимі в IR. Shared request-resource не відкривається повторно. Для незалежного root-виклику використовуйте app.execute або client. [Подробиці lifecycle та trace](architecture.md).
+
+## Явна async instrumentation
+
+Навчальний `tasksRepository` вище синхронний і не інструментований. Для спостереження та failure injection у виклик application-сервісу оголосіть async boundary:
+
+```ts
+import { resource } from "@arc/framework";
+
+const titleLookup = resource({
+  id: "tasks.titleLookup",
+  scope: "application",
+  instrument: ["find"],
+  open: () => ({
+    async find(id: string) {
+      return `Task ${id}`;
+    },
+  }),
+});
+```
+
+В операції додайте `needs: { titleLookup }` та викличте `await titleLookup.find(input.id)`. У IR з’явиться effect `tasks.titleLookup.find`. Це явне обгортання async methods application-ресурсів; синхронні методи прикладу не слід позначати instrument без зміни їхнього контракту на Promise. Докладніше — [API](api.md#resource--capability) та [Stand](testing-and-stand.md#failure-injection).
+
+## ARC Web / Fullstack 0.3
+
+Цей розділ описує server API. Browser та fullstack: [Web guide](web/getting-started.md), [remote contracts](fullstack/remote-operations.md), [Stand graph і interaction traces](stand/README.md). Поточний unified IR має version 3; IR v2 приклади аудиту 0.2 є історичними.

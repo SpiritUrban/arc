@@ -70,6 +70,22 @@ export function stand(app: Application, options: StandOptions = {}) {
         if (url.pathname === "/api/graph") return Response.json(app.graph());
         if (url.pathname === "/api/live")
           return Response.json({
+            browserMetrics: app.browserMetrics.snapshot(),
+            browserEvents: app.browserEvents,
+            interactions: [
+              ...new Set(
+                [
+                  ...app.browserEvents.map((e) => e.traceId),
+                  ...app.traces.map((t) => t.id),
+                ].filter(Boolean),
+              ),
+            ].map((traceId) => ({
+              traceId,
+              browser: app.browserEvents.filter((e) => e.traceId === traceId),
+              server: app.traces.filter((t) => t.id === traceId),
+              timingNote:
+                "Browser clock timestamps and server durations are not clock-synchronized; remote span includes network + server, not isolated network latency.",
+            })),
             metrics: app.metrics(),
             traces: app.traces,
             faults: Object.fromEntries(app.faults),

@@ -1,0 +1,12 @@
+{
+  "kind": "Linkedom actual-DOM binding microbenchmark; not real-browser performance or React/Vue comparison",
+  "bindings": 1000,
+  "affectedBindings": 3,
+  "writesInBatch": 100,
+  "observedBindingUpdates": 3,
+  "derivedNodes": 3,
+  "derivedComputationsIncludingInitialization": 6,
+  "derivedComputationsForBatch": 3,
+  "total": 301,
+  "elapsedMs": 0.5257850000000417
+}

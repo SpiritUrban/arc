@@ -12,18 +12,29 @@
     "inspect": "node --conditions=arc-source --import tsx framework/src/cli.ts inspect",
     "test": "node --conditions=arc-source --import tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "build": "npm run build --workspace @arc/framework && tsc",
+    "build": "npm run build --workspace @arc/framework && tsc && npm run build:app",
     "test:lifecycle": "node --conditions=arc-source --import tsx --test tests/lifecycle.test.ts",
     "benchmark:scheduler": "node --conditions=arc-source --import tsx benchmarks/scheduler.ts",
-    "test:distribution": "npm run build --workspace @arc/framework && node scripts/check-distribution.mjs"
+    "test:distribution": "npm run build --workspace @arc/framework && node scripts/check-distribution.mjs",
+    "dev:web": "ARC_APP=examples/web-counter/app.ts npm run dev",
+    "dev:fullstack": "ARC_APP=examples/fullstack-tasks/app.ts npm run dev",
+    "build:web": "ARC_APP=examples/web-counter/app.ts node --conditions=arc-source --import tsx framework/src/cli.ts build",
+    "build:fullstack": "ARC_APP=examples/fullstack-tasks/app.ts node --conditions=arc-source --import tsx framework/src/cli.ts build",
+    "test:web": "node --conditions=arc-source --import tsx --test tests/web-*.test.ts",
+    "test:fullstack": "node --conditions=arc-source --import tsx --test tests/fullstack.test.ts tests/browser-build.test.ts",
+    "typecheck:core": "tsc -p framework/tsconfig.neutral.json",
+    "benchmark:web": "node --conditions=arc-source --import tsx benchmarks/reactivity.ts",
+    "build:app": "node --conditions=arc-source --import tsx framework/src/cli.ts build"
   },
   "dependencies": {
     "@arc/framework": "*"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "linkedom": "^0.18.13",
     "prettier": "^3.9.10",
     "tsx": "^4.20.0",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "esbuild": "^0.28.2"
   }
 }

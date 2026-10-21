@@ -1,12 +1,47 @@
 {
   "name": "@arc/framework",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "exports": {
     ".": {
       "arc-source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./core": {
+      "arc-source": "./src/core-entry.ts",
+      "types": "./dist/core-entry.d.ts",
+      "import": "./dist/core-entry.js"
+    },
+    "./server": {
+      "arc-source": "./src/server.ts",
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js"
+    },
+    "./web": {
+      "arc-source": "./src/web/index.ts",
+      "types": "./dist/web/index.d.ts",
+      "import": "./dist/web/index.js"
+    },
+    "./fullstack": {
+      "arc-source": "./src/fullstack/client.ts",
+      "types": "./dist/fullstack/client.d.ts",
+      "import": "./dist/fullstack/client.js"
+    },
+    "./fullstack/server": {
+      "arc-source": "./src/fullstack/server.ts",
+      "types": "./dist/fullstack/server.d.ts",
+      "import": "./dist/fullstack/server.js"
+    },
+    "./stand": {
+      "arc-source": "./src/stand.ts",
+      "types": "./dist/stand.d.ts",
+      "import": "./dist/stand.js"
+    },
+    "./fullstack/build": {
+      "arc-source": "./src/fullstack/build.ts",
+      "types": "./dist/fullstack/build.d.ts",
+      "import": "./dist/fullstack/build.js"
     }
   },
   "bin": {
@@ -26,5 +61,13 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "prepack": "npm run build"
+  },
+  "peerDependencies": {
+    "esbuild": "^0.28.2"
+  },
+  "peerDependenciesMeta": {
+    "esbuild": {
+      "optional": true
+    }
   }
 }

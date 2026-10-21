@@ -1,14 +1,7 @@
 import { randomUUID } from "node:crypto";
-import {
-  s,
-  resource,
-  operation,
-  module,
-  http,
-  ok,
-  Fault,
-} from "@arc/framework";
+import { resource, operation, module, http, ok, Fault } from "@arc/framework";
 import { usersRepository } from "../users/index.ts";
+import { Order, ListOrders, CreateOrder } from "./contracts.ts";
 const currentUser = resource({
   id: "auth.currentUser",
   scope: "request",
@@ -19,13 +12,6 @@ const currentUser = resource({
     if (!user) throw new Fault("UNAUTHORIZED", 401);
     return user;
   },
-});
-const Order = s.object({
-  id: s.uuid(),
-  userId: s.uuid(),
-  product: s.string({ min: 1, max: 100 }),
-  quantity: s.int({ min: 1, max: 100 }),
-  total: s.number({ min: 0 }),
 });
 type Order = ReturnType<typeof Order.parse>;
 const ordersRepository = resource({
@@ -44,12 +30,7 @@ const ordersRepository = resource({
   },
 });
 export const createOrder = operation({
-  id: "orders.create",
-  input: s.object({
-    product: s.string({ min: 1, max: 100 }),
-    quantity: s.int({ min: 1, max: 100 }),
-  }),
-  output: Order,
+  ...CreateOrder,
   needs: { user: currentUser, orders: ordersRepository },
   effects: ["orders.write"],
   run: async ({ input, user, orders }) =>
@@ -63,9 +44,7 @@ export const createOrder = operation({
     ),
 });
 const listOrders = operation({
-  id: "orders.list",
-  input: s.object({}),
-  output: Order.array(),
+  ...ListOrders,
   needs: { user: currentUser, orders: ordersRepository },
   run: async ({ user, orders }) => ok(await orders.list(user.id)),
 });

@@ -1,0 +1,1020 @@
+{
+  "version": 3,
+  "nodes": [
+    {
+      "id": "tasks.repository",
+      "kind": "resource",
+      "scope": "application",
+      "effects": [],
+      "estimateMs": null,
+      "runtime": "server"
+    },
+    {
+      "id": "tasks.list",
+      "kind": "operation",
+      "effects": [],
+      "estimateMs": null,
+      "input": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          },
+          "required": [
+            "id",
+            "title"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "errors": {},
+      "budgetMs": null,
+      "expose": {
+        "web": true
+      },
+      "plan": {
+        "scheduler": "dependency-ready",
+        "resources": [
+          {
+            "id": "tasks.repository",
+            "dependencies": []
+          }
+        ]
+      },
+      "runtime": "server"
+    },
+    {
+      "id": "tasks.create",
+      "kind": "operation",
+      "effects": [],
+      "estimateMs": null,
+      "input": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "errors": {
+        "TITLE_EXISTS": {
+          "status": 409,
+          "details": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "title"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "budgetMs": null,
+      "expose": {
+        "web": true
+      },
+      "plan": {
+        "scheduler": "dependency-ready",
+        "resources": [
+          {
+            "id": "tasks.repository",
+            "dependencies": []
+          }
+        ]
+      },
+      "runtime": "server"
+    },
+    {
+      "id": "tasks.repository.list",
+      "kind": "effect",
+      "resource": "tasks.repository",
+      "method": "list",
+      "runtime": "server"
+    },
+    {
+      "id": "tasks.repository.create",
+      "kind": "effect",
+      "resource": "tasks.repository",
+      "method": "create",
+      "runtime": "server"
+    },
+    {
+      "id": "tasks.page",
+      "kind": "view",
+      "runtime": "browser"
+    },
+    {
+      "id": "tasks.title-input",
+      "kind": "binding",
+      "runtime": "browser"
+    },
+    {
+      "id": "tasks.new-title",
+      "kind": "state",
+      "runtime": "browser",
+      "scope": "application"
+    },
+    {
+      "id": "tasks.title-edit",
+      "kind": "binding",
+      "runtime": "browser"
+    },
+    {
+      "id": "tasks.add-click",
+      "kind": "binding",
+      "runtime": "browser"
+    },
+    {
+      "id": "tasks.add",
+      "kind": "action",
+      "runtime": "browser",
+      "scope": "application"
+    },
+    {
+      "id": "tasks.create-boundary",
+      "kind": "remote-endpoint",
+      "runtime": "browser"
+    },
+    {
+      "id": "tasks.current",
+      "kind": "web-resource",
+      "runtime": "browser",
+      "scope": "application"
+    },
+    {
+      "id": "tasks.current.remote",
+      "kind": "remote-endpoint",
+      "runtime": "browser"
+    },
+    {
+      "id": "tasks.add-disabled",
+      "kind": "binding",
+      "runtime": "browser"
+    },
+    {
+      "id": "tasks.add.running",
+      "kind": "derived",
+      "runtime": "browser"
+    },
+    {
+      "id": "tasks.loading-text",
+      "kind": "binding",
+      "runtime": "browser"
+    },
+    {
+      "id": "tasks.current.loading",
+      "kind": "derived",
+      "runtime": "browser"
+    },
+    {
+      "id": "tasks.list-text",
+      "kind": "binding",
+      "runtime": "browser"
+    },
+    {
+      "id": "tasks.current.data",
+      "kind": "derived",
+      "runtime": "browser"
+    },
+    {
+      "id": "tasks.error-text",
+      "kind": "binding",
+      "runtime": "browser"
+    },
+    {
+      "id": "tasks.add.error",
+      "kind": "derived",
+      "runtime": "browser"
+    },
+    {
+      "id": "tasks.current.error",
+      "kind": "derived",
+      "runtime": "browser"
+    },
+    {
+      "id": "contract:tasks.list:input",
+      "kind": "contract",
+      "runtime": "shared",
+      "estimateMs": 0,
+      "schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "contract:tasks.list:output",
+      "kind": "contract",
+      "runtime": "shared",
+      "estimateMs": 0,
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          },
+          "required": [
+            "id",
+            "title"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "id": "contract:tasks.create:input",
+      "kind": "contract",
+      "runtime": "shared",
+      "estimateMs": 0,
+      "schema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "contract:tasks.create:output",
+      "kind": "contract",
+      "runtime": "shared",
+      "estimateMs": 0,
+      "schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "tasks.list",
+      "to": "tasks.repository",
+      "name": "tasks",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.create",
+      "to": "tasks.repository",
+      "name": "tasks",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.repository",
+      "to": "tasks.repository.list",
+      "kind": "CALLS"
+    },
+    {
+      "from": "tasks.repository",
+      "to": "tasks.repository.create",
+      "kind": "CALLS"
+    },
+    {
+      "from": "tasks.title-input",
+      "to": "tasks.new-title",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.new-title",
+      "to": "tasks.title-input",
+      "kind": "BINDS"
+    },
+    {
+      "from": "tasks.page",
+      "to": "tasks.title-input",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.page",
+      "to": "tasks.title-edit",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.add",
+      "to": "tasks.new-title",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.create-boundary",
+      "to": "tasks.create",
+      "kind": "REMOTE_CALLS"
+    },
+    {
+      "from": "tasks.add",
+      "to": "tasks.create-boundary",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.current.remote",
+      "to": "tasks.list",
+      "kind": "REMOTE_CALLS"
+    },
+    {
+      "from": "tasks.current",
+      "to": "tasks.current.remote",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.current",
+      "to": "tasks.list",
+      "kind": "REMOTE_CALLS"
+    },
+    {
+      "from": "tasks.add",
+      "to": "tasks.current",
+      "kind": "INVALIDATES"
+    },
+    {
+      "from": "tasks.add-click",
+      "to": "tasks.add",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.add-click",
+      "to": "tasks.add",
+      "kind": "TRIGGERS"
+    },
+    {
+      "from": "tasks.page",
+      "to": "tasks.add-click",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.add",
+      "to": "tasks.add.running",
+      "kind": "DERIVES"
+    },
+    {
+      "from": "tasks.add-disabled",
+      "to": "tasks.add.running",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.add.running",
+      "to": "tasks.add-disabled",
+      "kind": "BINDS"
+    },
+    {
+      "from": "tasks.page",
+      "to": "tasks.add-disabled",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.current",
+      "to": "tasks.current.loading",
+      "kind": "DERIVES"
+    },
+    {
+      "from": "tasks.loading-text",
+      "to": "tasks.current.loading",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.current.loading",
+      "to": "tasks.loading-text",
+      "kind": "BINDS"
+    },
+    {
+      "from": "tasks.page",
+      "to": "tasks.loading-text",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.current",
+      "to": "tasks.current.data",
+      "kind": "DERIVES"
+    },
+    {
+      "from": "tasks.list-text",
+      "to": "tasks.current.data",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.current.data",
+      "to": "tasks.list-text",
+      "kind": "BINDS"
+    },
+    {
+      "from": "tasks.page",
+      "to": "tasks.list-text",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.add",
+      "to": "tasks.add.error",
+      "kind": "DERIVES"
+    },
+    {
+      "from": "tasks.error-text",
+      "to": "tasks.add.error",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.current",
+      "to": "tasks.current.error",
+      "kind": "DERIVES"
+    },
+    {
+      "from": "tasks.error-text",
+      "to": "tasks.current.error",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.add.error",
+      "to": "tasks.error-text",
+      "kind": "BINDS"
+    },
+    {
+      "from": "tasks.current.error",
+      "to": "tasks.error-text",
+      "kind": "BINDS"
+    },
+    {
+      "from": "tasks.page",
+      "to": "tasks.error-text",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.list",
+      "to": "contract:tasks.list:input",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.current.remote",
+      "to": "contract:tasks.list:input",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.current",
+      "to": "contract:tasks.list:input",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.list",
+      "to": "contract:tasks.list:output",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.current.remote",
+      "to": "contract:tasks.list:output",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.current",
+      "to": "contract:tasks.list:output",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.create",
+      "to": "contract:tasks.create:input",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.create-boundary",
+      "to": "contract:tasks.create:input",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.create",
+      "to": "contract:tasks.create:output",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "tasks.create-boundary",
+      "to": "contract:tasks.create:output",
+      "kind": "DEPENDS_ON"
+    }
+  ],
+  "routes": [],
+  "partitions": {
+    "browser": [
+      "tasks.page",
+      "tasks.title-input",
+      "tasks.new-title",
+      "tasks.title-edit",
+      "tasks.add-click",
+      "tasks.add",
+      "tasks.create-boundary",
+      "tasks.current",
+      "tasks.current.remote",
+      "tasks.add-disabled",
+      "tasks.add.running",
+      "tasks.loading-text",
+      "tasks.current.loading",
+      "tasks.list-text",
+      "tasks.current.data",
+      "tasks.error-text",
+      "tasks.add.error",
+      "tasks.current.error"
+    ],
+    "server": [
+      "tasks.repository",
+      "tasks.list",
+      "tasks.create",
+      "tasks.repository.list",
+      "tasks.repository.create"
+    ],
+    "shared": [
+      "contract:tasks.list:input",
+      "contract:tasks.list:output",
+      "contract:tasks.create:input",
+      "contract:tasks.create:output"
+    ]
+  },
+  "boundaries": [
+    {
+      "from": "tasks.create-boundary",
+      "to": "tasks.create",
+      "transport": "arc-internal-v1"
+    },
+    {
+      "from": "tasks.current.remote",
+      "to": "tasks.list",
+      "transport": "arc-internal-v1"
+    },
+    {
+      "from": "tasks.current",
+      "to": "tasks.list",
+      "transport": "arc-internal-v1"
+    }
+  ],
+  "analysis": {
+    "nodes": [
+      {
+        "id": "tasks.repository",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 2,
+        "dependencyCount": 2,
+        "dependents": [
+          "tasks.list",
+          "tasks.create"
+        ],
+        "blastRadius": [
+          "tasks.list",
+          "tasks.create"
+        ],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.list",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 3,
+        "dependencyCount": 5,
+        "dependents": [],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.create",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 3,
+        "dependencyCount": 5,
+        "dependents": [],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.repository.list",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [
+          "tasks.repository",
+          "tasks.list",
+          "tasks.create"
+        ],
+        "blastRadius": [
+          "tasks.list",
+          "tasks.create"
+        ],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.repository.create",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [
+          "tasks.repository",
+          "tasks.list",
+          "tasks.create"
+        ],
+        "blastRadius": [
+          "tasks.list",
+          "tasks.create"
+        ],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.page",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 7,
+        "dependencyCount": 17,
+        "dependents": [],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.title-input",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 1,
+        "dependencyCount": 1,
+        "dependents": [
+          "tasks.page"
+        ],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.new-title",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [
+          "tasks.title-input",
+          "tasks.page",
+          "tasks.add",
+          "tasks.add-click"
+        ],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.title-edit",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [
+          "tasks.page"
+        ],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.add-click",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 1,
+        "dependencyCount": 5,
+        "dependents": [
+          "tasks.page"
+        ],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.add",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 2,
+        "dependencyCount": 4,
+        "dependents": [
+          "tasks.add-click",
+          "tasks.page"
+        ],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.create-boundary",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 2,
+        "dependencyCount": 2,
+        "dependents": [
+          "tasks.add",
+          "tasks.add-click",
+          "tasks.page"
+        ],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.current",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 3,
+        "dependencyCount": 3,
+        "dependents": [],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.current.remote",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 2,
+        "dependencyCount": 2,
+        "dependents": [
+          "tasks.current"
+        ],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.add-disabled",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 1,
+        "dependencyCount": 1,
+        "dependents": [
+          "tasks.page"
+        ],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.add.running",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [
+          "tasks.add-disabled",
+          "tasks.page"
+        ],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.loading-text",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 1,
+        "dependencyCount": 1,
+        "dependents": [
+          "tasks.page"
+        ],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.current.loading",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [
+          "tasks.loading-text",
+          "tasks.page"
+        ],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.list-text",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 1,
+        "dependencyCount": 1,
+        "dependents": [
+          "tasks.page"
+        ],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.current.data",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [
+          "tasks.list-text",
+          "tasks.page"
+        ],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.error-text",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 2,
+        "dependencyCount": 2,
+        "dependents": [
+          "tasks.page"
+        ],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.add.error",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [
+          "tasks.error-text",
+          "tasks.page"
+        ],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "tasks.current.error",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [
+          "tasks.error-text",
+          "tasks.page"
+        ],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "contract:tasks.list:input",
+        "declaredEstimateMs": 0,
+        "compilerDerivedCriticalPathMs": 0,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [
+          "tasks.list",
+          "tasks.current.remote",
+          "tasks.current"
+        ],
+        "blastRadius": [
+          "tasks.list"
+        ],
+        "budgetMs": null
+      },
+      {
+        "id": "contract:tasks.list:output",
+        "declaredEstimateMs": 0,
+        "compilerDerivedCriticalPathMs": 0,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [
+          "tasks.list",
+          "tasks.current.remote",
+          "tasks.current"
+        ],
+        "blastRadius": [
+          "tasks.list"
+        ],
+        "budgetMs": null
+      },
+      {
+        "id": "contract:tasks.create:input",
+        "declaredEstimateMs": 0,
+        "compilerDerivedCriticalPathMs": 0,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [
+          "tasks.create",
+          "tasks.create-boundary",
+          "tasks.add",
+          "tasks.add-click",
+          "tasks.page"
+        ],
+        "blastRadius": [
+          "tasks.create"
+        ],
+        "budgetMs": null
+      },
+      {
+        "id": "contract:tasks.create:output",
+        "declaredEstimateMs": 0,
+        "compilerDerivedCriticalPathMs": 0,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [
+          "tasks.create",
+          "tasks.create-boundary",
+          "tasks.add",
+          "tasks.add-click",
+          "tasks.page"
+        ],
+        "blastRadius": [
+          "tasks.create"
+        ],
+        "budgetMs": null
+      }
+    ],
+    "warnings": [
+      {
+        "code": "MISSING_ESTIMATE",
+        "node": "tasks.list",
+        "message": "No declared operation estimate"
+      },
+      {
+        "code": "MISSING_ESTIMATE",
+        "node": "tasks.create",
+        "message": "No declared operation estimate"
+      }
+    ]
+  }
+}

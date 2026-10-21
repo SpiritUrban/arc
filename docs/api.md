@@ -1,10 +1,10 @@
-# API ARC 0.2
+# API ARC 0.3
 
 [← Зміст](README.md) · [Міграція](audit/README.md)
 
 Публічні експорти — з `@arc/framework`. Для повних прикладів дивіться [написання коду](writing-code.md) та [архітектуру](architecture.md).
 
-## Contracts
+## Схеми
 
 | API                                  | Дані / опції                     |
 | ------------------------------------ | -------------------------------- |
@@ -71,7 +71,7 @@ const repository = resource({
 
 `capability` є alias resource. Needs задаються так само, як у operation. Application-open отримує dependencies; request-open додатково request/signal. Scope типовий application. Close отримує початкове значення application-ресурсу, а не instrumentation proxy.
 
-`instrument` — явний список **async methods**. TypeScript перевіряє ключі; runtime перевіряє наявність функції. ARC обгортає тільки перелічені методи у proxy, не змінюючи оригінальний об’єкт. Effect-вузол має ID `resourceId.method`; через нього проходять spans та ін’єкції. Не перелічуйте синхронний метод: boundary повертає Promise. Внутрішні `this.otherMethod()` на оригінальному об’єкті не перехоплюються автоматично. Instrumentation діє всередині ARC execution, включно з request-open; startup/поза execution не створюють request spans.
+`instrument` — явний список **async methods**. TypeScript перевіряє ключі; runtime перевіряє наявність функції. ARC обгортає тільки перелічені методи у proxy, не змінюючи оригінальний об’єкт. Effect-вузол має ID `resourceId.method`; через нього проходять spans та ін’єкції. Не перелічуйте синхронний метод: boundary повертає Promise. Внутрішні `this.otherMethod()` на оригінальному об’єкті не перехоплюються автоматично. Application-method instrumentation діє всередині ARC execution, зокрема коли метод викликається з request-open; startup/поза execution не створюють request spans. Proxy наразі встановлюється тільки для application-ресурсів. `instrument` на request-ресурсі може потрапити в IR, але його методи runtime зараз не обгортає; для такого ресурсу спостерігається та ін’єктується сам `open`.
 
 ## module / application / lifecycle
 
@@ -108,7 +108,7 @@ Application/module приймають operations/resources/routes/queues/schedul
 
 | Метод                                             | Семантика                                       |
 | ------------------------------------------------- | ----------------------------------------------- |
-| `compile({ overrides? })`                         | Pure compilation, IR v2, plans, analysis        |
+| `compile({ overrides? })`                         | Pure compilation, IR v3, plans, analysis        |
 | `start()` / `activate()`                          | Активація, idempotent concurrent Promise        |
 | `execute(id,input,{request?,signal?,overrides?})` | Новий root context, тільки після start          |
 | `graph()`                                         | IR та analysis; без activation                  |
@@ -149,4 +149,20 @@ Legacy `queue(app, op, options)` та `schedule(app, op, options)` лишают�
 
 `MetricsAccumulator(windowMs)` окремо накопичує lifetime counts/outcomes, active/peak, RPM (60 s), RPS (1 s), p50/p95/p99 за windowMs. Percentile samples зберігаються точно в часовому вікні, без ліміту кількості; великий traffic потребує майбутнього histogram/exporter. Вікно percentiles не скорочує RPM-retention.
 
-`runLoad(runner, options)` та `findBreakingPoint(runner, options)` — [load API та обмеження](testing-and-stand.md). `matches`, `runTestSpec`, `StandTestSpec` — reusable JSON specs. `stand(app, { testFile?, hooks?, networkBaseUrl? })` повертає Web handler інструментів. Налаштований testFile завантажується при першому запиті; довільний шлях із браузера не приймається.
+`runLoad(runner, options)` та `findBreakingPoint(runner, options)` — [load API та обмеження](testing-and-stand.md). `matches`, `runTestSpec`, `StandTestSpec` — reusable JSON specs. `stand(app, { testFile?, hooks?, networkBaseUrl? })` повертає Web handler інструментів. Читання налаштованого testFile починається під час створення `stand(...)`; handler очікує завершення цього читання перед обробкою запитів. Відсутній файл означає порожній список, інші помилки читання/JSON не ігноруються. Довільний шлях із браузера не приймається.
+
+## IR та compile analysis
+
+`ArchitectureIR.version` дорівнює 2. `nodes[].kind`: operation/resource/http-route/queue/worker/schedule/effect. `edges[].kind`: DEPENDS_ON/ROUTES_TO/CALLS/CONSUMES/TRIGGERS; EMITS поки лише зарезервовано. Повні поля та [generated приклад](audit/architecture-ir.json) описано в [архітектурі](architecture.md).
+
+`operation.plan` у IR — `{ scheduler: 'dependency-ready', resources: [{ id, dependencies }] }`, а не масив бар’єрів рівнів. `routes` збережено окремо для HTTP-інструментів. `effects` є авторськими метаданими, не списком дозволів. ID ingress формуються як `http:METHOD:/path`, worker — `worker:queueId`, effect — `resourceId.method`; ці ID також беруть участь у перевірці унікальності.
+
+`analysis.nodes[]` містить declaredEstimateMs, compilerDerivedCriticalPathMs, estimateModel, fanOut, dependencyCount, dependents, blastRadius та budgetMs. Поточний аналіз обходить лише DEPENDS_ON/CALLS: HTTP ingress і TRIGGERS не включаються до dependents/blastRadius автоматично. Warnings: MISSING_ESTIMATE, BUDGET_EXCEEDED, REQUEST_SCOPE_REVIEW. Порушення scopes — compile error, а не warning. [Межі оцінок](architecture.md#compile-analysis).
+
+`traceLimit` має бути цілим невід’ємним числом; 0 вимикає зберігання traces, але не метрики. `metricsWindowMs` має бути скінченним додатним числом. Поля `metrics.count` і `metrics.errors` лишилися для сумісності: count = totalCalls, errors = business_error + fault + cancelled.
+
+## Package subpaths і browser API
+
+`/core`: neutral contracts, schemas, graph/module/application metadata, compiler diagnostics, instrumentation protocol. `/server`: operations/resources/transports. `/web`: state, derive, batch/flush/tick, Scope, action, webResource, binding/view/mount, webApplication. `/fullstack`: remote, remoteClient, remoteCall, telemetryTransport. `/fullstack/server`: internalTransport. `/fullstack/build`: buildWeb/staticWeb. `/stand`: Node Stand.
+
+Повні сигнатури browser API та практичні приклади: [Web](web/getting-started.md), [remote](fullstack/remote-operations.md). Server `resource` і browser `webResource` мають різну semantics; fullstack imports не вводять двозначний resource alias.
