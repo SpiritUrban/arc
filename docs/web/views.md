@@ -25,3 +25,11 @@ Binding types: text, property, attribute, event, visible. sources — явні r
 View setup виконується один раз на mount. IR містить binding nodes та BINDS source → binding; view залежить від bindings. `needs` додає явні graph dependencies, `owned` задає nodes, які треба активувати/звільнити разом із view. Instance scope знімає listeners/subscriptions і прибирає DOM на unmount; application dispose також unmount усі instances.
 
 Приклад Tasks показує двосторонній input через окремі property та input-event bindings. Список MVP відображається text formatter; keyed list reconciliation не реалізований.
+
+## Workspace: composition і списки
+
+Кореневий [shell](../../src/page.ts) через needs оголошує UsersPage та OrdersPage. [Browser entry](../../src/browser.ts) спочатку mount shell, потім обидві feature views у створені targets; залежність view у graph сама не створює її DOM.
+
+Workspace list/table bindings використовують property=innerHTML з application escapeHTML helper для кожного динамічного рядка. Це оновлення одного region, без keyed reconciliation. Для plain text використовуйте text binding; framework не санітизує довільний innerHTML. Деталі [forms/events та списків](forms-and-events.md).
+
+[Ownership і cleanup](lifecycle.md), [DOM tests](testing.md), [frontend feature guide](writing-frontend.md).

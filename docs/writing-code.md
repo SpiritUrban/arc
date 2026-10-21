@@ -306,3 +306,5 @@ const titleLookup = resource({
 ## ARC Web / Fullstack 0.3
 
 Цей розділ описує server API. Browser та fullstack: [Web guide](web/getting-started.md), [remote contracts](fullstack/remote-operations.md), [Stand graph і interaction traces](stand/README.md). Поточний unified IR має version 3; IR v2 приклади аудиту 0.2 є історичними.
+
+Frontend код кореневого застосунку: [покроковий посібник](web/writing-frontend.md), [forms/events](web/forms-and-events.md), [Workspace structure](workspace-app.md).

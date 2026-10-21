@@ -63,3 +63,11 @@ Browser bundle містить shared contracts та UI, але не repositories
 ## Перевірка
 
 `tests/workspace.test.ts` збирає фактичний root browser bundle та виконує його в isolated VM/Linkedom із real HTTP transport. Перевіряє створення користувача й замовлення, суму, duplicate email, escaping, пошук, identity switching, trace continuity, disposal та відсутність server implementation у browser manifest. Це integration coverage, не візуальна перевірка в реальному браузері.
+
+## Як змінювати frontend
+
+Почніть із [покрокового frontend guide](web/writing-frontend.md). [Forms/events](web/forms-and-events.md) пояснює inputBindings, native submit, явний TRIGGERS і escaped list regions. [Lifecycle](web/lifecycle.md) описує mount панелей та ownership; [тести](web/testing.md) — перевірку feature без зовнішніх систем.
+
+Додаючи новий remote operation, змініть shared contract і server operation, явно дозвольте expose.web, додайте browser remoteClient/resource і graph dependency. Для нового поля форми задайте унікальний state ID, property/input bindings, включіть їх у view.bindings та викличте bind у setup. Для нового async mutation використовуйте action і invalidates замість ручного isLoading та повторного fetch у event callback.
+
+Стилі належать application src/styles.ts, а не framework. Shell навігація — anchor links до секцій, не SPA router. Немає повноцінного forms layer, keyed lists чи автоматичного CSS pipeline.

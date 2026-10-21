@@ -39,4 +39,4 @@ Compiled ESM і declarations доступні через `@arc/framework/{core,s
 
 `src/` тепер містить frontend і backend одного проєкту: користувачі, вибір активного користувача, створення та історія замовлень. Запуск — `npm run dev`, сторінка http://localhost:3000, Stand http://localhost:3100. `npm run build` компілює ESM та browser assets; `npm run build:app` збирає тільки frontend.
 
-[Посібник проєкту](docs/workspace-app.md). `examples/` залишаються малими навчальними прикладами.
+[Посібник проєкту](docs/workspace-app.md) · [Frontend документація](docs/web/README.md) · [Як писати UI](docs/web/writing-frontend.md). `examples/` залишаються малими навчальними прикладами.

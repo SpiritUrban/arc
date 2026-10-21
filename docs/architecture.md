@@ -107,3 +107,5 @@ Estimate-модель: власна declared cost + max шлях залежно�
 Нейтральний compiler додає runtime targets і partitions до спільного graph. Нові kinds: contract, state, derived, web-resource, action, view, binding, remote-endpoint; relations DERIVES, BINDS, REMOTE_CALLS, INVALIDATES. Shared contracts мають estimateMs=0; server analysis не вдає аналіз JS bodies чи точне прогнозування browser render cost.
 
 Browser dataflow має microtask batching, dependency-first derived propagation і binding updates без повторного setup. [Scheduler](web/state-and-derived.md), [lifecycle view](web/views.md), [boundaries](fullstack/runtime-boundaries.md), [migration IR v3](migration-0.3.md). Server lifecycle вище застосовується до server partition; browser використовує start/mount/unmount/dispose.
+
+Frontend implementation guide: [state → resource/action → bindings/view](web/writing-frontend.md), [browser lifecycle](web/lifecycle.md), [tests](web/testing.md). Кореневий Workspace у src/ реалізує цю модель для users/orders; це основний проєкт, а Counter/Tasks у examples/ — навчальні vertical slices.

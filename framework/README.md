@@ -53,3 +53,5 @@ Production CLI: `ARC_APP=dist/src/app.js node framework/arc.mjs start`. Післ
 `@arc/framework/core` — neutral graph/contracts; `/server` — server; `/web` — fine-grained browser runtime; `/fullstack` — browser remote bridge; `/fullstack/server` і `/fullstack/build` — Node integration; `/stand` — tooling. Один physical package, підготовлений до майбутнього розділення. Browser build/dev потребує optional peer esbuild; server-only JS — ні.
 
 [Web](../docs/web/getting-started.md), [Fullstack](../docs/fullstack/overview.md), [IR v3 migration](../docs/migration-0.3.md). SSR/SSG/router/forms не реалізовані.
+
+Frontend посібники: [зміст ARC Web](../docs/web/README.md), [як писати feature](../docs/web/writing-frontend.md), [forms/events](../docs/web/forms-and-events.md), [lifecycle](../docs/web/lifecycle.md), [тести](../docs/web/testing.md). Кореневий application: [ARC Workspace](../docs/workspace-app.md).

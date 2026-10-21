@@ -7,3 +7,5 @@ Graph показує browser state → action → remote boundary → server ope
 SSE — live push, polling — fallback. Trace buffers bounded; server accumulator незалежний від trace eviction. Browser telemetry best-effort, обмежене debugging storage; не production monitoring.
 
 [Server Stand/testing](../testing-and-stand.md), [межі trace measurements](../fullstack/tracing.md), [звіт і graph](../audit/web-fullstack-report.md).
+
+Для основного Workspace запускайте npm run dev. Його graph містить users/orders frontend та backend; вибір користувача, users.add і orders.add створюють activity через відповідні remote boundaries. [Workspace frontend tests](../web/testing.md) зіставляють browser action із server operation за trace ID.

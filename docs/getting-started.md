@@ -40,7 +40,7 @@ CLI сам викликає compile і start для start/stand/run; graph/inspe
 | `npm test`                         | Unit/integration                                |
 | `npm run test:lifecycle`           | Lifecycle/concurrency окремо                    |
 | `npm run typecheck`                | TypeScript і negative type tests                |
-| `npm run build`                    | framework/dist JS/.d.ts + root dist             |
+| `npm run build`                    | framework/dist + root dist + browser .arc/web   |
 | `npm run test:distribution`        | Packed package smoke test без tsx               |
 | `npm run benchmark:scheduler`      | Штучний DAG benchmark                           |
 
@@ -50,7 +50,7 @@ Native JS production entrypoint:
 ARC_APP=dist/src/app.js node framework/arc.mjs start
 ```
 
-Ця команда використовує compiled ESM без tsx. Development скрипти використовують condition `arc-source`, щоб приклад і тести імпортували саме source workspace. За замовчуванням package import веде на `framework/dist/index.js`, types — на `.d.ts`. Після зміни коду перед перевіркою compiled CLI повторіть build.
+Ця команда використовує compiled server ESM без tsx. Для Workspace CLI також збирає browser assets з налаштованого web.entry: потрібні esbuild та доступний src/browser.ts із його imports. Це поточний CLI flow, а не standalone deployment готових static assets без source. Development скрипти використовують condition `arc-source`, щоб приклад і тести імпортували саме source workspace. За замовчуванням package import веде на `framework/dist/index.js`, types — на `.d.ts`. Після зміни коду перед перевіркою compiled CLI повторіть build.
 
 `ARC_APP` типовий src/app.ts (від cwd), PORT — 3000, STAND_PORT — 3100. Для TypeScript entrypoint Node 22.18+ підтримує erasable syntax; для іншого TS-синтаксису застосунку використовуйте dev script або compiled JS. CLI пакета не залежить від tsx.
 
@@ -97,3 +97,5 @@ import { application, operation, s, ok } from "@arc/framework";
 `npm run build:app` збирає кореневий frontend; `npm run build:web` / `npm run build:fullstack` створюють browser assets навчальних прикладів у .arc/web. CLI `arc dev` compile/build/start/serve і відкриває Stand; це basic build на старті, без watch/HMR. [Web guide](web/getting-started.md), [Fullstack guide](fullstack/overview.md).
 
 Деталі кореневого UI та його graph: [ARC Workspace](workspace-app.md). Root `npm run build` включає browser build.
+
+Frontend розробка: [зміст](web/README.md), [feature guide](web/writing-frontend.md), [forms](web/forms-and-events.md), [lifecycle](web/lifecycle.md), [тести](web/testing.md).

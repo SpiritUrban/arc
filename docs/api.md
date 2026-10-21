@@ -166,3 +166,18 @@ Legacy `queue(app, op, options)` та `schedule(app, op, options)` лишают�
 `/core`: neutral contracts, schemas, graph/module/application metadata, compiler diagnostics, instrumentation protocol. `/server`: operations/resources/transports. `/web`: state, derive, batch/flush/tick, Scope, action, webResource, binding/view/mount, webApplication. `/fullstack`: remote, remoteClient, remoteCall, telemetryTransport. `/fullstack/server`: internalTransport. `/fullstack/build`: buildWeb/staticWeb. `/stand`: Node Stand.
 
 Повні сигнатури browser API та практичні приклади: [Web](web/getting-started.md), [remote](fullstack/remote-operations.md). Server `resource` і browser `webResource` мають різну semantics; fullstack imports не вводять двозначний resource alias.
+
+## Browser lifecycle і binding API
+
+| API                                                      | Поточна semantics                                                      |
+| -------------------------------------------------------- | ---------------------------------------------------------------------- |
+| state({id,initial,scope?})                               | get/set/update/subscribe/dispose; explicit identity                    |
+| derive({id,from,compute})                                | cached readable, explicit reactive dependencies                        |
+| batch(fn), flush(), tick()                               | synchronous writes group, immediate flush, await scheduled propagation |
+| binding({id,type,sources,name?,format?,handler?,input?}) | text/property/attribute/event/visible; input для action — fixed value  |
+| view({id,bindings,needs?,owned?,setup})                  | setup({document,scope,bind}) повертає root Node                        |
+| mount(view,target,{telemetry?})                          | standalone mount, instance.unmount()/dispose()                         |
+| webApplication({nodes,telemetry?})                       | compile/start/mount/dispose; needs не робить auto DOM mount            |
+| Scope.add(cleanup), Scope.own(node)                      | explicit cleanup ownership; reverse disposal                           |
+
+[Frontend API у прикладах](web/README.md), [actions/resources](web/actions-and-resources.md), [remote union](fullstack/remote-operations.md), [lifecycle](web/lifecycle.md). Не покладайтеся на auto dependency tracking JS bodies чи automatic per-instance node cloning.

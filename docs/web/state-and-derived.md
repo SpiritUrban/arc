@@ -9,3 +9,5 @@
 Синхронний початок action.run автоматично batched. Після await використовуйте окремий `batch(() => {...})` для кількох пов’язаних записів. ARC не тримає глобальну transaction відкритою під час network request.
 
 `Scope` прибирає owned cleanup у зворотному порядку. Application nodes живуть до webApplication.dispose. View-owned nodes живуть до unmount; для незалежного state кількох view instances створюйте nodes/view у factory. Один definition object не клонується автоматично на кожний mount.
+
+Практика: [як писати frontend](writing-frontend.md), [input bindings](forms-and-events.md), [ownership](lifecycle.md). У Workspace search — local state, filtered users — derive, usersData — remote resource; їхні semantics не взаємозамінні.
