@@ -1,0 +1,233 @@
+{
+  "version": 2,
+  "nodes": [
+    {
+      "id": "session",
+      "kind": "resource",
+      "scope": "request",
+      "effects": [],
+      "estimateMs": 1
+    },
+    {
+      "id": "read",
+      "kind": "operation",
+      "effects": [],
+      "estimateMs": 2,
+      "input": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "string"
+      },
+      "errors": {},
+      "budgetMs": null,
+      "plan": {
+        "scheduler": "dependency-ready",
+        "resources": [
+          {
+            "id": "session",
+            "dependencies": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "parent",
+      "kind": "operation",
+      "effects": [],
+      "estimateMs": 1,
+      "input": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "string"
+      },
+      "errors": {},
+      "budgetMs": 20,
+      "plan": {
+        "scheduler": "dependency-ready",
+        "resources": [
+          {
+            "id": "session",
+            "dependencies": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "http:GET:/demo",
+      "kind": "http-route",
+      "method": "GET",
+      "path": "/demo"
+    },
+    {
+      "id": "jobs",
+      "kind": "queue",
+      "capacity": 1000
+    },
+    {
+      "id": "worker:jobs",
+      "kind": "worker",
+      "concurrency": 2
+    },
+    {
+      "id": "refresh",
+      "kind": "schedule",
+      "everyMs": 60000
+    }
+  ],
+  "edges": [
+    {
+      "from": "read",
+      "to": "session",
+      "name": "session",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "parent",
+      "to": "session",
+      "name": "session",
+      "kind": "DEPENDS_ON"
+    },
+    {
+      "from": "parent",
+      "to": "read",
+      "name": "read",
+      "kind": "CALLS"
+    },
+    {
+      "from": "http:GET:/demo",
+      "to": "parent",
+      "kind": "ROUTES_TO"
+    },
+    {
+      "from": "worker:jobs",
+      "to": "jobs",
+      "kind": "CONSUMES"
+    },
+    {
+      "from": "worker:jobs",
+      "to": "read",
+      "kind": "CALLS"
+    },
+    {
+      "from": "refresh",
+      "to": "read",
+      "kind": "TRIGGERS"
+    }
+  ],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/demo",
+      "operation": "parent",
+      "status": 200
+    }
+  ],
+  "analysis": {
+    "nodes": [
+      {
+        "id": "session",
+        "declaredEstimateMs": 1,
+        "compilerDerivedCriticalPathMs": 1,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [
+          "read",
+          "parent",
+          "worker:jobs"
+        ],
+        "blastRadius": [
+          "read",
+          "parent"
+        ],
+        "budgetMs": null
+      },
+      {
+        "id": "read",
+        "declaredEstimateMs": 2,
+        "compilerDerivedCriticalPathMs": 3,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 1,
+        "dependencyCount": 1,
+        "dependents": [
+          "parent",
+          "worker:jobs"
+        ],
+        "blastRadius": [
+          "parent"
+        ],
+        "budgetMs": null
+      },
+      {
+        "id": "parent",
+        "declaredEstimateMs": 1,
+        "compilerDerivedCriticalPathMs": 4,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 2,
+        "dependencyCount": 2,
+        "dependents": [],
+        "blastRadius": [],
+        "budgetMs": 20
+      },
+      {
+        "id": "http:GET:/demo",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "jobs",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "worker:jobs",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 1,
+        "dependencyCount": 2,
+        "dependents": [],
+        "blastRadius": [],
+        "budgetMs": null
+      },
+      {
+        "id": "refresh",
+        "declaredEstimateMs": null,
+        "compilerDerivedCriticalPathMs": null,
+        "estimateModel": "declared-node-cost + max(dependency/call path); calls may actually be sequential",
+        "fanOut": 0,
+        "dependencyCount": 0,
+        "dependents": [],
+        "blastRadius": [],
+        "budgetMs": null
+      }
+    ],
+    "warnings": [
+      {
+        "code": "REQUEST_SCOPE_REVIEW",
+        "node": "session",
+        "message": "Check whether this independent resource needs request scope"
+      }
+    ]
+  }
+}

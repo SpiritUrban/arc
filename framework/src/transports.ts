@@ -1,5 +1,10 @@
-import { Application, Fault, type Operation, type Result } from "./core.ts";
-import type { Infer } from "./schema.ts";
+import { Application, Fault, type Operation, type Result } from "./core.js";
+import type { QueueDefinition, ScheduleDefinition } from "./core.js";
+import {
+  createQueueRuntime,
+  createScheduleRuntime,
+} from "./runtime-adapters.js";
+import type { Infer } from "./schema.js";
 
 /** Explicit JSON-RPC exposure; operation identifiers are never exposed implicitly. */
 export function rpc(app: Application, methods: Record<string, Operation>) {
@@ -68,110 +73,58 @@ export function rpc(app: Application, methods: Record<string, Operation>) {
   };
 }
 
-/** An in-memory bounded queue adapter. Durability belongs to an external adapter. */
+/** Declarative transports are graph nodes. The legacy helper requires a registered declaration. */
+export function queue(def: QueueOptions): QueueDefinition;
 export function queue(
   app: Application,
   op: Operation,
-  options: { concurrency?: number; capacity?: number } = {},
+  options?: { id?: string; concurrency?: number; capacity?: number },
+): ReturnType<typeof createQueueRuntime>;
+export function queue(
+  first: Application | QueueOptions,
+  op?: Operation,
+  options: { id?: string; concurrency?: number; capacity?: number } = {},
 ) {
-  const concurrency = options.concurrency ?? 4,
-    capacity = options.capacity ?? 1000;
-  if (
-    !Number.isInteger(concurrency) ||
-    concurrency < 1 ||
-    !Number.isInteger(capacity) ||
-    capacity < 1
-  )
-    throw new Error("Invalid queue options");
-  const pending: {
-    input: unknown;
-    resolve: (value: Result) => void;
-    reject: (error: unknown) => void;
-  }[] = [];
-  let running = 0,
-    completed = 0,
-    failed = 0,
-    closed = false;
-  const drains: (() => void)[] = [];
-  const pump = () => {
-    while (running < concurrency && pending.length) {
-      const job = pending.shift()!;
-      running++;
-      void app
-        .execute(op.id, job.input)
-        .then(
-          (value) => {
-            completed++;
-            if (!value.ok) failed++;
-            job.resolve(value);
-          },
-          (reason) => {
-            failed++;
-            job.reject(reason);
-          },
-        )
-        .finally(() => {
-          running--;
-          pump();
-        });
-    }
-    if (!running && !pending.length)
-      drains.splice(0).forEach((resolve) => resolve());
-  };
-  return {
-    enqueue(input: unknown): Promise<Result> {
-      if (closed) return Promise.reject(new Error("Queue is closed"));
-      if (pending.length >= capacity)
-        return Promise.reject(new Error("Queue capacity exceeded"));
-      return new Promise((resolve, reject) => {
-        pending.push({ input, resolve, reject });
-        pump();
-      });
-    },
-    metrics: () => ({ pending: pending.length, running, completed, failed }),
-    async close() {
-      closed = true;
-      if (running || pending.length)
-        await new Promise<void>((resolve) => drains.push(resolve));
-    },
-  };
+  if (!(first instanceof Application))
+    return Object.freeze({ kind: "queue" as const, ...first });
+  const id = options.id ?? `queue:${op!.id}`;
+  const runtime = first.queues.get(id);
+  return (
+    runtime ??
+    first.attachQueue({ kind: "queue", id, operation: op!, ...options })
+  );
 }
-
-/** Non-overlapping interval scheduler. Close it before closing the application. */
+type QueueOptions = Omit<QueueDefinition, "kind">;
+export function schedule(
+  def: Omit<ScheduleDefinition, "kind">,
+): ScheduleDefinition;
 export function schedule(
   app: Application,
   op: Operation,
   options: {
+    id?: string;
     everyMs: number;
     input: () => unknown;
     onError?: (error: unknown) => void;
   },
-) {
-  if (!Number.isFinite(options.everyMs) || options.everyMs < 1)
-    throw new Error("Invalid schedule interval");
-  let active: Promise<unknown> | undefined;
-  const timer = setInterval(() => {
-    if (active) return;
-    active = Promise.resolve()
-      .then(() => app.execute(op.id, options.input()))
-      .then(
-        (result) => {
-          if (!result.ok) options.onError?.(result);
-        },
-        (reason) => {
-          options.onError?.(reason);
-        },
-      )
-      .finally(() => {
-        active = undefined;
-      });
-  }, options.everyMs);
-  return {
-    async close() {
-      clearInterval(timer);
-      await active;
-    },
-  };
+): ReturnType<typeof createScheduleRuntime>;
+export function schedule(
+  first: Application | Omit<ScheduleDefinition, "kind">,
+  op?: Operation,
+  options?: {
+    id?: string;
+    everyMs: number;
+    input: () => unknown;
+    onError?: (error: unknown) => void;
+  },
+): ScheduleDefinition | ReturnType<typeof createScheduleRuntime> {
+  if (!(first instanceof Application))
+    return Object.freeze({ kind: "schedule" as const, ...first });
+  const id = options!.id ?? `schedule:${op!.id}`;
+  return (
+    first.scheduleRuntimes.get(id) ??
+    first.attachSchedule({ kind: "schedule", id, operation: op!, ...options! })
+  );
 }
 
 /** A typed direct client: the same contract can be invoked without HTTP. */

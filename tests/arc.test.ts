@@ -108,6 +108,8 @@ test("minimal graph, shared dependency once per request, lifecycle in reverse or
     needs: { left, right },
     run: (ctx) => {
       assert.deepEqual(Object.keys(ctx).sort(), [
+        "call",
+        "fail",
         "input",
         "left",
         "right",
@@ -118,6 +120,7 @@ test("minimal graph, shared dependency once per request, lifecycle in reverse or
   });
   const app = application({ operations: [op, ping()] });
   await app.compile();
+  await app.start();
   await app.execute("ping", {});
   assert.equal(opened, 0);
   assert.deepEqual(await app.execute("sum", {}), ok(16));
@@ -155,6 +158,7 @@ test("parallel layer settles before cleanup on failure", async () => {
   });
   const app = application({ operations: [op] });
   await app.compile();
+  await app.start();
   await assert.rejects(app.execute("fail", {}), /bad/);
   assert.equal(closed, true);
   await app.close();
@@ -175,6 +179,7 @@ test("expected errors, undeclared errors and output validation", async () => {
   });
   const app = application({ operations: [expected, bad] });
   await app.compile();
+  await app.start();
   assert.deepEqual(await app.execute("expected", {}), error("MISSING"));
   await assert.rejects(app.execute("bad", {}), (e: any) => e.status === 500);
   assert.equal(app.traces.length, 2);
@@ -206,6 +211,7 @@ test("HTTP adapter validates input, maps errors and exports OpenAPI", async () =
   });
   const app = application({ routes: [http.get("/users/:id", op)] });
   await app.compile();
+  await app.start();
   const fetch = handler(app);
   assert.equal(
     (await fetch(new Request("http://local/users/bad"))).status,
@@ -228,6 +234,7 @@ test("HTTP adapter validates input, maps errors and exports OpenAPI", async () =
 test("Stand graph, run, saved tests, load and failure injection", async () => {
   const app = application({ operations: [ping()] });
   await app.compile();
+  await app.start();
   const fetch = stand(app);
   const post = (path: string, body: unknown) =>
     fetch(
@@ -274,6 +281,7 @@ test("Node server serves real HTTP and shuts down", async () => {
   const op = ping();
   const app = application({ routes: [http.get("/ping", op)] });
   await app.compile();
+  await app.start();
   const server = await serve(handler(app), { port: 0 });
   try {
     const address = server.address() as { port: number };
@@ -302,8 +310,12 @@ test("RPC explicit exposure and queue bounded concurrency", async () => {
       return ok(input.value * 2);
     },
   });
-  const app = application({ operations: [op] });
+  const app = application({
+    operations: [op],
+    queues: [queue({ id: "queue:work", operation: op, concurrency: 2 })],
+  });
   await app.compile();
+  await app.start();
   const request = rpc(app, { "work.double": op });
   const response = await request(
     new Request("http://local/rpc", {

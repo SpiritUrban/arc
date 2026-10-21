@@ -1,187 +1,158 @@
-# Тести та ARC Stand
+# Тести та ARC Stand 0.2
 
 [← Зміст](README.md)
 
-## Тест операції без HTTP
+## Перевірки
 
-Test harness сам створює Application, компілює його, викликає операцію та закриває ресурси. `provide` підміняє значення ресурсу, а не його визначення.
-
-Приклад використовує готовий навчальний модуль:
-
-```ts
-import { test as nodeTest } from "node:test";
-import assert from "node:assert/strict";
-import { test as testOperation, error } from "@arc/framework";
-import { getTask, tasksRepository } from "./tasks.ts";
-
-nodeTest("missing task", async () => {
-  const id = "00000000-0000-4000-8000-000000000001";
-  const result = await testOperation(getTask)
-    .provide(tasksRepository, {
-      create: (title) => ({ id, title, done: false }),
-      find: () => undefined,
-    })
-    .run({ id });
-
-  assert.deepEqual(result, error("TASK_NOT_FOUND"));
-});
+```sh
+npm test                    # unit/integration
+npm run test:lifecycle      # окремо lifecycle/concurrency
+npm run typecheck           # включно з negative type tests
+npm run build               # framework/dist ESM + declarations, root dist
+npm run test:distribution   # pack → clean offline install → plain node / CLI
+npm run benchmark:scheduler
+node --conditions=arc-source --import tsx --test docs/examples/tasks.test.ts
 ```
 
-Імпортуйте той самий об’єкт ресурсу, який указаний у `needs`. Створення нового ресурсу з тим самим ID не є підміною.
+`tests/contracts.types.ts` містить @ts-expect-error перевірки неправильних business codes, details і ctx.call input. `lifecycle.test.ts` перевіряє pure compile, concurrent start/close, rollback, shared nested scope, dependency-ready scheduling, abort і adapter drain. `stand-tools.test.ts` — corpus, metrics, explicit effects, specs, load та SSE.
 
-Підмінений ресурс не відкривається і не закривається ARC. Гілка його реальних залежностей також не ініціалізується, якщо вона більше ніде не потрібна. Це дозволяє замінити repository і не піднімати його DB. Значення fake має відповідати типу всього ресурсу, включно з методами, які конкретний тест не викликає.
-
-Вхідний контракт продовжує перевірятися. Для UUID-схеми передавайте валідний UUID, навіть коли fake не використовує ID.
-
-## HTTP-тест без мережі
+## Тест операції та HTTP
 
 ```ts
-import assert from "node:assert/strict";
-import { handler } from "@arc/framework";
-import { createTasksApp } from "./tasks.ts";
+const result = await testOperation(getTask)
+  .provide(tasksRepository, fakeRepository)
+  .run({ id: "00000000-0000-4000-8000-000000000001" });
+```
 
-const app = createTasksApp();
+Harness виконує compile → start → execute → close. Підмінюйте той самий resource object із needs; fake має відповідати всьому типу ресурсу. Input/output/errors перевіряються. Для Request/signal можна передати другий аргумент run. Для stateful integration створюйте новий Application фабрикою.
+
+```ts
 await app.compile();
+await app.start();
 try {
-  const fetch = handler(app);
-  const response = await fetch(
+  const response = await handler(app)(
     new Request("http://localhost/tasks", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title: "Test the HTTP adapter" }),
+      body: JSON.stringify({ title: "Check ARC" }),
     }),
   );
-
-  assert.equal(response.status, 201);
-  const task = await response.json();
-  assert.equal(task.title, "Test the HTTP adapter");
 } finally {
   await app.close();
 }
 ```
 
-Цей тест перевіряє маршрутизацію, збирання input, contracts, виконання і JSON-відповідь. Він не перевіряє Node-сокет, Host-фільтр або ліміт body з `serve`; для цього потрібен тест із реальним сервером.
+Це HTTP-handler тест без socket. Node bridge/Host/body limits перевіряються окремими network integration tests.
 
-Для ізоляції створюйте Application фабрикою, як `createTasksApp`, замість повторного використання вже закритого default-export.
+## Stand та input corpus
 
-Запуск навчальних тестів:
+`npm run dev` запускає application :3000 і Stand :3100. У графі є ingress, operation, resource, effect, queue, worker і schedule. Клік відкриває contract/plan/analysis. Вузли активності підсвічуються SSE-подіями; polling metrics/traces лишається fallback.
 
-```sh
-node --import tsx --test docs/examples/tasks.test.ts
+Generate valid/invalid та список cases використовують schema-aware corpus: валідний sample, min/max і сусідні boundary values, empty/unicode, malformed UUID/email, missing/optional fields і wrong types. Обирайте конкретний case зі списку. Генерація детермінована; random/property-based fuzzing ще попереду. Корпус може включати повторні бізнес-дані: schema-valid email не гарантує відсутність такого email у DB.
+
+## Три режими виконання
+
+| mode        | Що вимірює                                                 |
+| ----------- | ---------------------------------------------------------- |
+| `operation` | In-process app.execute; без HTTP mapping/network           |
+| `http`      | Локальний HTTP handler із Request/Response; без socket     |
+| `network`   | Реальний fetch до налаштованого server-side networkBaseUrl |
+
+CLI налаштовує networkBaseUrl на application loopback порт. Браузер не може передати довільний target URL. Network-вимір також може ділити процес/host із генератором — це не зовнішній deployment benchmark.
+
+Authorization у Stand передається Request-capabilities в усіх режимах. Operation mode повертає Result, HTTP/network — `{status, body}`. Виклики змінюють реальний стан поточного development application.
+
+## Load API
+
+`POST /api/load` приймає operation/input/authorization/mode та:
+
+| Поле          | Значення                                               |
+| ------------- | ------------------------------------------------------ |
+| `inputMode`   | fixed або generated: циклічний обхід валідного corpus  |
+| `count`       | Максимальна кількість запитів; API cap 10000           |
+| `durationMs`  | Максимальне вікно видачі запитів; API cap 30000 ms     |
+| `concurrency` | Worker cap, 1–100                                      |
+| `targetRps`   | Цільова частота видачі; без значення — без pacing      |
+| `rampUpMs`    | Лінійне зростання scheduled rate від нуля до targetRps |
+| `timeoutMs`   | AbortSignal timeout одного виклику                     |
+
+Завершення настає за першим із count/duration, після чого генератор чекає in-flight роботу. Duration не обриває вже початі виклики. Timeout вимагає cooperative cancellation від коду; JS не переривається примусово. Target RPS — offered-load план, не гарантований observed throughput; concurrency може обмежити видачу.
+
+Результат: completed, outcomes, durationMs, observed RPS, p50/p95/p99, peakConcurrent, targetRps, saturation flag. Saturation — проста евристика: observed RPS < 80% target при досягненні concurrency cap. Це не вимір насичення DB/CPU.
+
+`POST /api/breaking` додає initialRps (типово 10), maxRps (1000), steps (1–12, типово 6), constraints:
+
+```json
+{
+  "maxErrorRate": 0.01,
+  "maxFaultRate": 0.01,
+  "p95Ms": 1000,
+  "maxCancelledRate": 0,
+  "failOnSaturation": true
+}
 ```
 
-Основний набір перевірок фреймворку запускається `npm test`. Навчальні приклади лежать поза шаблоном `tests/*.test.ts`, тому виконуються окремою командою.
+Алгоритм підвищує/знижує RPS, а після появи passing/failing межі робить bisection. Повертає rounds із причинами та lastPassingRps/firstFailingRps. Без достатніх samples чи failing round не можна стверджувати, що межу знайдено. Поля constraints доступні через API; UI дає основні error-rate/p95 налаштування. Висновок стосується конкретного режиму, input і запуску.
 
-## Що перевіряти в прикладному коді
+## Метрики та traces
 
-| Тип тесту         | Приклад                                                           |
-| ----------------- | ----------------------------------------------------------------- |
-| Бізнес-успіх      | Створений об’єкт має потрібні поля                                |
-| Очікувана відмова | Відсутній запис повертає оголошений error                         |
-| Контракт          | Некоректний input не доходить до repository                       |
-| Авторизація       | Без Request/credentials capability відмовляє                      |
-| Ресурс            | Успіх і exception не залишають відкриту транзакцію або connection |
-| HTTP              | Параметри шляху, статус, формат response                          |
+Lifetime: totalCalls, ok, business_error, fault, cancelled; поточні active та peakConcurrent. Rolling: RPM за 60 s, RPS за 1 s, p50/p95/p99 за metricsWindowMs (типово 60 s). Вони не залежать від traceLimit. Nested operation calls рахуються окремо; root duration охоплює cleanup. Input-validation failures належать до fault, очікувані errors — business_error.
 
-Перевіряйте поведінку, важливу для вашої функціональності. Тести компілятора, scheduler та загальних механізмів уже є у `tests/arc.test.ts`.
-
-## Запуск Stand
-
-```sh
-npm run dev
-# або навчальний application:
-ARC_APP=docs/examples/tasks.ts npx arc stand
-```
-
-Відкрийте `http://localhost:3100`. Stand працює з тим самим Application у тому самому процесі. Виклики змінюють його справжній стан: створення завдання через Stand додає запис у repository цього запуску.
-
-Інтерфейс періодично отримує runtime-дані, типово раз на дві секунди. Це polling, а не потік server-sent events чи WebSocket.
-
-## Граф і контракти
-
-Натисніть operation-вузол або оберіть операцію у списку. Панель показує схеми input/output, errors, effects, scope/план та sample. Ресурс-вузол можна вибрати для огляду визначення та failure injection; для запуску знову оберіть operation.
-
-Граф відображає зібраний IR, а не виводить архітектуру з traces. RPM та p95 на вузлах операцій походять із runtime-викликів.
-
-## Виконання запиту
-
-1. Виберіть операцію.
-2. Натисніть **Generate valid**, щоб заповнити JSON із `input.sample()`.
-3. За потреби змініть поля та Authorization.
-4. Виберіть **Operation** або **HTTP**.
-5. Натисніть **Run operation**.
-
-**Operation** викликає `app.execute` напряму. Stand створює Request з Authorization для request-capabilities, тому цей режим відрізняється від CLI `arc run`, який Request не створює. Результат — Result із `ok`.
-
-**HTTP** будує Request і передає його локальному HTTP handler. Він перевіряє routing, input mapping, status та JSON-response, але не виконує мережевий round trip до порту 3000. Повертається `{ status, body }`. Якщо операція має кілька маршрутів, використовується перший знайдений.
-
-**Generate invalid** зараз створює `{ "__invalid": true }`. Це базовий приклад невалідного об’єкта, а не повний набір граничних чи fuzz-тестів. Валідація UUID, min/max та інших обмежень перевіряється відповідно до схеми.
-
-## Save as test
-
-Після виклику в режимі Operation натисніть **Save as test**, потім **Run tests**. Зберігаються operation ID, input і очікуваний Result. Повторний запуск порівнює `JSON.stringify(actual)` з `JSON.stringify(expected)`.
-
-Поточні обмеження:
-
-- Тести живуть лише в пам’яті екземпляра Stand; перезапуск сервера видаляє їх. TypeScript-файли не генеруються.
-- Authorization і Request не зберігаються. Для захищених операцій використовуйте кодові тести із fake-capability.
-- Створення з випадковим UUID, поточним часом або іншим недетермінованим output може не пройти точне порівняння при повторі.
-- Тест не скидає стан application-ресурсів, тому попередній запуск може вплинути на наступний.
-
-Для стабільного автотестування використовуйте Node test runner та `test(operation)`; Stand корисний для швидкої ручної перевірки.
-
-## Метрики й traces
-
-Таблиця runtime показує:
-
-| Поле      | Значення                                                                |
-| --------- | ----------------------------------------------------------------------- |
-| RPM       | Кількість завершених викликів за останні 60 секунд у збереженому буфері |
-| p50 / p95 | Перцентилі тривалості завершених викликів із буфера, мілісекунди        |
-| Errors    | Кількість traces зі статусом, відмінним від `ok`                        |
-
-Очікувані бізнес-відмови теж входять до Errors. Перцентилі рахуються за всім поточним буфером, а не лише за останньою хвилиною. Буфер спільний для всіх операцій, типовий розмір — 500 traces; через це RPM під високим навантаженням є обмеженим спостереженням, а не повним лічильником ingress.
-
-Виберіть trace зі списку, щоб побачити operation, status, total duration та spans. Spans охоплюють відкриття request-ресурсів і `run`, але не кожен метод repository чи SQL. HTTP parsing, передавання мережею та серіалізація поза executor не є окремими spans.
-
-## Load generator
-
-Виберіть операцію, input і режим, задайте Requests та Concurrency, натисніть **Start load**.
-
-- Requests: від 1 до 1000 на запуск.
-- Concurrency: від 1 до 25.
-- Результат: completed, errors, durationMs, RPS, p50, p95.
-
-Input фіксований для всіх викликів цього запуску. Автоматичного random dataset, налаштування цільового RPS, тривалості чи пошуку breaking point немає. Повторний create із тим самим email, наприклад, природно дасть бізнес-відмови через унікальність.
-
-Генератор працює у спільному процесі й event loop. Режим HTTP проходить локальний handler, але не Node HTTP-сервер. Ці виміри допомагають дослідити поведінку операції, однак не замінюють зовнішній benchmark deployment.
+Bounded trace buffer використовується тільки для debugging. Один root trace містить nested operation, resource-open та instrumented-effect spans із parentId. Деталі methods/SQL без явної instrumentation автоматично не перехоплюються. Ingress-specific network timings не є окремими compiler-derived estimates.
 
 ## Failure injection
 
-У панелі Failure injection:
+Для application-ресурсу оголосіть `instrument: ['asyncMethod']` і оберіть effect-вузол `resourceId.asyncMethod` у Stand. Сам application-resource вузол не створює ілюзії перехоплення довільних методів.
 
-1. Оберіть operation або request-resource.
-2. Задайте Latency ms: 0–5000.
-3. Задайте Error rate: 0–1, наприклад 0.2 для 20% імовірності.
-4. Натисніть **Apply** і запустіть операцію.
-5. Натисніть **Clear**, щоб прибрати ін’єкцію для цього вузла.
+Ін’єкції: latencyMs, errorRate, timeoutMs, unavailable. Timeout симулює очікування і Fault 504 **до фактичного виклику методу**, unavailable/errorRate — Fault 503. Це не реальне закриття DB connection; disconnect моделюється unavailable boundary. Оригінальний об’єкт не monkey-patched; внутрішні this.method виклики не перехоплюються. Для request-resource ін’єкція застосовується до open, для operation — до її execution span.
 
-Затримка виконується перед `run` операції або `open` request-ресурсу. Імовірнісна помилка кидає `Fault('INJECTED_FAILURE', 503)`. Ін’єкція впливає на наступні виклики цього Application, включно зі звичайними HTTP-запитами.
+Ін’єкція спільна для поточного Application і впливає також на його звичайні HTTP-виклики. Clear знімає налаштування. Signal скасовує injected delays.
 
-Уже відкриті application-ресурси та їхні методи не перехоплюються. Вибір такого вузла у формі не симулює відмову DB-пулу чи його запитів. Для цього потрібен request-resource навколо відповідної роботи або власний fake/adapter.
+## Reusable Stand tests
 
-## API Stand
+Scratch tests лишаються в пам’яті. Export JSON, import та Save to disk працюють зі стабільним versioned spec:
 
-Програмний інструмент може звертатися до локального API:
+```json
+{
+  "version": 1,
+  "name": "create record",
+  "operation": "records.create",
+  "input": { "name": "demo" },
+  "expected": {
+    "ok": true,
+    "value": {
+      "id": { "$match": "uuid" },
+      "createdAt": { "$match": "iso-date" }
+    }
+  },
+  "setup": "seed",
+  "reset": "reset"
+}
+```
 
-| Метод і шлях          | Дані                                                           |
-| --------------------- | -------------------------------------------------------------- |
-| `GET /api/graph`      | Architecture IR                                                |
-| `GET /api/live`       | metrics, traces, faults, tests                                 |
-| `POST /api/run`       | `{ operation, input, mode?, authorization? }`                  |
-| `POST /api/test/save` | `{ operation, input, expected, name? }`                        |
-| `POST /api/test/run`  | `{}`                                                           |
-| `POST /api/load`      | Дані run та `{ count, concurrency }`                           |
-| `POST /api/fault`     | `{ node, latencyMs?, errorRate? }` або `{ node, clear: true }` |
+Objects match subset fields, arrays — точну довжину й елементи. Доступні `$match: 'any'|'uuid'|'iso-date'|'type'` (для type ще поле type). Ігноруйте nondeterministic поля, пропускаючи їх у expected, або застосуйте matcher. Literal значення порівнюються через Object.is, не JSON.stringify.
 
-POST потребує `Content-Type: application/json`. Якщо є Origin, він має збігатися з origin Stand. Вбудований Stand орієнтований на локальну розробку; production roles, environments, DB console, історичне сховище та захист окремою системою login наразі відсутні.
+`stand(app, { testFile, hooks: { seed, reset }, networkBaseUrl })` налаштовує persistence і server-owned hooks. Setup виконується перед тестом, reset — у finally. Невідомий hook є помилкою. Hooks не виводяться автоматично з repository та не передаються кодом із браузера.
+
+CLI зберігає файл `.arc/stand-tests.json` при явному Save to disk. Scratch tests самі не пишуться на диск. До versioned spec можна явно додати request.authorization/request.headers через Include authorization; типовий export і live payload прибирають request context. Для export із credentials використовуйте `?includeContext=1`. Файл і контекст можуть містити локальні credentials — зберігайте їх тільки з явним наміром. `.arc/` виключено з Git.
+
+Для запуску поза Stand: `runTestSpec(app, spec, hooks)`. Spec — JSON; TypeScript test generation та YAML parser не реалізовані.
+
+## API Stand та SSE
+
+GET: `/api/graph`, `/api/live`, `/api/events`, `/api/test/export`.
+
+POST JSON:
+
+| Шлях                         | Payload                                                                                   |
+| ---------------------------- | ----------------------------------------------------------------------------------------- |
+| `/api/generate`              | operation                                                                                 |
+| `/api/run`                   | operation, input, mode?, authorization?                                                   |
+| `/api/load`, `/api/breaking` | параметри вище                                                                            |
+| `/api/fault`                 | node + injection settings або clear: true                                                 |
+| `/api/test/save`             | operation/input/expected/name?, includeContext?, authorization?, setup?, reset?, persist? |
+| `/api/test/import`           | tests: spec[], persist?                                                                   |
+| `/api/test/persist`          | {}                                                                                        |
+| `/api/test/run`              | {}                                                                                        |
+
+POST потребує application/json та same Origin, якщо Origin передано. SSE — operation.started/finished, resource.opened/closed, queue.state, worker.state, schedule.triggered, metrics.updated, graph.updated; без replay. Stand є локальним development tool, без production auth/RBAC або історичного сховища.

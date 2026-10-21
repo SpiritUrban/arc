@@ -1,0 +1,26 @@
+{
+  "kind": "synthetic timer DAG, not HTTP/deployment throughput",
+  "nodeDelaysMs": {
+    "slow": 80,
+    "fast": 5,
+    "childAfterFast": 80
+  },
+  "rounds": 5,
+  "legacyLevelBarrierMs": [
+    159.754427,
+    160.67617500000006,
+    160.53054799999995,
+    160.68348500000013,
+    160.5181480000001
+  ],
+  "dependencyReadyMs": [
+    89.09301800000003,
+    86.229063,
+    86.26730199999997,
+    86.033817,
+    85.95660799999996
+  ],
+  "beforeMeanMs": 160.43255660000005,
+  "afterMeanMs": 86.71596159999999,
+  "latencyReductionPercent": 45.948650674310855
+}

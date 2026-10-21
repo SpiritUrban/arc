@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { Application, Fault } from "./core.ts";
+import { Application, Fault, errorStatus } from "./core.js";
 export function problem(e: unknown): Response {
   return Response.json(
     {
@@ -77,7 +77,7 @@ export function handler(app: Application) {
         return Response.json(result.ok ? result.value : result, {
           status: result.ok
             ? (route.status ?? 200)
-            : route.operation.errors[result.error],
+            : errorStatus(route.operation.errors[result.error]),
         });
       }
       throw new Fault("NOT_FOUND", 404);
@@ -85,6 +85,46 @@ export function handler(app: Application) {
       return problem(e);
     }
   };
+}
+function errorResponses(errors: import("./core.js").ErrorContracts) {
+  const groups = new Map<number, { codes: string[]; schemas: any[] }>();
+  for (const [code, def] of Object.entries(errors)) {
+    const status = errorStatus(def),
+      group = groups.get(status) ?? { codes: [], schemas: [] };
+    group.codes.push(code);
+    group.schemas.push({
+      type: "object",
+      properties: {
+        ok: { const: false },
+        error: { const: code },
+        ...(typeof def !== "number" && def.details
+          ? { details: def.details.json }
+          : {}),
+      },
+      required: [
+        "ok",
+        "error",
+        ...(typeof def !== "number" && def.details ? ["details"] : []),
+      ],
+    });
+    groups.set(status, group);
+  }
+  return Object.fromEntries(
+    [...groups].map(([status, group]) => [
+      status,
+      {
+        description: group.codes.join(" | "),
+        content: {
+          "application/json": {
+            schema:
+              group.schemas.length === 1
+                ? group.schemas[0]
+                : { oneOf: group.schemas },
+          },
+        },
+      },
+    ]),
+  );
 }
 export function openapi(app: Application) {
   const paths: Record<string, any> = {};
@@ -134,12 +174,7 @@ export function openapi(app: Application) {
           description: "Success",
           content: { "application/json": { schema: r.operation.output.json } },
         },
-        ...Object.fromEntries(
-          Object.entries(r.operation.errors).map(([code, status]) => [
-            status,
-            { description: code },
-          ]),
-        ),
+        ...errorResponses(r.operation.errors),
       },
     };
   }
@@ -188,7 +223,31 @@ export async function serve(
       });
       const response = await fetchHandler(request);
       res.writeHead(response.status, Object.fromEntries(response.headers));
-      res.end(Buffer.from(await response.arrayBuffer()));
+      if (!response.body) {
+        res.end();
+        return;
+      }
+      const reader = response.body.getReader();
+      const disconnected = () => {
+        controller.abort();
+        void reader.cancel().catch(() => {});
+      };
+      res.once("close", disconnected);
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (!res.write(value))
+            await new Promise<void>((resolve) => {
+              res.once("drain", resolve);
+              res.once("close", resolve);
+            });
+        }
+        res.end();
+      } finally {
+        res.off("close", disconnected);
+        reader.releaseLock();
+      }
     } catch (e) {
       if (!res.headersSent) res.writeHead(500);
       res.end();

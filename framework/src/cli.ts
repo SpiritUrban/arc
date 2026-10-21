@@ -1,8 +1,8 @@
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
-import { Application } from "./core.ts";
-import { handler, serve, closeServer } from "./http.ts";
-import { stand } from "./stand.ts";
+import { Application } from "./core.js";
+import { handler, serve, closeServer } from "./http.js";
+import { stand } from "./stand.js";
 const [command = "stand", argument] = process.argv.slice(2);
 if (!["stand", "dev", "start", "graph", "inspect", "run"].includes(command)) {
   console.error("Usage: arc stand|start|graph|inspect <id>|run <id> <json>");
@@ -16,7 +16,8 @@ if (!(app instanceof Application))
 await app.compile();
 if (["graph", "inspect", "run"].includes(command)) {
   try {
-    if (command === "run")
+    if (command === "run") {
+      await app.start();
       console.log(
         JSON.stringify(
           await app.execute(argument, JSON.parse(process.argv[4] ?? "{}")),
@@ -24,7 +25,7 @@ if (["graph", "inspect", "run"].includes(command)) {
           2,
         ),
       );
-    else {
+    } else {
       const graph = app.graph();
       const output =
         command === "graph"
@@ -39,12 +40,21 @@ if (["graph", "inspect", "run"].includes(command)) {
 } else {
   const servers: Awaited<ReturnType<typeof serve>>[] = [];
   try {
+    await app.start();
     const port = Number(process.env.PORT ?? 3000);
     servers.push(await serve(handler(app), { port }));
     console.log(`ARC application  http://localhost:${port}`);
     if (command !== "start") {
       const standPort = Number(process.env.STAND_PORT ?? 3100);
-      servers.push(await serve(stand(app), { port: standPort }));
+      servers.push(
+        await serve(
+          stand(app, {
+            networkBaseUrl: `http://127.0.0.1:${port}`,
+            testFile: resolve(".arc/stand-tests.json"),
+          }),
+          { port: standPort },
+        ),
+      );
       console.log(`ARC Stand        http://localhost:${standPort}`);
     }
     console.log(
@@ -55,6 +65,7 @@ if (["graph", "inspect", "run"].includes(command)) {
       if (stopping) return;
       stopping = true;
       try {
+        app.publish("application.stopping", "application");
         await Promise.all(servers.map(closeServer));
         await app.close();
       } catch (e) {

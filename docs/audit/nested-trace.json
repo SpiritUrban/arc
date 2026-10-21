@@ -1,0 +1,35 @@
+{
+  "id": "6021a403-00a8-43ef-8370-78be4bc6547a",
+  "operation": "parent",
+  "startedAt": "2026-10-21T05:31:58.277Z",
+  "duration": 2.547423999999978,
+  "status": "ok",
+  "spans": [
+    {
+      "id": "c2358222-1236-4b8f-84d3-b1c826cdc9d7",
+      "parentId": "d653cc52-b381-4e8a-b8bd-20bfc45894a4",
+      "node": "session",
+      "kind": "resource.open",
+      "start": 1.714574999999968,
+      "duration": 0.14295800000002146,
+      "status": "ok"
+    },
+    {
+      "id": "2fafbe22-a1c0-4be7-acfd-02b17e4c8c65",
+      "parentId": "d653cc52-b381-4e8a-b8bd-20bfc45894a4",
+      "node": "read",
+      "kind": "operation",
+      "start": 2.105129999999974,
+      "duration": 0.18807800000001862,
+      "status": "ok"
+    },
+    {
+      "id": "d653cc52-b381-4e8a-b8bd-20bfc45894a4",
+      "node": "parent",
+      "kind": "operation",
+      "start": 1.1285669999999755,
+      "duration": 1.325776000000019,
+      "status": "ok"
+    }
+  ]
+}

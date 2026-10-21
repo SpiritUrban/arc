@@ -23,8 +23,11 @@ ARC — Node.js/TypeScript-фреймворк, у якому застосуно�
 З кореня репозиторію:
 
 ```sh
+npm run build
 ARC_APP=docs/examples/tasks.ts npx arc stand
-node --import tsx --test docs/examples/tasks.test.ts
+node --conditions=arc-source --import tsx --test docs/examples/tasks.test.ts
 ```
 
 Усі приклади використовують ESM та імпорти з `@arc/framework`. Для відносних імпортів TypeScript-файлів у цьому проєкті вказується розширення `.ts`.
+
+[Технічний аудит, evidence та міграція ARC 0.2](audit/README.md).

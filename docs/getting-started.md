@@ -1,118 +1,89 @@
-# Початок роботи
+# Початок роботи з ARC 0.2
 
 [← Зміст](README.md)
 
-## Встановлення та запуск
-
-Потрібен Node.js 22.18 або новіший. Реалізацію перевірено на Node.js 24. Команди нижче виконуються з кореня репозиторію.
+Потрібен Node.js 22.18+. З кореня репозиторію:
 
 ```sh
 npm install
+npm run build
 npm run dev
 ```
 
-Відкрийте:
+Application: http://localhost:3000; Stand: http://localhost:3100; OpenAPI: http://localhost:3000/openapi.json.
 
-- `http://localhost:3000/health` — endpoint застосунку;
-- `http://localhost:3100` — ARC Stand;
-- `http://localhost:3000/openapi.json` — контракт HTTP API у форматі OpenAPI 3.1.
+`framework/` — окремий workspace @arc/framework; `src/` — кореневий application із users/orders. Код фреймворку не імпортує application. Навчальний feature приклад: `docs/examples/tasks.ts`.
 
-`npm run dev` компілює граф, відкриває application-ресурси та запускає два сервери. Автоматичного перезапуску при редагуванні файлів зараз немає: після зміни коду перезапустіть команду.
-
-`npm start` запускає тільки HTTP-застосунок. Ctrl+C або SIGTERM запускає штатне завершення: CLI закриває сервери, потім застосунок чекає активні операції й закриває application-ресурси.
-
-## Як організовано репозиторій
-
-```text
-framework/              npm workspace @arc/framework
-  src/                  код фреймворку, незалежний від прикладу
-  arc.mjs               точка входу CLI
-src/                    застосунок користувача фреймворку
-  app.ts                композиція application
-  users/                feature-модуль користувачів
-  orders/               feature-модуль замовлень
-tests/                  перевірки реалізації ARC
-docs/                   посібник і навчальні приклади
-```
-
-Додавайте бізнес-функціональність у `src/`. У `framework/` змінюйте самі механізми ARC. Workspace дозволяє імпортувати фреймворк за іменем пакета:
+## Lifecycle та зміна з 0.1
 
 ```ts
-import { operation, resource, s, ok } from "@arc/framework";
+await app.compile(); // pure, без DB/Redis/SMTP
+await app.start(); // або activate()
+try {
+  await app.execute("system.health", {});
+} finally {
+  await app.close();
+}
 ```
+
+CLI сам викликає compile і start для start/stand/run; graph/inspect виконують тільки compile. Default-export entrypoint має лише створити application, без top-level підключень до зовнішніх систем. Старе compile → execute потрібно мігрувати на compile → start → execute.
 
 ## Команди
 
-| Команда                            | Призначення                                   |
-| ---------------------------------- | --------------------------------------------- |
-| `npm run dev`                      | Application та Stand                          |
-| `npm start`                        | Тільки application HTTP                       |
-| `npm run graph`                    | Граф застосунку у JSON                        |
-| `npm run inspect -- orders.create` | Один вузол, його контракт і план залежностей  |
-| `npx arc run system.health '{}'`   | Прямий виклик операції без HTTP               |
-| `npm test`                         | Тести з `tests/*.test.ts`                     |
-| `npm run typecheck`                | Перевірка TypeScript без генерації файлів     |
-| `npm run build`                    | Генерація JavaScript і declarations у `dist/` |
+| Команда                            | Призначення                                     |
+| ---------------------------------- | ----------------------------------------------- |
+| `npm run dev`                      | Source development CLI із tsx; без watch/reload |
+| `npm start`                        | Development HTTP без Stand                      |
+| `npm run graph`                    | Pure graph, без activation                      |
+| `npm run inspect -- orders.create` | Контракт/plan вузла                             |
+| `npx arc run system.health '{}'`   | Compiled CLI, direct execution                  |
+| `npm test`                         | Unit/integration                                |
+| `npm run test:lifecycle`           | Lifecycle/concurrency окремо                    |
+| `npm run typecheck`                | TypeScript і negative type tests                |
+| `npm run build`                    | framework/dist JS/.d.ts + root dist             |
+| `npm run test:distribution`        | Packed package smoke test без tsx               |
+| `npm run benchmark:scheduler`      | Штучний DAG benchmark                           |
 
-CLI підтримує `stand`, `dev` (синонім `stand`), `start`, `graph`, `inspect <id>`, `run <id> <json>`. Окремої CLI-команди `arc test` у поточній версії немає.
+Native JS production entrypoint:
 
-`graph` та `inspect` теж виконують `compile()`, тому можуть відкривати зовнішні application-ресурси. Після виведення результату вони закривають застосунок. `run` не створює HTTP Request: операціям із HTTP-авторизацією для ручної перевірки краще передавати заголовки через Stand або HTTP.
+```sh
+ARC_APP=dist/src/app.js node framework/arc.mjs start
+```
 
-## Налаштування
+Ця команда використовує compiled ESM без tsx. Development скрипти використовують condition `arc-source`, щоб приклад і тести імпортували саме source workspace. За замовчуванням package import веде на `framework/dist/index.js`, types — на `.d.ts`. Після зміни коду перед перевіркою compiled CLI повторіть build.
 
-| Змінна оточення | Типове значення | Призначення                                                             |
-| --------------- | --------------- | ----------------------------------------------------------------------- |
-| `ARC_APP`       | `src/app.ts`    | Файл із default-export об’єкта Application; шлях від поточного каталогу |
-| `PORT`          | `3000`          | Порт HTTP-застосунку                                                    |
-| `STAND_PORT`    | `3100`          | Порт Stand                                                              |
+`ARC_APP` типовий src/app.ts (від cwd), PORT — 3000, STAND_PORT — 3100. Для TypeScript entrypoint Node 22.18+ підтримує erasable syntax; для іншого TS-синтаксису застосунку використовуйте dev script або compiled JS. CLI пакета не залежить від tsx.
 
 ```sh
 PORT=4000 STAND_PORT=4100 npm run dev
 ARC_APP=docs/examples/tasks.ts npx arc stand
 ```
 
-Поточний CLI прив’язує сервери до `127.0.0.1`. Вбудований Node HTTP bridge приймає Host лише `localhost`, `127.0.0.1` або `[::1]`, із необов’язковим портом. Публічний домен чи розгортання за proxy потребують окремого адаптера або зміни цієї політики; одного `host: '0.0.0.0'` недостатньо.
+CLI слухає loopback. Node bridge має Host allowlist localhost/127.0.0.1/[::1]. Public ingress/proxy needs окремої адаптації, а не лише host 0.0.0.0. Ctrl+C/SIGTERM закриває SSE streams, HTTP servers та application lifecycle.
 
-## Перші запити
+## Приклад HTTP
 
 ```sh
+curl http://localhost:3000/health
 curl http://localhost:3000/users
-curl -X POST http://localhost:3000/users \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Olena","email":"olena@example.com"}'
-```
-
-Успішна HTTP-відповідь містить саме значення output, без обгортки `ok`:
-
-```json
-{ "id": "...", "name": "Olena", "email": "olena@example.com" }
-```
-
-Повторний email поверне 409 та об’єкт очікуваної помилки:
-
-```json
-{ "ok": false, "error": "EMAIL_EXISTS" }
-```
-
-Для замовлень приклад очікує demo-токен — UUID наявного користувача:
-
-```sh
 curl -X POST http://localhost:3000/orders \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer 00000000-0000-4000-8000-000000000001' \
   -d '{"product":"ARC Book","quantity":2}'
 ```
 
-Ця capability демонструє залежність від авторизації, але не перевіряє JWT чи підписаний access token. Дані користувачів і замовлень зберігаються в пам’яті процесу.
+Demo auth перевіряє наявного користувача за UUID, не JWT. Repositories — у пам’яті. Вони мають явні async instrumented methods для traces/failure injection, але не є DB adapter.
 
-## Використання пакета в іншому проєкті
-
-Встановіть каталог фреймворку як локальну залежність:
+## Package distribution
 
 ```sh
-npm install /absolute/path/to/arc/framework
+npm pack --workspace @arc/framework
 ```
 
-Створіть ESM-проєкт (`"type": "module"` у `package.json`) і `src/app.ts` із default-export результату `application(...)`. Запускайте `npx arc stand` із каталогу свого проєкту.
+Пакет містить compiled ESM, declarations, CLI bin і source для opt-in development condition. Production consumers імпортують JS без TypeScript loader:
 
-Пакет наразі експортує TypeScript-вихідні файли. CLI сам реєструє `tsx`; для власного запускного TypeScript-файлу використовуйте `node --import tsx path/to/main.ts` з установленим у вашому проєкті `tsx`. Звичайний запуск згенерованого JS без TypeScript loader не є окремо налаштованим distribution-процесом цього репозиторію.
+```js
+import { application, operation, s, ok } from "@arc/framework";
+```
+
+При локальній file-залежності спочатку зберіть framework: `npm run build --workspace @arc/framework`; після встановлення в іншому ESM-проєкті експортуйте application із вашого JS entrypoint і задайте ARC_APP. Чистий tarball install/import/CLI перевіряє `npm run test:distribution`.

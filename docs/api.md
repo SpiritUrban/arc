@@ -1,276 +1,152 @@
-# Довідник API
+# API ARC 0.2
 
-[← Зміст](README.md)
+[← Зміст](README.md) · [Міграція](audit/README.md)
 
-Усі наведені експорти доступні з `@arc/framework`. Це довідник поточної версії, а не специфікація всіх ідей із початкового обговорення.
+Публічні експорти — з `@arc/framework`. Для повних прикладів дивіться [написання коду](writing-code.md) та [архітектуру](architecture.md).
 
-## Схеми
+## Contracts
 
-| Виклик                               | Що приймає                                                |
-| ------------------------------------ | --------------------------------------------------------- |
-| `s.string({ min?, max?, format? })`  | Рядок; min/max — довжина, format — `'uuid'` або `'email'` |
-| `s.uuid()`                           | UUID за regex реалізації                                  |
-| `s.email()`                          | Email за спрощеним regex реалізації                       |
-| `s.number({ min?, max?, integer? })` | Скінченне число, необов’язкові межі та цілочисельність    |
-| `s.int({ min?, max? })`              | Скінченне ціле число                                      |
-| `s.boolean()`                        | `true` або `false`                                        |
-| `s.literal(value)`                   | Одне фіксоване значення string, number або boolean        |
-| `s.array(item)` або `item.array()`   | Масив елементів за схемою item                            |
-| `s.object({ field: schema })`        | Об’єкт із заданими полями; невідомі поля відхиляються     |
-| `schema.optional()`                  | Значення за схемою або `undefined`                        |
+| API                                  | Дані / опції                     |
+| ------------------------------------ | -------------------------------- |
+| `s.string({ min?, max?, format? })`  | Рядок; format: uuid/email        |
+| `s.uuid()`, `s.email()`              | Рядкові формати                  |
+| `s.number({ min?, max?, integer? })` | Скінченне число                  |
+| `s.int({ min?, max? })`              | Ціле число                       |
+| `s.boolean()`                        | Boolean                          |
+| `s.literal(value)`                   | Фіксований string/number/boolean |
+| `s.array(item)`, `item.array()`      | Масив                            |
+| `s.object(shape)`                    | Об’єкт; зайві поля заборонені    |
+| `schema.optional()`                  | Значення або undefined; не null  |
 
-Ті самі конструктори, крім скорочень `uuid`, `email`, `int`, також експортуються окремо як `string`, `number`, `boolean`, `literal`, `array`, `object`.
+`schema.parse(value, path?)`, `schema.sample()`, `schema.json`, `Infer<typeof schema>`, `ValidationError.issues` збережено. Fluent `.min()` немає. `validateSchemaMetadata` перевіряє підтриману структуру без запуску callbacks.
 
-Кожна схема надає:
-
-```ts
-schema.parse(value); // перевірене значення або ValidationError
-schema.parse(value, "$.item"); // явний шлях для повідомлення про помилку
-schema.sample(); // детермінований приклад
-schema.json; // опис JSON Schema
-```
-
-`Infer<typeof schema>` виводить TypeScript-тип. `ValidationError.issues` містить масив повідомлень зі шляхами полів. Об’єкт збирає помилки відомих полів; невідоме поле може завершити перевірку раніше.
-
-Валідація сама не перетворює `'42'` на `42`. Числові та boolean query-параметри частково приводить HTTP-адаптер. Відсутні optional-поля не потрапляють у перевірений об’єкт.
-
-`sample()` не є random/fuzz генератором. Необов’язкові поля об’єкта пропускаються, масив має один елемент. Для звичайних підтриманих схем це зручний стартовий input; довільні поєднання обмежень або власна `Schema` можуть вимагати власного генератора. Для schemas наразі немає union, nullable, enum, default, transform, recursive schemas або обмежень довжини масиву.
+`generateCases(schema)` повертає `{ label, category, value, valid }[]`: sample, boundary, edge, invalid. Для number/string враховує min/max і сусідні значення, для uuid/email — характерні malformed inputs, для object/array — варіації полів/елементів. Validity визначається через parse. Генерація детермінована; random/property-based strategy ще не реалізована. Undefined не має самостійного JSON-представлення; для HTTP використовуйте object contracts.
 
 ## operation
 
 ```ts
-operation({
-  id: "feature.action",
-  input: InputSchema,
-  output: OutputSchema,
-  needs: { repository }, // типово {}
-  errors: { NOT_FOUND: 404 }, // типово {}
-  effects: ["storage.read"], // необов’язкові метадані
-  estimateMs: 5, // необов’язкова оцінка автора
-  async run({ input, repository, signal }) {
-    // Поверніть ok(...) або error(...).
+const read = operation({
+  id: "items.read",
+  input: s.object({ id: s.uuid() }),
+  output: s.string(),
+  needs: { repository },
+  calls: { fallback },
+  errors: {
+    NOT_FOUND: { status: 404, details: s.object({ id: s.uuid() }) },
+    FORBIDDEN: 403,
+  },
+  estimateMs: 5,
+  budgetMs: 50,
+  effects: ["storage.read"],
+  async run({ input, repository, call, fail, signal }) {
+    const value = await repository.find(input.id);
+    return value ? ok(value) : fail("NOT_FOUND", { id: input.id });
   },
 });
 ```
 
-Обов’язкові поля: `id`, `input`, `output`, `run`. ID має бути непорожнім і унікальним між operations та resources. Ключі `input`, `signal`, `request`, `__proto__`, `constructor`, `prototype` зарезервовані й заборонені як імена в `needs`.
+Обов’язкові: id/input/output/run. Needs/calls/errors типово порожні. `ctx.call(name, input)` дозволяє лише ключі declared calls і виводить child-контракти. `ctx.fail(code, details?)` виводить union errors; details обов’язкові, коли є schema. Поверніть `ok(value)` або дозволений business error. Старий глобальний `error(code, details?)` лишається для сумісності; для schema-typed details використовуйте fail. Не стирайте тип операції широкою анотацією Operation, якщо потрібні точні inferred codes.
 
-```ts
-ok(value); // { ok: true, value }
-error("NOT_FOUND"); // { ok: false, error: 'NOT_FOUND', details: undefined }
-error("NOT_FOUND", { id });
-```
+`Result<T,E>`, `OperationResult<O,E>`, `BusinessError<E>`, `ErrorContracts`, `Fail<E>` експортуються. Runtime відхиляє `UNDECLARED_ERROR`, `INVALID_ERROR_DETAILS`, `INVALID_OUTPUT`, `INVALID_RESULT`. `Fault(code, status=500, details?)` — exception для framework/capabilities. Після abort результат не повертається як успіх.
 
-JSON-серіалізація пропускає `details`, коли воно `undefined`. `Result<T, E>` — дискримінований union за полем `ok`; стандартний тип E — `string`.
-
-`Fault(code, status = 500, details?)` є exception із HTTP-статусом. `Fault` часто використовується capability чи адаптером. Для бізнес-відмов операції перевагу має `error` із записом у `errors`.
+Зарезервовані needs keys: input, signal, request, call, fail, **proto**, constructor, prototype. ID спільні між усіма node kinds.
 
 ## resource / capability
 
 ```ts
-resource({
-  id: "storage",
-  scope: "application", // або 'request'; типово 'application'
-  needs: {},
-  effects: ["storage.read"],
-  estimateMs: 2,
-  async open(ctx) {
-    return value;
-  },
-  async close(value) {
-    // Звільнення отриманого значення.
+const repository = resource({
+  id: "items.repository",
+  scope: "application",
+  instrument: ["find"],
+  open: () => ({
+    async find(id: string) {
+      return id;
+    },
+  }),
+  close: async (value) => {
+    /* close client */
   },
 });
 ```
 
-Обов’язкові поля: `id`, `open`. `open` отримує оголошені залежності; request-ресурсу додатково передаються `request` та `signal`, які можуть бути `undefined`. Application-ресурси відкриваються без request-контексту.
+`capability` є alias resource. Needs задаються так само, як у operation. Application-open отримує dependencies; request-open додатково request/signal. Scope типовий application. Close отримує початкове значення application-ресурсу, а не instrumentation proxy.
 
-`capability` — точний alias `resource`. Немає реєстрації за класом чи пошуку залежності за рядком: `needs` містить самі об’єкти визначень.
+`instrument` — явний список **async methods**. TypeScript перевіряє ключі; runtime перевіряє наявність функції. ARC обгортає тільки перелічені методи у proxy, не змінюючи оригінальний об’єкт. Effect-вузол має ID `resourceId.method`; через нього проходять spans та ін’єкції. Не перелічуйте синхронний метод: boundary повертає Promise. Внутрішні `this.otherMethod()` на оригінальному об’єкті не перехоплюються автоматично. Instrumentation діє всередині ARC execution, включно з request-open; startup/поза execution не створюють request spans.
 
-## module та application
+## module / application / lifecycle
 
 ```ts
+const jobs = queue({
+  id: "jobs",
+  operation: processJob,
+  concurrency: 4,
+  capacity: 1000,
+});
+const timer = schedule({
+  id: "daily-check",
+  operation: check,
+  everyMs: 60_000,
+  input: () => ({}),
+});
 const feature = module({
   id: "feature",
-  operations: [action],
-  resources: [backgroundResource],
-  routes: [http.get("/feature", action)],
+  operations: [read],
+  routes: [http.get("/items/:id", read)],
+  queues: [jobs],
+  schedules: [timer],
 });
-
 const app = application({
   modules: [feature],
-  operations: [],
-  resources: [],
-  routes: [],
   traceLimit: 500,
+  metricsWindowMs: 60_000,
 });
-```
-
-`module` лише групує визначення. `id` модуля не додає URL-префікс і не префіксує ID операцій. Явний `resources` доречний, коли ресурс треба відкрити з lifecycle застосунку навіть без залежності від нього в операціях. У module немає вкладеного `modules`.
-
-Основні методи Application:
-
-| Метод / поле                                    | Поведінка                                                       |
-| ----------------------------------------------- | --------------------------------------------------------------- |
-| `await app.compile()`                           | Перевірка графа, плани, відкриття application-ресурсів          |
-| `await app.execute(id, input, options?)`        | Result або rejected Promise у разі exception                    |
-| `app.graph()`                                   | Поточний IR; використовуйте після compile                       |
-| `app.metrics()`                                 | Метрики операцій із збережених traces                           |
-| `app.traces`                                    | Буфер traces                                                    |
-| `app.operations`, `app.resources`, `app.routes` | Зібрані визначення; після compile включають знайдені залежності |
-| `await app.close()`                             | Очікування активних операцій і звільнення application-ресурсів  |
-
-`execute` приймає options `{ request?: Request, signal?: AbortSignal, overrides?: Map }`. Request та signal незалежні: для програмного адаптера передайте `signal: request.signal` явно, якщо потрібно. Input перевіряється завжди.
-
-`compile({ overrides })` і `execute(..., { overrides })` — низькорівневі засоби тестової підміни за об’єктом ресурсу. Для звичайних тестів використовуйте `test(operation)`, який узгоджує обидві підміни та прибирає зайві гілки залежностей.
-
-Повторний `compile` уже скомпільованого застосунку нічого не змінює. Не використовуйте його як hot reload або спосіб пізно змінити overrides.
-
-## HTTP-маршрути
-
-```ts
-http.get("/tasks/:id", getTask);
-http.post("/tasks", createTask, { status: 201 });
-http.put("/tasks/:id", replaceTask);
-http.patch("/tasks/:id", updateTask);
-http.delete("/tasks/:id", deleteTask);
-```
-
-Ці функції повертають Route; самі сервер не запускають. Успішний status типовий 200. Поточний handler використовує JSON-відповіді; для операцій видалення зручніше повертати JSON-підтвердження зі статусом 200, ніж порожній 204.
-
-Для HTTP input має бути об’єктом. Адаптер збирає його як:
-
-```ts
-{ ...jsonBody, ...query, ...pathParams }
-```
-
-Отже query перекриває body, а pathParams перекриває обидва. Не використовуйте конфліктні імена для різних джерел без явного наміру.
-
-| Джерело   | Правила поточної версії                                                                              |
-| --------- | ---------------------------------------------------------------------------------------------------- |
-| Path      | `:name` — один непорожній сегмент; значення декодується як рядок                                     |
-| Query     | Верхньорівневі number/integer приводяться через Number; boolean — лише `'true'`/`'false'`            |
-| JSON body | Для POST/PUT/PATCH та інших методів, крім GET/HEAD/DELETE; потрібен `application/json` і JSON-об’єкт |
-| DELETE    | Body не читається handler-ом; input передавайте через path/query                                     |
-
-Повторювані query-ключі не стають масивом, залишається останнє значення. Вкладені об’єкти й масиви із query не декодуються. Path-числа автоматично не приводяться, тому числовий ID краще передавати як string і обробляти явно. Заголовки input-схема автоматично не бачить; їх читає request-capability.
-
-Маршрути з меншою кількістю параметрів перевіряються першими. Wildcard, regex-параметри, optional-сегменти, довільні middleware та автоматичний CORS/OPTIONS не реалізовані. `/openapi.json` є вбудованим GET-маршрутом; не використовуйте його під власний endpoint.
-
-### Програмний запуск HTTP
-
-```ts
-import { handler, serve, closeServer } from "@arc/framework";
-
 await app.compile();
-const server = await serve(handler(app), {
-  port: 3000,
-  host: "127.0.0.1",
-  maxBodyBytes: 1024 * 1024,
-});
-
-// Під час завершення:
-await closeServer(server);
-await app.close();
+await app.start();
 ```
 
-`handler(app)` створює функцію `(Request) => Promise<Response>`. Вона придатна і для HTTP-тестів без сокетів. `serve` повертає Node `Server`. Типовий ліміт body — 1 MiB. Bridge буферизує запит та відповідь; streaming і WebSocket не підтримуються. Правила Host описані в [початку роботи](getting-started.md#налаштування).
+Application/module приймають operations/resources/routes/queues/schedules; application також modules та telemetry settings. Module не створює namespace чи prefix. Транзитивні needs/calls/transport operations реєструються автоматично.
 
-### Відповіді й помилки
+| Метод                                             | Семантика                                       |
+| ------------------------------------------------- | ----------------------------------------------- |
+| `compile({ overrides? })`                         | Pure compilation, IR v2, plans, analysis        |
+| `start()` / `activate()`                          | Активація, idempotent concurrent Promise        |
+| `execute(id,input,{request?,signal?,overrides?})` | Новий root context, тільки після start          |
+| `graph()`                                         | IR та analysis; без activation                  |
+| `metrics()`                                       | Незалежний accumulator                          |
+| `close()`                                         | Зупинка adapters, drain, cleanup                |
+| `subscribe(listener)`                             | Runtime events; повертає unsubscribe            |
+| `queues.get(queueId)`                             | Активний queue runtime із enqueue/metrics/close |
 
-| Випадок                                                   | HTTP-відповідь                                     |
-| --------------------------------------------------------- | -------------------------------------------------- |
-| `ok(value)`                                               | `value`, status маршруту                           |
-| Оголошений `error(code, details)`                         | Result із `ok: false`, status з `operation.errors` |
-| Невалідний input                                          | 400 `VALIDATION_ERROR`, details із повідомленнями  |
-| Некоректне JSON body або не об’єкт                        | 400 `INVALID_JSON`                                 |
-| Непідтриманий Content-Type                                | 415 `UNSUPPORTED_MEDIA_TYPE`                       |
-| Невідомий маршрут                                         | 404 `NOT_FOUND`                                    |
-| `throw new Fault(code, status, details)`                  | Заданий status і код                               |
-| Невалідний успішний output                                | 500 `INVALID_OUTPUT`                               |
-| Інший exception, невалідний Result або неоголошений error | 500 `INTERNAL_ERROR`                               |
+`test(operation).provide(resource,value).run(input, options?)` компілює, запускає й закриває ізольований application. Підмінені гілки не відкриваються. Для низькорівневих overrides задавайте їх при compile, щоб pruning був узгоджений.
 
-Помилки Node bridge до виклику handler можуть мати простішу відповідь: перевищення ліміту body дає 413 `{"error":"BODY_TOO_LARGE"}`, заборонений Host — порожній 403.
+## HTTP та OpenAPI
 
-`openapi(app)` повертає специфікацію програмно; `GET /openapi.json` — через handler. Схеми успішних відповідей і `operation.errors` беруться з визначень. Auth-capabilities не перетворюються автоматично на security schemes чи додаткові 401-відповіді OpenAPI.
+`http.get/post/put/patch/delete(path, operation, { status? })` створюють декларацію маршруту; success status типовий 200. `handler(app)` повертає Web Request/Response-функцію. `serve(handler, { port, host?, maxBodyBytes? })` повертає Node Server. `closeServer(server)` закриває його; application закривається окремо.
 
-## JSON-RPC
+HTTP input: `{ ...body, ...query, ...path }`. GET/HEAD/DELETE використовують path/query; POST/PUT/PATCH очікують JSON-об’єкт і application/json. Query number/integer та true/false приводяться за верхньорівневою схемою, path лишається string. Масиви/вкладені об’єкти query не декодуються. При повторі query-ключа лишається останній. Для заголовків використовуйте request-capability. Немає автоматичного CORS, wildcards чи optional segments.
 
-```ts
-import { rpc, serve, closeServer } from "@arc/framework";
+Успішна відповідь — output, business error — Result з status контракту. Невалідний input: 400 VALIDATION_ERROR; JSON: 400 INVALID_JSON; Content-Type: 415; відсутній route: 404; невалідний output/error details або невідомий exception: 500. Fault повертає свій status; cancellation через довільний AbortSignal не має окремого стандартного HTTP-коду в цій версії.
 
-await app.compile();
-const rpcServer = await serve(rpc(app, { "tasks.get": getTask }), {
-  port: 3200,
-});
+`GET /openapi.json` та `openapi(app)` описують contracts/errors, включно з details schemas і oneOf для спільного error status. Auth-capabilities не генерують security schemes автоматично.
 
-// Перед app.close():
-await closeServer(rpcServer);
-```
+Node bridge: body limit 1 MiB, loopback Host allowlist; request body буферизується, response body передається потоком з backpressure. Це підтримує SSE Stand. Довільна streaming-business-operation не є контрактом operation API. Публічний Host/production ingress потребує адаптації.
 
-Запит:
+## RPC, queue, schedule та client
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "tasks.get",
-  "params": { "id": "00000000-0000-4000-8000-000000000001" }
-}
-```
+`rpc(app, { 'public.method': operation })` повертає handler одиночних JSON-RPC 2.0 викликів. Потрібні compile/start і зареєстрована operation. Business errors: -32000; validation: -32602; unknown method: -32601. Повного batch/notification edge-case compliance немає.
 
-RPC-ім’я може відрізнятися від ID операції. Операція має бути зареєстрована в Application до compile; сам `rpc` не реєструє її. HTTP-заголовки передаються до request-capabilities.
+Декларативні queue/schedule показано вище. Queue — in-memory, без retries/durability. Capacity обмежує pending; concurrency — активні jobs. Enqueue повертає Result або rejected Promise. Metrics: pending/running/completed/failed; completed включає resolved business errors, failed також включає їх, тому поля перетинаються. Application.close дренує всі прийняті jobs.
 
-Реалізовано одиночні виклики: parse error `-32700`, invalid request `-32600`, method not found `-32601`, invalid params `-32602`, internal error `-32603`. Оголошена бізнес-помилка повертається з RPC-кодом `-32000`. Успішно виконана notification без `id` отримує порожній HTTP 204. Повної підтримки batch та всіх протокольних edge cases немає.
+Schedule — interval, не cron expression. Перший запуск після інтервалу; overlapping ticks пропускаються. Input callback виконується тільки runtime. `onError` обробляє business Result/exception, callback exception публікується як schedule.error.
 
-## Черга в пам’яті
+Legacy `queue(app, op, options)` та `schedule(app, op, options)` лишаються після start. Вони знаходять declared runtime або приєднують transport до IR, якщо operation вже скомпільована. До start користуйтеся декларативною формою. Значення id за замовчуванням: `queue:${op.id}`, `schedule:${op.id}`.
 
-```ts
-import { queue } from "@arc/framework";
+`client(app, { name: op })` — типізований локальний root-execution client. Це не frontend SDK і не заміна nested ctx.call.
 
-const worker = queue(app, createTask, { concurrency: 4, capacity: 1000 });
-const result = await worker.enqueue({ title: "Queued task" });
-console.log(worker.metrics());
-await worker.close();
-```
+## Telemetry та Stand tools
 
-Application перед цим має бути скомпільований, а операція — зареєстрована. `concurrency` обмежує активні jobs, `capacity` — jobs в очікуванні, без активних. При переповненні або після close `enqueue` повертає rejected Promise.
+`traceContext.getStore()` повертає traceId/operation. Trace spans мають id, parentId, node, kind, start/duration ms та status. `app.traces` — bounded debug storage. `app.metrics()` не читає цей буфер.
 
-`enqueue` завершується Result операції або відхиляється при exception. Обробляйте Promise кожної job. `close()` припиняє приймання нових jobs і чекає завершення вже прийнятих, включно з pending.
+`MetricsAccumulator(windowMs)` окремо накопичує lifetime counts/outcomes, active/peak, RPM (60 s), RPS (1 s), p50/p95/p99 за windowMs. Percentile samples зберігаються точно в часовому вікні, без ліміту кількості; великий traffic потребує майбутнього histogram/exporter. Вікно percentiles не скорочує RPM-retention.
 
-`metrics()` повертає `{ pending, running, completed, failed }`. `completed` рахує resolved Result, зокрема бізнес-відмови; `failed` включає бізнес-відмови та exceptions. Тому ці поля не є взаємовиключними.
-
-Черга не має persistence, retries, delivery guarantees чи передачі request-контексту. Queue та schedule не додають власних вузлів до Architecture IR і не мають окремих панелей керування у Stand.
-
-## Планувальник
-
-```ts
-import { schedule } from "@arc/framework";
-
-const timer = schedule(app, createTask, {
-  everyMs: 60_000,
-  input: () => ({ title: "Periodic task" }),
-  onError: (reason) => console.error(reason),
-});
-
-await timer.close();
-```
-
-Це interval, а не cron-expression. Перший виклик — після першого інтервалу. Якщо попередній ще працює, tick пропускається. Пропущені ticks не накопичуються. `close` очищує timer і чекає активний виклик. `onError` отримує бізнес-Result з `ok: false` або exception; сам callback не повинен кидати помилку.
-
-## Локальний типізований client
-
-```ts
-import { client } from "@arc/framework";
-
-const api = client(app, { create: createTask, get: getTask });
-const result = await api.create({ title: "Typed call" });
-```
-
-Input/output виводяться із схем переданих операцій. Клієнт викликає `app.execute` локально, без HTTP, RPC або автоматичного Request. Він не є згенерованим frontend SDK, не реєструє операції й не обходить runtime-валидацію.
-
-## Test harness та telemetry
-
-`test(operation).provide(resource, fake).run(input)` описано з прикладами в [розділі тестування](testing-and-stand.md).
-
-`traceContext.getStore()` усередині виклику повертає `{ traceId, operation }` або `undefined` поза ним. `Trace` та `Span` експортуються як TypeScript-інтерфейси. Всі тривалості — мілісекунди. Формат і межі метрик описані в [архітектурі](architecture.md#граф-та-спостереження).
+`runLoad(runner, options)` та `findBreakingPoint(runner, options)` — [load API та обмеження](testing-and-stand.md). `matches`, `runTestSpec`, `StandTestSpec` — reusable JSON specs. `stand(app, { testFile?, hooks?, networkBaseUrl? })` повертає Web handler інструментів. Налаштований testFile завантажується при першому запиті; довільний шлях із браузера не приймається.

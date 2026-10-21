@@ -1,140 +1,103 @@
-# Як влаштований ARC
+# Архітектура ARC 0.2
 
-[← Зміст](README.md)
+[← Зміст](README.md) · [Аудит і міграція](audit/README.md)
 
-## Основні сутності
+ARC зберігає модель executable architecture graph: контракти описують дані, операції — сценарії, ресурси/capabilities — явні залежності. Компілятор, runtime і Stand працюють із цією самою архітектурою.
 
-| Сутність              | Роль                                                         | Функція                               |
-| --------------------- | ------------------------------------------------------------ | ------------------------------------- |
-| Contract              | Runtime-перевірка input/output та виведення TypeScript-типів | `s.object`, `s.string` тощо           |
-| Operation             | Один сценарій бізнес-логіки з явними залежностями            | `operation`                           |
-| Resource / capability | Значення або сервіс, потрібний операції чи іншому ресурсу    | `resource`, `capability`              |
-| Feature module        | Групування операцій, ресурсів та маршрутів                   | `module`                              |
-| Application           | Компіляція й виконання зібраного графа                       | `application`                         |
-| Adapter               | Перетворення зовнішнього виклику на виклик операції          | `handler`, `rpc`, `queue`, `schedule` |
-| Stand                 | Інтерфейс до графа, runtime-метрик і інструментів тестування | `stand`                               |
+## Lifecycle: compile → start → execute → close
 
-Операції та ресурси є вузлами графа. `needs` утворює ребра залежностей. Наприклад, у кореневому застосунку:
-
-```mermaid
-flowchart LR
-  HTTP["POST /orders"] --> Create["orders.create"]
-  Create --> Auth["auth.currentUser · request"]
-  Create --> Orders["orders.repository · application"]
-  Auth --> Users["users.repository · application"]
+```ts
+await app.compile(); // метадані, invariants, плани; без open()
+await app.start(); // або activate(): відкриття application-ресурсів
+try {
+  await app.execute("orders.create", input);
+} finally {
+  await app.close();
+}
 ```
 
-Стрілка між вузлами означає «потребує», а не порядок виконання. Спочатку executor має отримати залежності вузла, потім може виконати сам вузол.
+`compile()` збирає транзитивні `needs` та `calls`, перевіряє унікальність ID, цикли, scopes, підтриману структуру схем, error mappings і маршрути. Будує dependency-ready execution plans та Architecture IR v2. Не викликає `open`, `run`, `sample`, schedule input або validation callbacks. `graph()` та `inspect` читають тільки метадані. Сам імпорт користувацького entrypoint все ще виконує його top-level JavaScript: не відкривайте DB на рівні модуля.
 
-`capability` зараз є синонімом `resource`, а не окремим типом вузла. Feature module не утворює власного runtime-контейнера чи namespace: усі вузли застосунку мають спільний простір унікальних ID.
+`start()` послідовно відкриває application-ресурси у топологічному порядку, потім створює queue workers і запускає schedules. Одночасні start-виклики отримують один Promise; повторний start активного application не створює ресурси повторно. При partial failure відкриті ресурси закриваються; можна повторити start. Помилки activation і rollback зберігаються в AggregateError.
 
-## Що роблять функції визначення
+`execute()` до start відхиляється. Прихованого auto-start немає. `close()` є idempotent, чекає start, якщо він триває, припиняє schedules і нові зовнішні виклики, дренує прийняті queue jobs та активні execution contexts, потім закриває application-ресурси. Зовнішні HTTP-сервери закриває їхній власник; CLI робить це сам. Після close application не перезапускається.
 
-`operation(...)` та `resource(...)` повертають об’єкти визначень. Вони не запускають `run` або `open`. Визначення поверхнево заморожені через `Object.freeze`; вкладені об’єкти не є глибоко immutable. Не змінюйте `needs`, схеми, маршрути й масиви операцій після створення застосунку або компіляції.
+## Architecture IR v2
 
-Однаковий ресурс слід імпортувати з одного визначення. Два різні об’єкти з однаковим ID спричинять `Duplicate node id`; один і той самий об’єкт можна використовувати у багатьох `needs`.
+| Node kind    | Значення                                                |
+| ------------ | ------------------------------------------------------- |
+| `operation`  | Контракт, errors, calls, plan, declared estimate/budget |
+| `resource`   | Application/request capability                          |
+| `http-route` | HTTP ingress із методом та шляхом                       |
+| `queue`      | Черга із capacity                                       |
+| `worker`     | Споживач черги із concurrency                           |
+| `schedule`   | Інтервальне джерело запуску                             |
+| `effect`     | Явно instrumented async-method ресурсу                  |
 
-## Компіляція
+| Edge kind    | Напрям                                                                      |
+| ------------ | --------------------------------------------------------------------------- |
+| `DEPENDS_ON` | operation/resource → потрібний resource                                     |
+| `ROUTES_TO`  | http-route → operation                                                      |
+| `CALLS`      | operation → declared child operation; worker → operation; resource → effect |
+| `CONSUMES`   | worker → queue                                                              |
+| `TRIGGERS`   | schedule → operation                                                        |
 
-Після `application(...)` необхідно викликати `await app.compile()`. CLI робить це автоматично.
+`EMITS` зарезервовано в типі edge kinds; автоматичне виявлення producer-викликів enqueue не реалізовано. Черги та schedules оголошуються у application/module до compile, тому доступні у graph без start. Legacy runtime helpers можуть приєднати транспорт до вже активного application: це явно додає вузли/ребра та публікує `graph.updated`, але не компілює нові операції.
 
-Компілятор:
+Готовий приклад IR: [architecture-ir.json](audit/architecture-ir.json).
 
-1. Збирає явні ресурси, операції, маршрути й вміст feature-модулів.
-2. Обходить транзитивні `needs`. Ресурс не потрібно окремо додавати в `resources`, якщо він уже досяжний через залежності.
-3. Перевіряє цикли, дублікати ID, відсутні ресурси та заборонену залежність application → request.
-4. Перевіряє, що input/output операцій — екземпляри `Schema`, а коди очікуваних помилок лежать у 400–599.
-5. Перевіряє маршрути, успішні статуси 200–299 та збіг нормалізованих маршрутів. `/users/:id` і `/users/:name` для одного методу вважаються колізією.
-6. Будує для кожної операції план ресурсів по рівнях залежностей.
-7. Відкриває application-ресурси у порядку залежностей і зберігає отримані значення.
+## Explicit needs та operation calls
 
-Компіляція зараз є runtime-процедурою під час старту. Вона не генерує спеціалізований JavaScript-код, не аналізує тіло бізнес-функцій і не доводить коректність усіх обмежень схем чи відсутність N+1.
+`needs` містить тільки resource-визначення. Контекст отримує саме значення цих ресурсів, а не весь registry.
 
-Application-ресурси відкриваються послідовно. Паралельність по рівнях використовується для request-ресурсів під час виконання операції.
-
-## Execution plan
-
-Для `orders.create` план має вигляд:
-
-```text
-Рівень 0: users.repository, orders.repository
-Рівень 1: auth.currentUser
-Після ресурсів: orders.create.run
+```ts
+const parent = operation({
+  id: "parent",
+  input: s.object({}),
+  output: s.int(),
+  calls: { child },
+  async run({ call }) {
+    return call("child", {});
+  },
+});
 ```
 
-Application-ресурси рівня 0 вже відкриті під час `compile()`. Під час виклику executor використовує їхні збережені значення й відкриває тільки request-ресурси свого плану.
+`calls` є явним allowlist. Компілятор знаходить child транзитивно та додає CALLS relation. `ctx.call` типізує ім’я та input/output child. Неоголошене ім’я відхиляється і runtime-перевіркою. Цикли operation calls заборонені під час compile; runtime додатково захищається від рекурсії.
 
-Дві незалежні request-залежності одного рівня відкриваються паралельно через `Promise.allSettled`. Наступний рівень починається після завершення попереднього. Якщо один ресурс упав, runtime чекає завершення його сусідів, після чого звільняє успішно відкриті ресурси.
+Root і nested operations використовують один execution context: Request, AbortSignal, Promise-cache request-ресурсів, cleanup і root trace. Два child-виклики повторно використовують один request-resource. Звичайні незалежні `app.execute` створюють різні scopes. Локальний `client` використовує app.execute; усередині operation для вкладеного сценарію використовуйте ctx.call.
 
-Це рівневий scheduler: готова гілка не переходить до наступного рівня раніше за решту поточного рівня. Автоматичних retries чи rollback бізнес-ефектів немає.
+Operation spans мають `id` і `parentId`; nested trace не губиться в окремому root trace. Приклад: [nested-trace.json](audit/nested-trace.json). Не залишайте calls без await: runtime приєднує вже розпочаті detached calls/effects перед cleanup, але обробка їхнього Result лишається відповідальністю автора.
 
-## Шлях одного виклику
+## Dependency-ready scheduler
 
-```text
-adapter
-  → app.execute(operationId, input, options)
-  → перевірка input
-  → отримання application-значень
-  → відкриття request-ресурсів за планом
-  → перевірка signal перед run
-  → operation.run({ input, ...needs, signal })
-  → перевірка Result і успішного output
-  → закриття request-ресурсів
-  → завершення trace
-  → adapter формує відповідь
-```
+Кожен resource має memoized Promise на execution context. Він починає open відразу після завершення **своїх** dependencies. Повільна сусідня гілка не затримує готову наступну гілку. Рівні, використані при побудові топологічного порядку, більше не є runtime-бар’єрами.
 
-Спільний request-ресурс, до якого ведуть кілька гілок, відкривається один раз на виклик. Наступний `execute` отримує нові request-ресурси, навіть коли обидва виклики відбулися всередині одного HTTP-запиту вашого власного адаптера.
+При partial failure runtime чекає вже розпочаті dependencies та nested calls, потім закриває успішно відкриті request-ресурси у зворотному **статичному топологічному порядку**, незалежному від випадкового порядку завершення siblings. Детермінізм порядку між незалежними вузлами задає обхід декларацій.
 
-Успішний output проходить через `Schema.parse`; повертається перевірене значення. Якщо `run` повернув невалідний output, виклик завершується `Fault('INVALID_OUTPUT', 500)`.
+AbortSignal перевіряється перед відкриттям ресурсу, перед і після run; передається nested calls і open. Уже запущене довільне I/O неможливо насильно перервати: resource та бізнес-код мають передавати signal до своїх API. Ін’єктовані затримки реагують на abort. Cleanup виконується і після cancellation.
 
-## Scopes та lifecycle
+## Scopes та межі гарантій
 
-| Хто залежить       | Application-ресурс | Request-ресурс |
-| ------------------ | ------------------ | -------------- |
-| Operation          | Дозволено          | Дозволено      |
-| Application-ресурс | Дозволено          | Заборонено     |
-| Request-ресурс     | Дозволено          | Дозволено      |
+Application може залежати тільки від application. Request може залежати від обох scopes. Request scope тепер означає **один root execution context із усіма вкладеними ctx.call**, а не кожен child окремо.
 
-Scope `application` типовий. Це один екземпляр на об’єкт Application, а не глобальний singleton на весь процес. `request` означає один екземпляр на `execute`, включно з RPC, CLI та queue-викликами.
+Визначення needs/calls/errors заморожуються після успішної compilation. Не змінюйте публічні масиви application, схеми чи маршрути після compile. Capability-модель не є sandbox JavaScript: прямі імпорти й globals можуть обходити граф. Compiler не аналізує тіла JS і не доводить відсутність N+1.
 
-`open` повертає значення ресурсу. `close(value)` отримує саме його. Request-ресурси закриваються перед завершенням `execute`, включно з помилками. Application-ресурси закриваються через `app.close()`. Закриття відбувається у зворотному порядку успішного відкриття, тому залежні ресурси звільняються раніше за свої залежності.
+`close(value)` не отримує результат операції. Framework не реалізує автоматичний commit/rollback. Частково створений усередині невдалого open ресурс має прибирати сам open.
 
-Якщо `open` частково створив зовнішній об’єкт, а потім кинув помилку, ARC не отримав його значення й не може передати його в `close`. Прибирайте частково створені ресурси всередині самого `open`.
+## Errors та observability
 
-`app.close()` припиняє приймати нові виклики, чекає вже активні та звільняє application-ресурси. Він не закриває самостійно сервери, queue чи schedule: власник адаптерів має закрити їх перед застосунком. Після закриття цей об’єкт Application повторно не компілюється.
+Errors підтримують старий запис `NOT_FOUND: 404` та `{ status: 404, details: Schema }`. Operation-local `fail` звужує допустимий код і тип details; runtime перевіряє details й output. OpenAPI описує error body та використовує oneOf для кількох errors з однаковим status.
 
-## Межі capability-моделі
+Метрики накопичуються незалежно від bounded traces. Є lifetime outcomes `ok`, `business_error`, `fault`, `cancelled`, total/active/peak, rolling RPM/RPS і p50/p95/p99 за часовим вікном. Root outcome враховує cleanup. Nested operations також мають власні лічильники; сума по всіх operations не є кількістю HTTP ingress.
 
-`needs: { users: usersRepository }` означає, що `ctx.users` отримує значення `usersRepository.open()`. Решта ресурсів автоматично в контекст не потрапляє. У TypeScript значення залежностей виводяться з їхніх визначень.
+SSE `/api/events` передає operation, resource, queue/worker і metrics events. Архітектурою лишається IR; events лише накладають поточну активність. Повільний SSE-споживач відключається, polling лишається fallback. Події не мають replay/durable delivery.
 
-Це не ізоляція довільного JavaScript. Прямий імпорт бази даних або доступ до глобальних змінних у `run` залишаються можливими та обходять граф. Щоб граф відповідав архітектурі, передавайте зовнішні сервіси через ресурси й тримайте pure-функції незалежними від I/O.
+## Compile analysis
 
-`needs` приймає ресурси. Операцію не можна напряму використати як ресурс у `needs`. Локальний `client` викликає зареєстровані операції, але ці виклики не додають окремі CALLS-ребра до IR.
+`graph.analysis` містить fanOut, dependencyCount, dependents/blastRadius, declaredEstimateMs, compilerDerivedCriticalPathMs, budgetMs і warnings.
 
-## Граф та спостереження
-
-`app.graph()` після компіляції повертає JSON-сумісний опис:
-
-- `version` — версія формату;
-- `nodes` — operation/resource, scope, ефекти, оцінки; для операцій також схеми, помилки, приклад input і план;
-- `edges` — залежності `{ from, to, name }`;
-- `routes` — HTTP-метод, шлях, ID операції та статус успіху.
-
-`from` — вузол-споживач, `to` — ресурс-залежність, `name` — ключ у `needs`. `effects` та `estimateMs` — заявлені автором метадані; executor не використовує їх як дозволи або таймаути й не розраховує з них критичний шлях.
-
-Кожен виклик відомої операції записує trace, зокрема невалідний input. Trace містить загальну тривалість та spans `open` request-ресурсів і `run` операції. Порядок spans у масиві відповідає завершенню, `start` і `duration` вимірюються у мілісекундах. Загальний час охоплює також валідацію та cleanup; сума spans при паралельності не дорівнює тривалості виклику.
-
-`traceContext` використовує AsyncLocalStorage лише для `{ traceId, operation }`. Ресурси через нього не передаються. Автоматичного логера, перехоплення SQL та OpenTelemetry exporter зараз немає.
+Estimate-модель: власна declared cost + max шлях залежностей/CALLS. Це структурна оцінка/нижня межа для графа; послідовні calls, умовні гілки та тривалість методів із JS не виводяться. Відсутня оцінка на шляху дає null. Budget warning порівнює саме цю модель із declared budget. Scope-review warning є рекомендацією, scope leak — compilation error. Це не runtime measurement і не прогноз пропускної здатності.
 
 ## Карта реалізації
 
-| Файл                                              | Відповідальність                                                                  |
-| ------------------------------------------------- | --------------------------------------------------------------------------------- |
-| [`core.ts`](../framework/src/core.ts)             | Визначення, DFS-перевірка графа, плани, lifecycle, executor, traces, test harness |
-| [`schema.ts`](../framework/src/schema.ts)         | Runtime-валидація, JSON Schema, типи й sample                                     |
-| [`http.ts`](../framework/src/http.ts)             | Маршрутизація, збирання input, HTTP-помилки, OpenAPI, Node bridge                 |
-| [`transports.ts`](../framework/src/transports.ts) | JSON-RPC, queue, schedule, локальний client                                       |
-| [`stand.ts`](../framework/src/stand.ts)           | API інструментів Stand                                                            |
-| [`stand-ui.ts`](../framework/src/stand-ui.ts)     | Вбудована HTML/CSS/JS сторінка                                                    |
-| [`cli.ts`](../framework/src/cli.ts)               | Завантаження entrypoint, команди та сигнали завершення                            |
+`core.ts` — визначення, compiler/lifecycle/execution; `analysis.ts` — статичні оцінки; `metrics.ts` — accumulator; `runtime-adapters.ts` — workers/schedules; `schema.ts` та `generator.ts` — contracts/corpus; `http.ts`, `transports.ts` — адаптери; `stand.ts`, `load.ts`, `test-spec.ts`, `stand-ui.ts` — стенд.

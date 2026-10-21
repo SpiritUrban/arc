@@ -1,117 +1,51 @@
 # ARC — Application Runtime Graph Compiler
 
-ARC описує backend як виконуваний граф операцій, контрактів та ресурсів. Фреймворк є окремим workspace-пакетом **`framework/`**, а **`src/`** — самостійний приклад застосунку, який імпортує `@arc/framework`.
-
-Потрібен Node.js **22.18+** (перевірено на 24).
+ARC описує backend як executable architecture graph із contracts, operations, resources/capabilities та explicit needs. Фреймворк — окремий workspace **framework/**, приклад застосунку — **src/**.
 
 ```sh
 npm install
+npm run build
 npm run dev
 ```
 
-Застосунок: **http://localhost:3000**. ARC Stand: **http://localhost:3100**. Сервери слухають loopback. Зупинка через Ctrl+C закриває сервери, чекає активні операції та звільняє ресурси.
-
-```text
-framework/                @arc/framework — окремий модуль
-  src/core.ts             визначення, компілятор, executor, lifecycle, telemetry
-  src/schema.ts           типізовані контракти, JSON Schema, генерація input
-  src/http.ts             Web Request/Response, Node HTTP, OpenAPI
-  src/transports.ts       JSON-RPC, queue, interval scheduler, typed client
-  src/stand.ts            API інструментів розробника
-  src/stand-ui.ts         вбудований інтерфейс Stand
-  src/cli.ts              stand/start/graph/inspect/run
-src/
-  app.ts                  композиція кореневого застосунку
-  users/                  контракти, repository та операції користувачів
-  orders/                 замовлення з request-scoped авторизацією
-tests/                    тести фреймворку та адаптерів
-```
-
-Команди:
-
-```sh
-npm start                         # тільки application HTTP
-npm run graph                     # Architecture IR у JSON
-npm run inspect -- orders.create  # контракт, залежності, execution plan
-node framework/arc.mjs run system.health '{}'
-npm test
-npm run typecheck
-npm run build                     # JS і declarations у dist/
-```
-
-CLI також доступний як `npx arc stand` після `npm install`. `ARC_APP` задає шлях до default-export застосунку (типово `src/app.ts`), `PORT` і `STAND_PORT` — порти.
-
-Приклад API:
-
-```sh
-curl http://localhost:3000/health
-curl http://localhost:3000/users
-curl -X POST http://localhost:3000/users \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Vitaliy","email":"vitaliy@example.com"}'
-curl -X POST http://localhost:3000/orders \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer 00000000-0000-4000-8000-000000000001' \
-  -d '{"product":"ARC Book","quantity":2}'
-```
-
-`GET /openapi.json` повертає OpenAPI 3.1 із тих самих контрактів. Авторизація в прикладі демонстраційна: Bearer містить UUID наявного користувача; це не перевірка JWT. Дані прикладу зберігаються в пам’яті й скидаються при перезапуску.
+Node.js 22.18+. Application: http://localhost:3000; ARC Stand: http://localhost:3100.
 
 ## Документація
 
-Повний посібник: [docs/README.md](docs/README.md). Окремі розділи: [архітектура](docs/architecture.md), [як писати код](docs/writing-code.md), [довідник API](docs/api.md), [тести та Stand](docs/testing-and-stand.md). Є [готовий приклад модуля завдань](docs/examples/tasks.ts) із [тестами](docs/examples/tasks.test.ts).
+- [Посібник](docs/README.md), [початок роботи](docs/getting-started.md).
+- [Архітектура](docs/architecture.md), [написання коду](docs/writing-code.md), [API](docs/api.md).
+- [Stand, тести та навантаження](docs/testing-and-stand.md).
+- [Технічний аудит, міграція 0.1 → 0.2 та roadmap](docs/audit/README.md).
+- [Приклад модуля](docs/examples/tasks.ts) і [тести](docs/examples/tasks.test.ts).
 
-## Операції та ресурси
+## Lifecycle
 
 ```ts
-import { application, resource, operation, s, ok, http } from "@arc/framework";
-
-const clock = resource({
-  id: "clock",
-  scope: "application",
-  open: () => ({ now: () => new Date().toISOString() }),
-});
-
-const now = operation({
-  id: "time.now",
-  input: s.object({}),
-  output: s.object({ time: s.string() }),
-  needs: { clock },
-  run: ({ clock }) => ok({ time: clock.now() }),
-});
-
-const app = application({
-  operations: [now],
-  routes: [http.get("/time", now)],
-});
-await app.compile();
-await app.execute("time.now", {});
-await app.close();
+await app.compile(); // IR, invariants, plans, analysis — без resource.open
+await app.start(); // activation; activate() — alias
+try {
+  await app.execute("system.health", {});
+} finally {
+  await app.close();
+}
 ```
 
-`compile()` перевіряє цикли, дублікати ID, відсутні залежності, scope leaks, колізії маршрутів, схеми й HTTP-коди. Для кожної операції будується план її транзитивних залежностей по рівнях. Незалежні request-ресурси відкриваються паралельно, спільна залежність обчислюється один раз на виклик. Application-ресурси відкриваються під час компіляції у порядку залежностей. Звільнення відбувається у зворотному порядку; executor чекає завершення всього паралельного рівня навіть при помилці.
+`arc graph` та `arc inspect` не активують зовнішні ресурси. Nested `ctx.call` має declared CALLS edges, shared request scope та parent-linked spans. Scheduler запускає dependency-ready вузли без бар’єрів рівнів. Errors типізуються через operation-local fail і можуть мати details schema.
 
-`run` отримує тільки оголошені `needs`, `input` і `signal`. Request-ресурси додатково отримують стандартний `Request`. Це обмеження контексту та типізації, а не sandbox довільного JavaScript: глобальні змінні й прямі імпорти залишаються відповідальністю застосунку. Scope leaks перевіряються під час `compile()`.
+Stand показує IR v2, schema-aware input corpus, незалежні metrics, SSE activity, reusable JSON test specs, явні effect fault boundaries і три режими load testing. In-process/local-network результати не є benchmark продуктивності deployment.
 
-Очікувані помилки повертаються через `error('CODE')` і оголошуються як `errors: { CODE: 404 }`. Неоголошені помилки та невалідний output є збоями сервера. `Fault` використовується адаптерами/capabilities, наприклад для 401. Некоректний input повертає 400.
+## Перевірки й запуск
 
-## Stand
+```sh
+npm test
+npm run test:lifecycle
+npm run typecheck
+npm run build
+npm run test:distribution
+npm run benchmark:scheduler
+npm run graph
+npm run inspect -- orders.create
+ARC_APP=dist/src/app.js node framework/arc.mjs start
+```
 
-- Клікабельний граф зі справжнього Architecture IR, контракти та execution plans.
-- Генерація валідного input і прикладу невалідного input; прямий та HTTP запуск операції.
-- RPM, p50/p95, кількість помилок і spans відкриття request-ресурсів та операцій. Буфер обмежений 500 traces; RPM — виклики в останню хвилину в межах цього буфера.
-- Збереження результату як тесту та повторний запуск тестів **у пам’яті поточного сеансу**. Для сценаріїв з авторизацією використовуйте кодові тести з підміною capabilities.
-- Обмежений in-process load test із concurrency, RPS, p50/p95 і помилками. Цей тест ділить event loop із застосунком і не є зовнішнім production benchmark.
-- Ін’єкція затримки/помилок в операції та відкриття request-ресурсів. Уже відкриті application-ресурси не переініціалізуються.
-
-Метрики вимірюються наявним executor. Внутрішні запити до DB чи виклики методів repository автоматично не перехоплюються. `estimateMs` і `effects` є явними метаданими вузлів; без значення оцінка лишається `null`.
-
-## Інші адаптери
-
-`rpc(app, { 'users.get': getUser })` повертає Web handler JSON-RPC 2.0 з явним переліком доступних операцій. Його можна передати в `serve`. `queue(app, operation, { concurrency, capacity })` дає `enqueue`, `metrics`, `close`; це черга в пам’яті. `schedule(app, operation, { everyMs, input, onError })` запускає неперекривні interval-виклики. Черги й планувальники потрібно закривати перед `app.close()`.
-
-`client(app, { getUser })` дає типізований локальний клієнт із виведенням input/output. `test(operation).provide(resource, fake).run(input)` запускає операцію без HTTP та не відкриває підмінений application-ресурс.
-
-## Стан реалізації
-
-Це робоча початкова реалізація архітектури з `doc.md`. Подальші частини концепції: durable queue/cron adapters, distributed deployment та bundling, OpenTelemetry export, DB instrumentation, persisted scenarios/record→test, повний property-based fuzzing, автоматичний пошук межі навантаження, what-if симуляції, architecture diff, генерація мережевого SDK і самокалібровані оцінки. Вони ще не реалізовані. Заяв про перевагу у швидкодії над Express чи Fastify без окремих benchmark немає.
+Compiled ESM package і CLI не потребують tsx. Development-скрипти працюють із TypeScript source. Repositories прикладу та queue — in-memory; auth — демонстраційний UUID token. Межі compile estimates, failure injection і roadmap описано в документації; `doc.md` лишається початковим обговоренням концепції.

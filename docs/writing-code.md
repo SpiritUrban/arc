@@ -88,7 +88,7 @@ export const tasksRepository = resource({
 });
 ```
 
-Кожен Application отримує власну Map під час `compile()`. Не створюйте Map на рівні модуля, якщо не хочете ділити її між різними екземплярами застосунку й тестами.
+Кожен Application отримує власну Map під час `start()`. Не створюйте Map на рівні модуля, якщо не хочете ділити її між різними екземплярами застосунку й тестами.
 
 Реальна DB-реалізація може мати async-методи. У такому разі очікуйте їх через `await` у `run`. Створення пулу та його закриття оформлюйте як `open`/`close`, а конфігурацію передавайте через замикання або інший application-ресурс.
 
@@ -134,11 +134,11 @@ export const getTask = operation({
 });
 ```
 
-`error` можна доповнити деталями: `error('TASK_NOT_FOUND', { id: input.id })`. Деталі наразі мають тип `unknown`; окремої error-schema немає.
+`error` можна доповнити деталями: `error('TASK_NOT_FOUND', { id: input.id })`. Для типізованих деталей оголосіть `errors: { TASK_NOT_FOUND: { status: 404, details: s.object({ id: s.uuid() }) } }` та поверніть `fail("TASK_NOT_FOUND", { id: input.id })` через operation-local ctx.fail.
 
 Відсутність завдання є нормальною бізнес-ситуацією. Помилка мережі чи зламаний DB connection може залишитися exception. HTTP-адаптер перетворить невідомий exception на 500 `INTERNAL_ERROR` без тексту exception у відповіді.
 
-`errors` — runtime-реєстр дозволених кодів. TypeScript у цій версії не звужує всі можливі `error(...)` до ключів цього об’єкта. Повернення незареєстрованого коду виявляється під час виконання і стає збоєм сервера.
+`errors` типізує union business codes; operation-local `fail` перевіряє код і details. Runtime додатково валідує код і details schema. Глобальний `error` збережений для простих числових contracts; не стирайте inferred operation type широкими анотаціями.
 
 ## 6. Зберіть feature-модуль та application
 
@@ -166,7 +166,7 @@ import { tasks } from "./tasks/index.ts";
 export default application({ modules: [tasks] });
 ```
 
-Не викликайте `compile()` у default-export entrypoint для CLI: CLI зробить це сам. Якщо запускаєте application програмно, викликайте `compile` перед будь-яким `execute` та `close` у `finally`.
+Не викликайте `compile()` у default-export entrypoint для CLI: CLI зробить це сам. Якщо запускаєте application програмно, викликайте `compile`, потім `start` перед будь-яким `execute` та `close` у `finally`.
 
 Масив `operations` робить намір модуля явним. Операції, указані тільки в `routes`, компілятор теж знаходить. Досяжні через `needs` ресурси реєструються автоматично.
 
@@ -175,6 +175,7 @@ export default application({ modules: [tasks] });
 Код попередніх кроків уже зібраний у `docs/examples/tasks.ts`. Без копіювання файлів:
 
 ```sh
+npm run build
 ARC_APP=docs/examples/tasks.ts npx arc stand
 ```
 
@@ -254,6 +255,10 @@ async function loadRemote(url: string, signal?: AbortSignal) {
 - Тримайте input/output серіалізовними для HTTP та Stand. Поточні схеми працюють із JSON-подібними значеннями.
 - Вибирайте request scope для користувача, тимчасового стану та транзакцій; application — для спільних клієнтів і пулів.
 - Не зберігайте request-дані у спільному application-ресурсі без власної моделі конкурентного доступу.
-- Не покладайтеся на порядок ключів `needs`: незалежні request-ресурси одного рівня відкриваються паралельно.
+- Не покладайтеся на порядок ключів `needs`: request-ресурси відкриваються, щойно готові саме їхні dependencies.
 - Задавайте успішний HTTP-статус у маршруті, очікувані помилки — в операції.
 - Створюйте новий Application для ізольованого тестового сценарію, коли потрібен реальний стан ресурсів.
+
+## Вкладений сценарій
+
+Оголосіть `calls: { getTask }`, а всередині run використовуйте `await call("getTask", { id })`. Child input/output виводяться зі схем; calls видимі в IR. Shared request-resource не відкривається повторно. Для незалежного root-виклику використовуйте app.execute або client. [Подробиці lifecycle та trace](architecture.md).

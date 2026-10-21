@@ -19,6 +19,7 @@ test("operation: repository can be replaced without HTTP", async () => {
 test("application: created task can be read over HTTP", async () => {
   const app = createTasksApp();
   await app.compile();
+  await app.start();
   try {
     const fetch = handler(app);
     const created = await fetch(

@@ -76,7 +76,13 @@ export const number = (
       v <= (options.max ?? Infinity)
         ? v
         : fail(p, "invalid number"),
-    () => Math.max(options.min ?? 0, Math.min(1, options.max ?? 1)),
+    () => {
+      const value = Math.max(
+        options.min ?? -Infinity,
+        Math.min(1, options.max ?? Infinity),
+      );
+      return options.integer ? Math.ceil(value) : value;
+    },
   );
 export const boolean = () =>
   new Schema<boolean>(
@@ -153,3 +159,66 @@ export const s = {
   int: (o: { min?: number; max?: number } = {}) =>
     number({ ...o, integer: true }),
 };
+
+/** Validate supported contract metadata without executing validation or sample callbacks. */
+export function validateSchemaMetadata(
+  json: Record<string, any>,
+  path = "$",
+): void {
+  if (
+    !json ||
+    !["object", "array", "string", "number", "integer", "boolean"].includes(
+      json.type,
+    )
+  )
+    throw new Error(`Invalid schema type: ${path}`);
+  if (json.type === "string") {
+    for (const key of ["minLength", "maxLength"])
+      if (
+        json[key] !== undefined &&
+        (!Number.isInteger(json[key]) || json[key] < 0)
+      )
+        throw new Error(`Invalid schema length: ${path}`);
+    if ((json.minLength ?? 0) > (json.maxLength ?? Infinity))
+      throw new Error(`Impossible schema bounds: ${path}`);
+    if (json.format && !["uuid", "email"].includes(json.format))
+      throw new Error(`Unsupported schema format: ${path}`);
+    if (
+      json.format === "uuid" &&
+      ((json.minLength ?? 0) > 36 || (json.maxLength ?? Infinity) < 36)
+    )
+      throw new Error(`Impossible UUID bounds: ${path}`);
+    if (json.format === "email" && (json.maxLength ?? Infinity) < 5)
+      throw new Error(`Impossible email bounds: ${path}`);
+  }
+  if (["number", "integer"].includes(json.type)) {
+    for (const key of ["minimum", "maximum"])
+      if (json[key] !== undefined && !Number.isFinite(json[key]))
+        throw new Error(`Invalid schema number bound: ${path}`);
+    const min = json.minimum ?? -Infinity,
+      max = json.maximum ?? Infinity;
+    if (
+      min > max ||
+      (json.type === "integer" && Math.ceil(min) > Math.floor(max))
+    )
+      throw new Error(`Impossible schema bounds: ${path}`);
+  }
+  if (json.type === "object") {
+    if (
+      !json.properties ||
+      typeof json.properties !== "object" ||
+      Array.isArray(json.properties)
+    )
+      throw new Error(`Invalid object properties: ${path}`);
+    if (
+      !Array.isArray(json.required) ||
+      json.required.some(
+        (k: any) => typeof k !== "string" || !Object.hasOwn(json.properties, k),
+      )
+    )
+      throw new Error(`Invalid required fields: ${path}`);
+    for (const [key, value] of Object.entries(json.properties))
+      validateSchemaMetadata(value as any, `${path}.${key}`);
+  }
+  if (json.type === "array") validateSchemaMetadata(json.items, `${path}[]`);
+}

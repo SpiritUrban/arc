@@ -16,6 +16,7 @@ export const User = s.object({
 type User = ReturnType<typeof User.parse>;
 export const usersRepository = resource({
   id: "users.repository",
+  instrument: ["find", "list", "create"],
   effects: ["memory.read", "memory.write"],
   open: () => {
     const users = new Map<string, User>([
@@ -29,9 +30,9 @@ export const usersRepository = resource({
       ],
     ]);
     return {
-      find: (id: string) => users.get(id),
-      list: () => [...users.values()],
-      create: (name: string, email: string) => {
+      find: async (id: string) => users.get(id),
+      list: async () => [...users.values()],
+      create: async (name: string, email: string) => {
         if ([...users.values()].some((u) => u.email === email))
           return undefined;
         const user = { id: randomUUID(), name, email };
@@ -47,8 +48,8 @@ export const getUser = operation({
   output: User,
   needs: { users: usersRepository },
   errors: { USER_NOT_FOUND: 404 },
-  run: ({ input, users }) => {
-    const user = users.find(input.id);
+  run: async ({ input, users }) => {
+    const user = await users.find(input.id);
     return user ? ok(user) : error("USER_NOT_FOUND");
   },
 });
@@ -58,8 +59,8 @@ export const createUser = operation({
   output: User,
   needs: { users: usersRepository },
   errors: { EMAIL_EXISTS: 409 },
-  run: ({ input, users }) => {
-    const user = users.create(input.name, input.email);
+  run: async ({ input, users }) => {
+    const user = await users.create(input.name, input.email);
     return user ? ok(user) : error("EMAIL_EXISTS");
   },
 });
@@ -68,7 +69,7 @@ export const listUsers = operation({
   input: s.object({}),
   output: User.array(),
   needs: { users: usersRepository },
-  run: ({ users }) => ok(users.list()),
+  run: async ({ users }) => ok(await users.list()),
 });
 export const users = module({
   id: "users",

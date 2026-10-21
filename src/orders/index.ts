@@ -13,9 +13,9 @@ const currentUser = resource({
   id: "auth.currentUser",
   scope: "request",
   needs: { users: usersRepository },
-  open: ({ request, users }) => {
+  open: async ({ request, users }) => {
     const id = request?.headers.get("authorization")?.replace(/^Bearer /, "");
-    const user = id ? users.find(id) : undefined;
+    const user = id ? await users.find(id) : undefined;
     if (!user) throw new Fault("UNAUTHORIZED", 401);
     return user;
   },
@@ -30,15 +30,16 @@ const Order = s.object({
 type Order = ReturnType<typeof Order.parse>;
 const ordersRepository = resource({
   id: "orders.repository",
+  instrument: ["save", "list"],
   effects: ["memory.write"],
   open: () => {
     const orders: Order[] = [];
     return {
-      save: (order: Order) => {
+      save: async (order: Order) => {
         orders.push(order);
         return order;
       },
-      list: (userId: string) => orders.filter((o) => o.userId === userId),
+      list: async (userId: string) => orders.filter((o) => o.userId === userId),
     };
   },
 });
@@ -51,9 +52,9 @@ export const createOrder = operation({
   output: Order,
   needs: { user: currentUser, orders: ordersRepository },
   effects: ["orders.write"],
-  run: ({ input, user, orders }) =>
+  run: async ({ input, user, orders }) =>
     ok(
-      orders.save({
+      await orders.save({
         id: randomUUID(),
         userId: user.id,
         ...input,
@@ -66,7 +67,7 @@ const listOrders = operation({
   input: s.object({}),
   output: Order.array(),
   needs: { user: currentUser, orders: ordersRepository },
-  run: ({ user, orders }) => ok(orders.list(user.id)),
+  run: async ({ user, orders }) => ok(await orders.list(user.id)),
 });
 export const orders = module({
   id: "orders",

@@ -9,7 +9,15 @@
     "outDir": "dist",
     "declaration": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "rewriteRelativeImportExtensions": true
+    "rewriteRelativeImportExtensions": true,
+    "customConditions": ["arc-source"]
   },
-  "include": ["framework/src/**/*.ts", "src/**/*.ts", "tests/**/*.ts"]
+  "include": [
+    "framework/src/**/*.ts",
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "docs/examples/**/*.ts",
+    "benchmarks/**/*.ts",
+    "scripts/**/*.ts"
+  ]
 }

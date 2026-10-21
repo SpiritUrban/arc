@@ -1,9 +1,9 @@
-# @arc/framework
+# @arc/framework 0.2
 
-Окремий TypeScript ESM-пакет ARC. Не імпортує код кореневого застосунку. Потребує Node.js 22.18+; CLI завантажує TypeScript через залежність `tsx`.
+ARC: executable architecture graph, operations/resources/capabilities, explicit needs/calls, contracts, dependency-ready execution, Stand.
 
-Публічний API експортується з `src/index.ts`: schemas, operation, resource/capability, module, application, results, HTTP/OpenAPI, Stand, JSON-RPC, queue, schedule, client та test harness.
+Package exports: compiled ESM `dist/index.js`, types `dist/index.d.ts`, bin `arc.mjs` → compiled CLI. Production runtime не потребує tsx. Node.js 22.18+. Opt-in condition `arc-source` адресує TypeScript source для workspace development.
 
-З кореня репозиторію: `npm install`, `npm run dev`, `npm test`. Детальні приклади та межі реалізації — у кореневому README.md. У власному застосунку встановіть цей каталог як локальну залежність `"@arc/framework": "file:../arc/framework"` та експортуйте application із `src/app.ts`.
+Lifecycle: `await app.compile(); await app.start(); await app.execute(id,input); await app.close();`. `activate()` — alias start; graph/inspect не відкривають ресурси.
 
-Повна документація: [посібник ARC](../docs/README.md), [архітектура](../docs/architecture.md), [написання коду](../docs/writing-code.md), [API](../docs/api.md).
+У workspace: `npm run build`, `npm test`, `npm run test:distribution`. Документація в репозиторії: [посібник](../docs/README.md), [API](../docs/api.md), [аудит і міграція](../docs/audit/README.md).

@@ -6,13 +6,16 @@
     "framework"
   ],
   "scripts": {
-    "dev": "node --import tsx framework/src/cli.ts stand",
-    "start": "node --import tsx framework/src/cli.ts start",
-    "graph": "node --import tsx framework/src/cli.ts graph",
-    "inspect": "node --import tsx framework/src/cli.ts inspect",
-    "test": "node --import tsx --test tests/*.test.ts",
+    "dev": "node --conditions=arc-source --import tsx framework/src/cli.ts stand",
+    "start": "node --conditions=arc-source --import tsx framework/src/cli.ts start",
+    "graph": "node --conditions=arc-source --import tsx framework/src/cli.ts graph",
+    "inspect": "node --conditions=arc-source --import tsx framework/src/cli.ts inspect",
+    "test": "node --conditions=arc-source --import tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "build": "tsc"
+    "build": "npm run build --workspace @arc/framework && tsc",
+    "test:lifecycle": "node --conditions=arc-source --import tsx --test tests/lifecycle.test.ts",
+    "benchmark:scheduler": "node --conditions=arc-source --import tsx benchmarks/scheduler.ts",
+    "test:distribution": "npm run build --workspace @arc/framework && node scripts/check-distribution.mjs"
   },
   "dependencies": {
     "@arc/framework": "*"
