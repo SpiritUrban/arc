@@ -1,5 +1,5 @@
 export class ValidationError extends Error {
-  constructor(public issues: string[]) {
+  constructor(public issues: string[], public readonly fields: readonly string[] = []) {
     super(issues.join("; "));
   }
 }
@@ -128,16 +128,20 @@ export const object = <S extends Shape>(shape: S): Schema<ObjectType<S>> =>
         if (!Object.hasOwn(shape, k)) fail(`${p}.${k}`, "unknown property");
       const result: Record<string, unknown> = {};
       const issues: string[] = [];
+      const fields: string[] = [];
       for (const [k, s] of Object.entries(shape)) {
         try {
           const value = s.parse((v as any)[k], `${p}.${k}`);
           if (value !== undefined) result[k] = value;
         } catch (e) {
-          if (e instanceof ValidationError) issues.push(...e.issues);
+          if (e instanceof ValidationError) {
+            issues.push(...e.issues);
+            fields.push(k);
+          }
           else throw e;
         }
       }
-      if (issues.length) throw new ValidationError(issues);
+      if (issues.length) throw new ValidationError(issues, fields);
       return result as ObjectType<S>;
     },
     () =>

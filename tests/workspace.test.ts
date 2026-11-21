@@ -66,8 +66,11 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     const { window, document } = parseHTML(
       '<html><head></head><body><div id="app"></div></body></html>',
     );
+    let createOrderRequests = 0;
     const fetcher: typeof fetch = (input, init) => {
-      const promise = fetch(new URL(String(input), origin), init);
+      const url = new URL(String(input), origin);
+      if (url.pathname === "/_arc/call/orders.create") createOrderRequests++;
+      const promise = fetch(url, init);
       pending.add(promise);
       void promise.finally(() => pending.delete(promise)).catch(() => {});
       return promise;
@@ -202,14 +205,25 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     input("[data-quantity]", "0");
     submit("#orders form");
     await waitFor(() =>
-      document.querySelector("#orders [role=alert]")!.textContent!.includes("Перевірте введені дані"),
+      document.querySelector("[data-quantity-error]")!.textContent!.includes("від 1 до 100"),
     );
+    assert.equal(quantity.getAttribute("aria-invalid"), "true");
     assert.equal(quantity.value, "0");
+    assert.equal(createOrderRequests, 1);
     assert.equal(
       document.querySelector<HTMLInputElement>("[data-product]")!.value,
       "Rejected product",
     );
     assert.equal(document.querySelectorAll("[data-rows] tr").length, 1);
+    input("[data-product]", "");
+    input("[data-quantity]", "2");
+    submit("#orders form");
+    await waitFor(() =>
+      document.querySelector("#orders [data-error]")!.textContent!.includes("Перевірте введені дані"),
+    );
+    assert.equal(quantity.getAttribute("aria-invalid"), "false");
+    assert.equal(document.querySelector("[data-quantity-error]")!.textContent, "");
+    assert.equal(createOrderRequests, 1);
     input("[data-name]", "Duplicate User");
     input("[data-email]", "new@example.com");
     submit("#users form");

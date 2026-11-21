@@ -39,7 +39,7 @@ function renderOrdersPage() {
           <span class="circle-icon">↗</span>
         </div>
         {/* ARC перехоплює submit, викликає createOrder і залишає користувача на цій сторінці. */}
-        <form class="order-form" data-form onSubmit={createOrder}>
+        <form class="order-form" data-form novalidate onSubmit={createOrder}>
           <label class="product-field">
             Назва товару
             <input
@@ -50,18 +50,25 @@ function renderOrdersPage() {
               bind:value={createOrder.fields.product}
             />
           </label>
-          <label class="quantity-field">
-            Кількість
-            <input
-              data-quantity
-              required
-              type="number"
-              min="1"
-              max="100"
-              step="1"
-              bind:value={createOrder.fields.quantity}
-            />
-          </label>
+          <div class="quantity-field">
+            <label>
+              Кількість
+              <input
+                data-quantity
+                name="quantity"
+                required
+                type="number"
+                min="1"
+                max="100"
+                step="1"
+                bind:value={createOrder.fields.quantity}
+                aria-invalid={createOrder.invalid("quantity")}
+              />
+            </label>
+            <p class="error" role="alert" data-quantity-error>
+              {createOrder.invalid("quantity") && "Введіть ціле число від 1 до 100."}
+            </p>
+          </div>
           <button
             class="button primary"
             type="submit"
@@ -77,7 +84,11 @@ function renderOrdersPage() {
           <span>Для вибраного користувача</span>
         </div>
         <p class="error" role="alert" data-error>
-          {failureMessage(createOrder().error ?? ordersData().error)}
+          {failureMessage(
+            (createOrder.invalid("quantity") && !createOrder.invalid("product")
+              ? undefined
+              : createOrder().error) ?? ordersData().error,
+          )}
         </p>
       </div>
       <div class="panel history">

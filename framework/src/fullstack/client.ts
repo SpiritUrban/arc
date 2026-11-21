@@ -2,7 +2,7 @@ import {
   type OperationContract,
   type BusinessError,
 } from "../neutral/contracts.js";
-import type { Infer } from "../schema.js";
+import { ValidationError, type Infer } from "../schema.js";
 import {
   browserEvent,
   identity,
@@ -238,7 +238,13 @@ export type Mutation<C extends OperationContract, Field extends string = never> 
   CallableAction<void, RemoteResult<C>> & {
     fields: RemoteForm<C, Field>["fields"];
     failed(code: keyof C["errors"] & string): boolean;
+    invalid(field: InputField<C>): boolean;
   };
+
+type InputField<C extends OperationContract> =
+  Infer<C["input"]> extends Record<string, unknown>
+    ? Extract<keyof Infer<C["input"]>, string>
+    : never;
 
 function buildRemoteForm<C extends OperationContract, Field extends string>(
   contract: C, options: FormOptions<C, Field>, defaults: RemoteFormDefaults, callable: true,
@@ -294,7 +300,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
       if (!fieldOptions && !submission)
         throw new TypeError("Named-field forms must be submitted from an HTML form");
       const payload = submission
-        ? contract.input.parse(submission.values)
+        ? submission.values
         : input
         ? input(values)
         : (Object.fromEntries(
@@ -303,7 +309,8 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
               parse ? parse(values[name]) : values[name],
             ]),
           ) as Infer<C["input"]>);
-      const result = await client.call(payload, ctx);
+      const validated = submission || callable ? contract.input.parse(payload) : payload;
+      const result = await client.call(validated, ctx);
       if (result.ok && !ctx.signal.aborted) {
         batch(() => {
           for (const { name, initial } of definitions) {
@@ -363,6 +370,10 @@ function bindMutation(defaults: RemoteFormDefaults) {
         return status === "error" &&
           result?.kind === "business_error" &&
           result.error === code;
+      },
+      invalid(field: InputField<C>) {
+        const { error } = submit();
+        return error instanceof ValidationError && error.fields.includes(field);
       },
     });
   }
