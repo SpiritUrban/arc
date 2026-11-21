@@ -1,13 +1,11 @@
 # ARC Fullstack
 
-Один feature module містить server operations/resources та `web:{nodes,entry}`. Це вибрано замість нового універсального nodes API, щоб зберегти server compatibility. Нейтральний compiler будує один IR v3 з browser/server/shared partitions та boundary manifest.
+У full-stack застосунку доменна операція має один контракт для браузера й сервера. `operationContract` задає ID, вхід, результат, бізнес-помилки й доступність операції з браузера. Сервер додає реалізацію та її залежності. Браузер використовує той самий контракт через `query` для читання або `mutation` для запису.
 
-[Tasks application](../../examples/fullstack-tasks/app.ts) об’єднує [server](../../examples/fullstack-tasks/server.ts), [contracts](../../examples/fullstack-tasks/contracts.ts) та [page](../../examples/fullstack-tasks/page.tsx). Запуск: `npm run dev:fullstack-tasks`, web/server :3000, Stand :3100. `npm run build:fullstack` збирає browser assets; `npm run build` компілює framework/server ESM і збирає frontend Workspace; для Tasks assets використовуйте саме build:fullstack.
+Наприклад, `CreateOrder` задає контракт створення замовлення. Серверна операція отримує поточного користувача й репозиторій, обчислює суму та зберігає замовлення. Форма викликає операцію через `mutation` і вказує, який запит оновити після успіху. [Контракт](../../examples/workspace/orders/contracts.ts) · [Сервер](../../examples/workspace/orders/server.ts) · [Форма](../../examples/workspace/orders/page.tsx)
 
-Shared `operationContract` містить id/input/output/errors/expose; сервер додає реалізацію через `operation(contract, implementation)`, а браузер використовує той самий контракт у `remote` або `remoteForm`. DTO source не дублюється. Browser bundle не імпортує repository.
-
-[Remote](remote-operations.md) · [Boundaries/build](runtime-boundaries.md) · [Tracing](tracing.md). Майбутні SPA/SSR/SSG targets можуть використовувати той самий View Graph; SSR transport зможе замінити network на direct execution. Зараз реалізовано лише browser SPA execution. `remoteForm` підключає HTML-форму до контракту та керує станом надсилання.
+ARC збирає браузерні, серверні й спільні вузли в один граф (IR v3). Браузерна збірка отримує контракт і клієнт виклику, а репозиторій та реалізація операції працюють на сервері. Stand показує граф і трасу від надсилання форми до оновлення даних у браузері. [Запити й форми](remote-operations.md) · [Межі виконання](runtime-boundaries.md) · [Трасування](tracing.md)
 
 ## Fullstack-приклад Workspace
 
-[ARC Workspace](../workspace-app.md) у `examples/workspace/` використовує users/orders server features і browser panels в одному IR. Його звичайний запуск — npm run dev:workspace. [Frontend guide](../web/writing-frontend.md) показує shared descriptors → resource/action → binding/view → root composition; [browser tests](../web/testing.md) перевіряють повний user flow.
+Запустіть Workspace командою `npm run dev:workspace`. Для меншого прикладу зі списком завдань виконайте `npm run dev:fullstack-tasks`. [ARC Workspace](../workspace-app.md) · [Fullstack Tasks](../../examples/fullstack-tasks/app.ts)

@@ -1,6 +1,8 @@
 # @arc/framework
 
-ARC — executable architecture graph із contracts, operations, resources/capabilities, explicit needs/calls, dependency-ready runtime та Stand. Node.js 22.18+, ESM.
+ARC — full-stack фреймворк, у якому застосунок будують навколо доменних операцій. Спільний контракт описує вхід, результат і бізнес-помилки. Сервер реалізує операцію та оголошує її залежності. ARC пов’язує їх із транспортом та інтерфейсом у виконуваному графі, який можна переглянути в Stand.
+
+Потрібен Node.js 22.18+. Пакет використовує ESM.
 
 ## Public package
 
@@ -44,7 +46,7 @@ Production CLI: `ARC_APP=dist/examples/workspace/app.js node framework/arc.mjs s
 
 ## TSX-шаблони
 
-Задайте `"jsx": "react-jsx"` і `"jsxImportSource": "@arc/framework/web"` у compiler options TypeScript. У файлі `.tsx` оголосіть view, наприклад `view({ id: "page", template: () => <main>Привіт!</main> })`. Динамічні значення та події підключайте через `bind:text={state}` і `on:click={action}`. ARC додає прив’язки до графа ще до mount, а потім використовує їх для оновлення DOM.
+Задайте `"jsx": "react-jsx"` і `"jsxImportSource": "@arc/framework/web"` у параметрах TypeScript. Сторінка читає дані з `query(contract)`, а форма передає `mutation(contract)` в `onSubmit`. ARC оновлює залежні ділянки DOM. Для звичайних реактивних JSX-виразів у браузерній збірці є режим `// @arc reactive-jsx`.
 
 ## Документація репозиторію
 
@@ -56,6 +58,6 @@ Production CLI: `ARC_APP=dist/examples/workspace/app.js node framework/arc.mjs s
 
 `@arc/framework/core` — neutral graph/contracts; `/server` — server; `/web` — fine-grained browser runtime; `/fullstack` — browser remote bridge; `/fullstack/server` і `/fullstack/build` — Node integration; `/stand` — tooling. Один physical package, підготовлений до майбутнього розділення. Browser build/dev потребує optional peer esbuild; server-only JS — ні.
 
-[Web](../docs/web/getting-started.md), [Fullstack](../docs/fullstack/overview.md), [IR v3 migration](../docs/migration-0.3.md). `remoteForm` зв’язує поля й оновлення ресурсів із серверним контрактом, а `project` обчислює значення в TSX-прив’язці.
+[Web](../docs/web/getting-started.md), [Fullstack](../docs/fullstack/overview.md), [IR v3 migration](../docs/migration-0.3.md).
 
 Frontend посібники: [зміст ARC Web](../docs/web/README.md), [як писати feature](../docs/web/writing-frontend.md), [forms/events](../docs/web/forms-and-events.md), [lifecycle](../docs/web/lifecycle.md), [тести](../docs/web/testing.md). Fullstack-приклад: [ARC Workspace](../docs/workspace-app.md).

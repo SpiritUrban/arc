@@ -5,24 +5,24 @@ Workspace використовує HTML-форми в TSX, вбудовані о
 ## Поля та submit
 
 ```ts
-const { fields, submit: addUser } = remoteForm(CreateUser, {
-  fields: { name: textField(), email: textField() },
+const addUser = mutation(CreateUser, {
   refresh: [users],
 });
 ```
 
 ```tsx
-<form on:submit={addUser}>
-  <label>Ім’я <input required bind:value={fields.name} /></label>
-  <button type="submit" bind:disabled={addUser.running}>
+<form onSubmit={addUser}>
+  <label>Ім’я <input name="name" required /></label>
+  <label>Email <input name="email" type="email" required /></label>
+  <button type="submit">
     Додати користувача
   </button>
 </form>
 ```
 
-`bind:value={fields.name}` записує значення state у поле й оновлює state на події `input`. Значення DOM-поля є рядком. У формі замовлень `integerField(1)` перетворює рядок на число перед запитом. Ціле значення та межі перевіряє серверна схема.
+ARC збирає значення полів за `name` і перевіряє їх за контрактом. `onSubmit` блокує повторне надсилання, поки виконується операція. Подія, дія і серверний виклик мають спільну трасу.
 
-`on:submit={addUser}` скасовує стандартну навігацію й одночасно допускає лише один submit цієї дії. `bind:disabled` показує цей стан у DOM. Подія, дія і серверний виклик зберігають спільний trace.
+Якщо значення потрібне до надсилання, підключіть його через `bind:value`. У формі замовлень поле кількості живить підрахунок суми, а `integerField(1)` перетворює рядок на число для контракту. [Форма замовлень](../../examples/workspace/orders/page.tsx)
 
 ## Typed business error
 
@@ -41,7 +41,7 @@ if (result.ok) {
 }
 ```
 
-У Workspace `remoteForm` надає цей результат через `submit.result`, а `failureMessage` перетворює `submit.error` або помилку ресурсу на повідомлення. Raw server exceptions не показуються в UI. Errors з optional details schema також типізуються contract union.
+У Workspace результат доступний через `addUser().result`. Функція `failureMessage` перетворює `addUser().error` або помилку запиту на повідомлення для сторінки.
 
 ## Списки
 
@@ -58,4 +58,4 @@ if (result.ok) {
 
 `bind:children={rows}` підходить для вмісту, який зручно замінити цілком. Рядкові значення в обох випадках стають текстовими вузлами.
 
-У [списку користувачів](../../examples/workspace/users/page.tsx) контейнер також має `bind={select}`. Цей явний binding знаходить натиснутий рядок через `closest("[data-user]")` і змінює `selectedUser`.
+У списку користувачів `map` і `key` зберігають DOM рядків, а `onClick` на кнопці змінює `selectedUser`. [Сторінка користувачів](../../examples/workspace/users/page.tsx)

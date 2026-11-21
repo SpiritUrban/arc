@@ -1,18 +1,16 @@
 # Як писати frontend на ARC
 
-Цей посібник використовує [приклад ARC Workspace](../workspace-app.md) з `examples/workspace/`. Реалізація фреймворку лежить у `framework/`.
+Почніть із доменної операції, яку виконує сторінка. У Workspace форма створює користувача через контракт `CreateUser`, а список читає користувачів через `ListUsers`. [ARC Workspace](../workspace-app.md)
 
 ## 1. Оберіть власника даних
 
-| Потреба                                     | Primitive            | Приклад Workspace                                     |
-| ------------------------------------------- | -------------------- | ----------------------------------------------------- |
-| Поле форми, search, вибраний користувач     | state                | users.create.submit.fields.name, users.search, workspace.selected-user |
-| Фільтр, видимі замовлення, активний користувач | derive               | users.filtered, orders.visible, users.active            |
-| Дані із server/external API                 | query / webResource | users.list.query, orders.list.query                         |
-| Mutation або user command                   | action               | users.create.submit, orders.create.submit                                 |
-| DOM та listeners                            | view / binding       | users.page, `each(visibleOrders, …)`                         |
-
-Не зберігайте копію remote list у додатковому state без окремої потреби. Не запускайте fetch із `derive.compute` чи `view.template`: load належить resource, mutation — action.
+| Потреба | API | Приклад Workspace |
+| --- | --- | --- |
+| Стан екземпляра сторінки | `view.state` | `search` |
+| Спільний вибір | `signal` | `selectedUser` |
+| Похідні дані | функція або `derive` | `visible()`, `visibleOrders` |
+| Читання з сервера | `query` | `users`, `ordersData` |
+| Запис на сервер | `mutation` | `addUser`, `createOrder` |
 
 ## 2. Розміщуйте код за feature
 
@@ -46,12 +44,11 @@ examples/workspace/
 ## 4. Опишіть форму та її результат
 
 ```ts
-import { remoteForm, textField } from "@arc/framework/fullstack";
+import { mutation } from "@arc/framework/fullstack";
 import { CreateUser } from "./contracts.ts";
 import { selectedUser, users } from "../user-selection.ts";
 
-const { fields, submit: addUser } = remoteForm(CreateUser, {
-  fields: { name: textField(), email: textField() },
+const addUser = mutation(CreateUser, {
   needs: [selectedUser],
   refresh: [users],
   onSuccess(user, ctx) {
@@ -60,15 +57,15 @@ const { fields, submit: addUser } = remoteForm(CreateUser, {
 });
 ```
 
-`remoteForm` створює стан полів, дію та endpoint у графі. `refresh` оновлює `query(ListUsers)` після успіху. `onSuccess` отримує типізовану відповідь і змінює вибір користувача. `needs` показує цю залежність у Stand. Локальний пошук фільтрує дані з `users().data`.
+`refresh` оновлює список після успіху. `onSuccess` отримує типізовану відповідь і вибирає нового користувача. `needs` додає цей зв’язок до графа.
 
 ## 5. Оголосіть шаблон і прив’язки
 
 ```tsx
-<form on:submit={addUser}>
-  <label>Ім’я <input required bind:value={fields.name} /></label>
-  <label>Email <input required type="email" bind:value={fields.email} /></label>
-  <button type="submit" bind:disabled={addUser.running}>Додати користувача</button>
+<form onSubmit={addUser}>
+  <label>Ім’я <input name="name" required /></label>
+  <label>Email <input name="email" required type="email" /></label>
+  <button type="submit">Додати користувача</button>
 </form>
 ```
 
@@ -82,18 +79,13 @@ ARC створює вузли директив ще до монтування. �
 web: { nodes: [WorkspacePage], entry: "examples/workspace/browser.ts" }
 ```
 
-WorkspacePage.needs посилається на UsersPage та OrdersPage, тому compiler знаходить їх транзитивно. У [browser.ts](../../examples/workspace/browser.ts):
+Шаблон `WorkspacePage` містить `{UsersPage}` і `{OrdersPage}`. ARC додає обидві сторінки до графа й монтує разом із кореневою.
 
 ```ts
-const app = webApplication({ nodes: [WorkspacePage], telemetry });
-app.compile();
-app.start();
-app.mount(WorkspacePage, document.querySelector("#app")!);
-app.mount(UsersPage, document.querySelector("#users")!);
-app.mount(OrdersPage, document.querySelector("#orders")!);
+const app = startWeb(WorkspacePage, document.querySelector("#app")!, { telemetry });
 ```
 
-Parent view створює mount targets перед child mounts. needs — architecture dependency, він не робить автоматичного DOM mount. Runtime починає application resources на start; pagehide викликає app.dispose та telemetry.dispose. Повний bootstrap і CSS injection — у browser.ts.
+У браузерній точці входу `pagehide` звільняє застосунок і транспорт телеметрії. [Браузерна точка входу](../../examples/workspace/browser.ts)
 
 ## 7. Перевірте boundary та interaction
 

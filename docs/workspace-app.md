@@ -1,6 +1,6 @@
 # ARC Workspace — fullstack-приклад
 
-ARC Workspace — приклад застосунку з користувачами та замовленнями в `examples/workspace/`. Він використовує server operations/resources, Web state/derive/action/view/bindings і fullstack remote bridge.
+ARC Workspace — приклад застосунку для роботи з користувачами та замовленнями. Він показує, як доменна операція «створити замовлення» поєднує спільний контракт, серверну логіку, репозиторій і форму. Після успіху ARC оновлює список замовлень поточного користувача.
 
 ## Запуск
 
@@ -37,14 +37,14 @@ npm test
 - `examples/workspace/users/server.ts`, `examples/workspace/orders/server.ts` — існуючі серверні сховища, операції та REST-маршрути.
 - `examples/workspace/auth.ts` — визначення користувача в межах HTTP-запиту.
 - `examples/workspace/user-selection.ts` — спільний браузерний стан вибору та дані користувача.
-- `examples/workspace/users/page.tsx` — users resource, search/local fields, create action, active user, bindings/view.
-- `examples/workspace/orders/page.tsx` — віддалений список замовлень, форма на `remoteForm` і підсумки, залежні від вибраного користувача.
+- `examples/workspace/users/page.tsx` — пошук, список користувачів і форма створення через `mutation`.
+- `examples/workspace/orders/page.tsx` — список замовлень через `query`, форма через `mutation` і підсумки для вибраного користувача.
 - `examples/workspace/page.tsx`, `examples/workspace/styles.ts` — responsive Workspace shell та стилі.
 - `examples/workspace/browser.ts` — browser composition, mount, telemetry та pagehide disposal.
 - `examples/workspace/ui.ts` — допоміжні функції для input bindings, форматування сум і повідомлень про помилки.
 
 ```text
-users.create.submit.fields.name / users.create.submit.fields.email
+Форма створення користувача (onSubmit)
   → users.create.submit [action]
     → users.create.submit.remote → users.create [server] → users.repository
     INVALIDATES → users.list.query → users.list [server]
@@ -58,7 +58,7 @@ orders.list.query → orders.visible → DOM bindings підсумку
 
 Remote order requests використовують request-scoped Authorization header з поточним selected user. При зміні identity resource abort попередній запит; framework generation guard відкидає старий результат. Додатковий derived filter не показує попереднього користувача під час reload.
 
-ARC створює вузли прив’язок із TSX до mount. Bindings оновлюють поля вводу, підсумки, повідомлення та списки. `each` зберігає незмінні рядки таблиці замовлень за ID, а `bind:children` будує список користувачів із TSX; введені дані стають текстовими вузлами. Native form validation доповнюється server contract validation.
+ARC створює вузли прив’язок із TSX до монтування. `each` у таблиці замовлень і JSX-список із `map` та `key` на сторінці користувачів зберігають DOM незмінених рядків. Браузерні перевірки форми доповнює перевірка за контрактом операції.
 
 Browser bundle містить shared contracts та UI, але не repositories, Node crypto чи request auth implementation. Compile перевіряє remote exposure і contract compatibility. REST `/users`, `/orders`, `/health` збережені; `/` тепер application UI. Browser telemetry й server traces видно в одному Stand graph.
 
@@ -68,8 +68,8 @@ Browser bundle містить shared contracts та UI, але не repositories
 
 ## Як змінювати frontend
 
-Почніть із [покрокового frontend guide](web/writing-frontend.md). [Forms/events](web/forms-and-events.md) пояснює `bind:value`, `on:submit` і TSX-списки. [Lifecycle](web/lifecycle.md) описує mount панелей та ownership; [тести](web/testing.md) — перевірку feature без зовнішніх систем.
+Почніть із покрокового посібника про frontend. [Як писати frontend](web/writing-frontend.md) · [Форми й події](web/forms-and-events.md) · [Життєвий цикл](web/lifecycle.md) · [Тести](web/testing.md)
 
-Для нового браузерного виклику оголосіть спільний контракт із `expose.web` і підключіть його на сервері. У формі опишіть поле в `remoteForm` і прив’яжіть його через `bind:value={fields.name}`. Додайте потрібний список у `refresh`, щоб ARC оновив його після успішного запиту.
+Для нової операції оголосіть спільний контракт із `expose: { web: true }` і реалізуйте його на сервері. Для читання використайте `query`. Для запису прив’яжіть `mutation` до `onSubmit` та вкажіть запити для оновлення в `refresh`. Полям, потрібним лише під час надсилання, достатньо HTML-атрибута `name`.
 
-Стилі належать application examples/workspace/styles.ts, а не framework. Shell навігація — anchor links до секцій, не SPA router. Форми використовують браузерні перевірки та серверні схеми, а `remoteForm` керує надсиланням і оновленням ресурсів.
+Стилі застосунку лежать у `examples/workspace/styles.ts`. Навігація Workspace використовує посилання на секції сторінки.

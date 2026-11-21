@@ -1,6 +1,8 @@
 # ARC — Application Runtime Graph Compiler
 
-ARC is an application graph framework/compiler for server, browser and fullstack applications. Архітектура — executable application graph; compiler визначає runtime targets, contracts і явні boundaries.
+**ARC — full-stack фреймворк для застосунків, побудованих навколо доменних операцій.** Операція на кшталт «створити замовлення» має контракт, бізнес-логіку й явні залежності. ARC збирає операції, ресурси, транспорт та інтерфейс у виконуваний граф.
+
+Браузер читає дані через `query` і надсилає зміни через `mutation` за спільними із сервером контрактами. У Stand видно, як дія в інтерфейсі доходить до серверної операції та які дані оновлюються після неї.
 
 | Режим         | API                                                       | Приклад                  |
 | ------------- | --------------------------------------------------------- | ------------------------ |
@@ -41,7 +43,7 @@ npm run benchmark:web
 
 Server lifecycle: `compile → start → execute → close`. `graph`/`inspect` не відкривають ресурси. Browser lifecycle: `compile → start → mount → unmount → dispose`. [TSX-шаблон](docs/web/views.md) описує DOM і прив’язки. ARC додає їх до графа до mount, а після mount оновлює залежні ділянки DOM.
 
-Compiled ESM і declarations доступні через `@arc/framework/{core,server,web,fullstack,stand}`; кореневий import зберігає server API. Production JS не потребує tsx. Browser build tooling використовує optional peer esbuild. `remoteForm` підключає HTML-форму до серверного контракту, а `project` додає обчислення прямо в TSX-прив’язку. [Форми](docs/fullstack/remote-operations.md) · [Прив’язки](docs/web/views.md)
+Зібрані ESM-модулі й типи доступні через `@arc/framework/{core,server,web,fullstack,stand}`. Кореневий імпорт надає серверний API. Зібраний серверний JS працює без `tsx`. Для браузерної збірки використовується `esbuild`. [Запити й форми](docs/fullstack/remote-operations.md) · [Реактивний JSX](docs/web/views.md)
 
 ## Збірка застосунку та сайту
 
