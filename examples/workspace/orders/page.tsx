@@ -120,7 +120,7 @@ function renderOrdersPage(quantity: Signal<string>) {
                 render: (order) => (
                   <tr data-order={order.id}>
                     <td>
-                      <strong>{order.product}</strong>
+                      <strong><a href={`/orders/${order.id}`}>{order.product}</a></strong>
                       <small>#{order.id.slice(0, 8)}</small>
                     </td>
                     <td>{order.quantity}</td>

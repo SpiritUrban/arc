@@ -5,6 +5,7 @@ import { resolve, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { wireContract } from "../neutral/descriptor.js";
+import { comparePagePaths, matchPagePath } from "../neutral/page-path.js";
 import type { ArchitectureIR, GraphDefinition } from "../neutral/graph.js";
 import { fileURLToPath } from "node:url";
 type BuildPage = { path: string; entry: string; id?: string };
@@ -33,13 +34,13 @@ function hasReadRoute(path: string, ir: ArchitectureIR) {
     if (route.method !== "GET" && route.method !== "HEAD") return false;
     const parts = route.path.replace(/\/$/, "").split("/");
     return parts.length === segments.length && parts.every(
-      (part, index) => part === segments[index] || (part.startsWith(":") && segments[index]),
+      (part, index) => part === segments[index] || (part.startsWith(":") && segments[index]) || (segments[index].startsWith(":") && part),
     );
   });
 }
 
 async function buildPage(
-  { entry: source, id }: BuildPage,
+  { entry: source, id, path }: BuildPage,
   outfile: string,
   ir: ArchitectureIR,
   serverModules: Set<string>,
@@ -55,7 +56,7 @@ async function buildPage(
           contents: [
             `import * as page from ${JSON.stringify(entry)};`,
             `import { bootstrapPage } from ${JSON.stringify(fileURLToPath(new URL("./page-bootstrap.js", import.meta.url)))};`,
-            `bootstrapPage(page, ${JSON.stringify(id)});`,
+            `bootstrapPage(page, ${JSON.stringify(id)}, ${JSON.stringify(path)});`,
           ].join("\n"),
           resolveDir: dirname(entry),
           sourcefile: "arc-page-entry.js",
@@ -186,6 +187,11 @@ function missingFile(error: unknown) {
   return (error as NodeJS.ErrnoException | undefined)?.code === "ENOENT";
 }
 
+export function findWebPage(pages: readonly PageAssets[], pathname: string) {
+  return pages.filter(({ path }) => matchPagePath(path, pathname) !== undefined)
+    .sort((a, b) => comparePagePaths(a.path, b.path))[0];
+}
+
 export async function staticWeb(
   outDir: string,
   request: Request,
@@ -193,6 +199,7 @@ export async function staticWeb(
 ): Promise<Response | undefined> {
   if (request.method !== "GET" && request.method !== "HEAD") return;
   const path = new URL(request.url).pathname;
+  if (path === "/openapi.json") return;
   let pages = builtPages;
   if (!pages) {
     try {
@@ -208,7 +215,7 @@ export async function staticWeb(
       !params.some((param) => /^q\s*=\s*0(?:\.0*)?$/.test(param));
   });
   const script = pages.find((page) => page.script === path);
-  const page = pages.find((page) => page.path === path);
+  const page = findWebPage(pages, path);
   const file = script ? script.script.slice(1) : page && (!page.api || acceptsHtml) ? page.html : undefined;
   if (!file) return;
 

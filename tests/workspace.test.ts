@@ -68,6 +68,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     await app.start();
     const built = await buildWeb(app, { outDir: dir });
     assert.ok(nodes.some(({ id }) => id === "page:orders-screen"));
+    assert.ok(nodes.some(({ id }) => id === "page:order-detail"));
     assert.ok(built.manifest.inputs.includes("examples/workspace/page.tsx"));
     assert.ok(built.manifest.inputs.some((input) => input.endsWith("arc-page-entry.js")));
     assert.ok(!built.manifest.inputs.includes("examples/workspace/users/server.ts"));
@@ -503,7 +504,43 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       }),
     );
     assert.equal(createdOverRest.status, 201);
-    assert.match(await createdOverRest.text(), /REST order/);
+    const restOrder = await createdOverRest.json() as { id: string; product: string };
+    assert.equal(restOrder.product, "REST order");
+    const detailPath = `/orders/%${restOrder.id.charCodeAt(0).toString(16)}${restOrder.id.slice(1)}`;
+    const readOrder = (path: string, actor: string) => fetch(`${origin}${path}`, {
+      headers: { accept: "application/json", authorization: `Bearer ${actor}` },
+    });
+    const ownOrder = await readOrder(detailPath, userId!);
+    assert.equal(ownOrder.status, 200);
+    assert.equal((await ownOrder.json() as { id: string }).id, restOrder.id);
+    const otherOrder = await readOrder(detailPath, demoId);
+    assert.equal(otherOrder.status, 404);
+    assert.match(await otherOrder.text(), /ORDER_NOT_FOUND/);
+    const missing = await readOrder("/orders/00000000-0000-4000-8000-000000000099", userId!);
+    assert.equal(missing.status, 404);
+
+    const detail = await fetch(`${origin}${detailPath}`, { headers: { accept: "text/html" } });
+    assert.equal(detail.status, 200);
+    const { document: detailDocument, window: detailWindow } = parseHTML(await detail.text());
+    const detailScript = detailDocument.querySelector("script")!.getAttribute("src")!;
+    const detailCode = await fetch(`${origin}${detailScript}`).then((response) => response.text());
+    new vm.Script(detailCode).runInContext(vm.createContext({
+      ...browserGlobals,
+      document: detailDocument,
+      window: {
+        location: new URL(`${origin}${detailPath}`),
+        addEventListener: detailWindow.addEventListener.bind(detailWindow),
+      },
+    }));
+    try {
+      await waitFor(() => detailDocument.querySelector('section[aria-label="Замовлення"] [role=alert]')?.textContent?.includes("недоступне") === true);
+      assert.equal(detailDocument.querySelector("[data-order-detail]"), null);
+      await waitFor(() => Boolean(detailDocument.querySelector(`[data-user="${userId}"]`)));
+      detailDocument.querySelector(`[data-user="${userId}"]`)!.dispatchEvent(new detailWindow.Event("click"));
+      await waitFor(() => detailDocument.querySelector("[data-order-detail] h2")?.textContent === "REST order");
+    } finally {
+      detailWindow.dispatchEvent(new detailWindow.Event("pagehide"));
+    }
     cleanupBrowser();
     cleanupBrowser = undefined;
     assert.equal(document.querySelector("#app")!.children.length, 0);

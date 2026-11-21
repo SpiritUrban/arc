@@ -399,22 +399,31 @@ export function view<Initial extends Record<string, unknown>>(
   });
 }
 
-export interface PageContext {
+type OwnedNode = NonNullable<View["owned"]>[number];
+
+export interface PageContext<Param extends string = string> {
+  params: Readonly<Record<Param, string>>;
   local<T>(initial: T): Signal<T>;
+  own<T extends OwnedNode>(node: T): T;
 }
 
-export function pageView(id: string, template: (context: PageContext) => TemplateElement): View {
-  return scopedView({ id }, (local) => template({ local }));
+export function pageView(
+  id: string,
+  template: (context: PageContext) => TemplateElement,
+  params: Readonly<Record<string, string>> = {},
+): View {
+  return scopedView({ id }, (local, own) => template({ params, local, own }));
 }
 
 type LocalFactory = <T>(initial: T, name?: string) => Signal<T>;
 
 function scopedView(
   def: Omit<LocalViewOptions<Record<string, unknown>>, "state" | "template">,
-  template: (local: LocalFactory) => TemplateElement,
+  template: (local: LocalFactory, own: PageContext["own"]) => TemplateElement,
 ): View {
   function create(scope?: Scope) {
     const fields = new Map<string, GraphDefinition>();
+    const owned = [...(def.owned ?? [])];
     let building = true;
     const local: LocalFactory = (initial, name = String(fields.size)) => {
       if (!building) throw new Error(`Declare local state while building ${def.id}`);
@@ -423,10 +432,24 @@ function scopedView(
       fields.set(name, scope ? scope.own(field) : field);
       return field;
     };
-    const instance = buildView({ ...def, template: () => template(local) });
-    building = false;
-    instance.dependencies = [...(instance.dependencies ?? []), ...fields.values()];
-    return instance;
+    const own: PageContext["own"] = (node) => {
+      if (!building) throw new Error(`Declare owned resources while building ${def.id}`);
+      if (!owned.includes(node)) {
+        node.metadata = { ...node.metadata, scope: "view" };
+        owned.push(node);
+      }
+      return node;
+    };
+    try {
+      const instance = buildView({ ...def, owned, template: () => template(local, own) });
+      instance.dependencies = [...(instance.dependencies ?? []), ...fields.values()];
+      return instance;
+    } catch (error) {
+      if (scope) for (const node of owned) scope.own(node);
+      throw error;
+    } finally {
+      building = false;
+    }
   }
 
   const graphView = create();
@@ -781,12 +804,13 @@ export function mount(
     for (const source of b.sources) scope.add(source.subscribe(update));
   };
   try {
-    for (const item of def.owned ?? []) {
-      scope.own(item);
+    const instance = def[instantiateView]?.(scope) ?? def;
+    const owned = instance.owned ?? [];
+    for (const item of owned) scope.own(item);
+    for (const item of owned) {
       if ("activate" in item && typeof item.activate === "function")
         item.activate(telemetry);
     }
-    const instance = def[instantiateView]?.(scope) ?? def;
     root = instance.setup({
       document: target.ownerDocument,
       scope,

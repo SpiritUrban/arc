@@ -14,7 +14,7 @@ import {
   type OperationContract,
 } from "@arc/framework/server";
 import { currentUser } from "../auth.ts";
-import { Order, ListOrders, CreateOrder, CancelOrder } from "./contracts.ts";
+import { Order, ListOrders, GetOrder, CreateOrder, CancelOrder } from "./contracts.ts";
 
 // Імпортований Order є схемою перевірки. Локальний тип Order описує дані після parse.
 type Order = ReturnType<typeof Order.parse>;
@@ -24,7 +24,7 @@ type Order = ReturnType<typeof Order.parse>;
 const ordersRepository = resource({
   id: "orders.repository",
   // ARC записує виклики цих методів у трасу. Їх можна побачити в Stand.
-  instrument: ["save", "list", "cancel"],
+  instrument: ["save", "list", "find", "cancel"],
   // effects описує побічні ефекти в метаданих ARC. Сам запис виконує метод save.
   effects: ["memory.write"],
   open: () => {
@@ -36,6 +36,8 @@ const ordersRepository = resource({
       },
       // Вибірка обмежена власником, якого передає серверна операція.
       list: async (userId: string) => orders.filter((o) => o.userId === userId),
+      find: async (id: string, userId: string) =>
+        orders.find((order) => order.id === id && order.userId === userId),
       async cancel(id: string, userId: string) {
         const index = orders.findIndex((order) => order.id === id && order.userId === userId);
         if (index < 0) return "ORDER_NOT_FOUND" as const;
@@ -49,6 +51,13 @@ const ordersRepository = resource({
 });
 
 const needs = { user: currentUser, orders: ordersRepository };
+const getOrder = http.get("/orders/:id", GetOrder, {
+  needs,
+  async run({ input, user, orders }) {
+    const order = await orders.find(input.id, user.id);
+    return order ? ok(order) : error("ORDER_NOT_FOUND");
+  },
+});
 const createOrder = http.post("/orders", CreateOrder, {
   status: 201,
   needs,
@@ -92,5 +101,5 @@ class Orders {
 const listOrders = handlerModule("orders", Orders);
 export const orders = module({
   ...listOrders,
-  routes: [createOrder, cancelOrder, ...(listOrders.routes ?? [])],
+  routes: [getOrder, createOrder, cancelOrder, ...(listOrders.routes ?? [])],
 });

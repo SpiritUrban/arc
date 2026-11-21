@@ -19,6 +19,14 @@ export const ListOrders = operationContract({
   expose: { web: true },
 });
 
+export const GetOrder = operationContract({
+  id: "orders.get",
+  input: s.object({ id: s.uuid() }),
+  output: Order,
+  errors: { ORDER_NOT_FOUND: 404 },
+  expose: { web: true },
+});
+
 // Браузер передає товар і кількість. Сервер визначає власника за запитом і обчислює суму.
 export const CreateOrder = operationContract({
   id: "orders.create",

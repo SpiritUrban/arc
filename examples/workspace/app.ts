@@ -19,6 +19,7 @@ export const createApp = () =>
       pages: {
         "/": "./page.tsx",
         "/orders": "./orders-screen.tsx",
+        "/orders/:id": "./order-detail.tsx",
       },
     },
     operations: [health],

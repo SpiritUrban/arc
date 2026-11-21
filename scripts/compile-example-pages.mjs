@@ -7,6 +7,7 @@ const pageEntries = new Set([
   "fullstack-tasks/page.tsx",
   "workspace/page.tsx",
   "workspace/orders-screen.tsx",
+  "workspace/order-detail.tsx",
 ]);
 for (const file of await readdir(examples, { recursive: true })) {
   if (!file.endsWith(".tsx")) continue;

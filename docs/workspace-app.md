@@ -41,7 +41,7 @@ npm test
 - `examples/workspace/users/page.tsx` — пошук, список користувачів і форма створення через `mutation`.
 - `examples/workspace/orders/page.tsx` — список замовлень через `query`, форма через `mutation` і підсумки для вибраного користувача.
 - `examples/workspace/page.tsx`, `examples/workspace/styles.ts` — responsive Workspace shell та стилі.
-- `app.ts` задає `web.pages` для огляду на `/` і окремої сторінки замовлень на `/orders`. ARC генерує браузерний запуск і телеметрію для обох сторінок.
+- `app.ts` задає `web.pages` для огляду на `/`, списку на `/orders` і деталей на `/orders/:id`. За прямим посиланням операція `GetOrder` показує замовлення лише вибраному власнику.
 - `examples/workspace/ui.ts` — допоміжні функції для input bindings, форматування сум і повідомлень про помилки.
 
 ```text

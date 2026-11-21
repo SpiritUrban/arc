@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { dirname, relative, sep } from "node:path";
 import { rootView } from "./neutral/page-root.js";
+import { pageParamNames } from "./neutral/page-path.js";
 import {
   Schema,
   ValidationError,
@@ -1167,12 +1168,19 @@ export class Application {
     const routes = typeof web === "string" ? [["/", web] as const] : Object.entries(web.pages);
     if (!routes.length) throw new Error("Declare at least one web page");
 
+    const patterns = new Set<string>();
     const entries = routes.map(([path, file]) => {
-      if (!path.startsWith("/") || path.startsWith("//") || /[?#!*:\\]/.test(path) ||
+      const params = pageParamNames(path);
+      if (!path.startsWith("/") || path.startsWith("//") || /[?#!*\\]/.test(path) ||
           new URL(path, "http://arc.invalid").pathname !== path ||
+          path.split("/").some((part) => part.includes(":") && !/^:[a-zA-Z_][a-zA-Z0-9_]*$/.test(part)) ||
+          new Set(params).size !== params.length ||
           path === "/app.js" || path === "/openapi.json" ||
           path.startsWith("/arc-page-") || path.startsWith("/_arc/"))
         throw new Error(`Invalid web page path: ${path}`);
+      const shape = path.split("/").map((part) => part.startsWith(":") ? ":" : part).join("/");
+      if (patterns.has(shape)) throw new Error(`Duplicate web page pattern: ${path}`);
+      patterns.add(shape);
 
       const source = new URL(file, appEntry);
       const url = appEntry.pathname.endsWith(".js") && source.pathname.endsWith(".tsx") &&
@@ -1194,7 +1202,10 @@ export class Application {
       const normalize = typeof root === "function"
         ? (await import(webRuntime) as typeof import("./web/index.js")).pageView
         : undefined;
-      nodes.set(entry, rootView(root, id, normalize));
+      const params = Object.fromEntries(entries
+        .filter((page) => page.entry === entry)
+        .flatMap((page) => pageParamNames(page.path).map((name) => [name, ""])));
+      nodes.set(entry, rootView(root, id, normalize, params));
     }
     const pages = entries.map(({ path, entry, id }) => ({ path, entry, id }));
     const primary = pages.find(({ path }) => path === "/") ?? pages[0];

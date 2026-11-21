@@ -88,19 +88,19 @@ if (["graph", "inspect", "build", "run"].includes(command)) {
     const { internalTransport } = await import("./fullstack/server.js");
     const bridge = internalTransport(host);
     const web = webDir
-      ? (await import("./fullstack/build.js")).staticWeb
+      ? await import("./fullstack/build.js")
       : undefined;
     servers.push(
       await serve(
         async (request) => {
           const path = new URL(request.url).pathname;
           if (path.startsWith("/_arc/")) return bridge(request);
-          const asset = webDir && web ? await web(webDir, request, webPages) : undefined;
+          const asset = webDir && web ? await web.staticWeb(webDir, request, webPages) : undefined;
           if (asset) return asset;
           const response = serverHandler
             ? await serverHandler(request)
             : new Response("Not found", { status: 404 });
-          if (webPages?.some((page) => page.path === path && page.api) &&
+          if (web?.findWebPage(webPages ?? [], path)?.api &&
               (request.method === "GET" || request.method === "HEAD"))
             response.headers.append("vary", "Accept");
           return response;
