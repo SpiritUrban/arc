@@ -8,7 +8,7 @@
 | ------------------------------------------- | -------------------- | ----------------------------------------------------- |
 | Поле форми, search, вибраний користувач     | state                | users.create.submit.fields.name, users.search, workspace.selected-user |
 | Фільтр, видимі замовлення, активний користувач | derive               | users.filtered, orders.visible, users.active            |
-| Дані із server/external API                 | remote / webResource | users.current, orders.list.query                         |
+| Дані із server/external API                 | query / webResource | users.list.query, orders.list.query                         |
 | Mutation або user command                   | action               | users.create.submit, orders.create.submit                                 |
 | DOM та listeners                            | view / binding       | users.page, `each(visibleOrders, …)`                         |
 
@@ -48,19 +48,19 @@ examples/workspace/
 ```ts
 import { remoteForm, textField } from "@arc/framework/fullstack";
 import { CreateUser } from "./contracts.ts";
-import { selectedUser, usersData } from "../user-selection.ts";
+import { selectedUser, users } from "../user-selection.ts";
 
 const { fields, submit: addUser } = remoteForm(CreateUser, {
   fields: { name: textField(), email: textField() },
   needs: [selectedUser],
-  refresh: [usersData],
+  refresh: [users],
   onSuccess(user, ctx) {
     ctx.set(selectedUser, user.id);
   },
 });
 ```
 
-`remoteForm` створює стан полів, дію та endpoint у графі. `refresh` оновлює список після успіху. `onSuccess` отримує типізовану відповідь і змінює вибір користувача. `needs` показує цю залежність у Stand. Локальний пошук використовує окремий `state` і `derive` від завантажених користувачів.
+`remoteForm` створює стан полів, дію та endpoint у графі. `refresh` оновлює `query(ListUsers)` після успіху. `onSuccess` отримує типізовану відповідь і змінює вибір користувача. `needs` показує цю залежність у Stand. Локальний пошук фільтрує дані з `users().data`.
 
 ## 5. Оголосіть шаблон і прив’язки
 

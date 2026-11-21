@@ -1,5 +1,5 @@
 import { derive, signal } from "@arc/framework/web";
-import { remote } from "@arc/framework/fullstack";
+import { query } from "@arc/framework/fullstack";
 import { ListUsers } from "./users/contracts.ts";
 
 // Список користувачів і замовлення читають один і той самий вибір.
@@ -9,10 +9,10 @@ export const selectedUser = signal({
   initial: "00000000-0000-4000-8000-000000000001",
 });
 
-export const usersData = remote(ListUsers, { id: "users.current" });
+export const users = query(ListUsers);
 
 export const activeUser = derive({
   id: "users.active",
-  from: [usersData.data, selectedUser],
+  from: [users.data, selectedUser],
   compute: (users, id) => users?.find((user) => user.id === id),
 });

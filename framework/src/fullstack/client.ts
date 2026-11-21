@@ -15,6 +15,7 @@ import {
   webResource,
   type Action,
   type ActionContext,
+  type ResourceSnapshot,
   type WebResource,
 } from "../web/async.js";
 import {
@@ -358,14 +359,14 @@ export function remoteApi<
               input: (...values: SourceValues<Sources>) => Infer<C["input"]>;
             },
           ]
-    ): RemoteResource<C> {
-      return remote(contract, {
+    ): RemoteQuery<C> {
+      return createRemoteResource(contract, {
         id: query?.id ?? `${contract.id}.query`,
         from,
         input: query?.input,
         baseUrl,
         fetch: fetchWithHeaders,
-      });
+      }, true);
     },
     form: bindRemoteForm({ needs: from, baseUrl, fetch: fetchWithHeaders }),
   };
@@ -375,25 +376,69 @@ export type RemoteResource<C extends OperationContract> = WebResource<
   Infer<C["output"]>,
   Infer<C["input"]>
 > & { result: Readable<RemoteResult<C> | undefined> };
+
+export type RemoteQuery<C extends OperationContract> =
+  RemoteResource<C> & (() => ResourceSnapshot<Infer<C["output"]>>);
+
+type RemoteResourceOptions<C extends OperationContract> = {
+  id: string;
+  from?: readonly Readable<any>[];
+  input?: (...values: any[]) => Infer<C["input"]>;
+  baseUrl?: string;
+  fetch?: typeof globalThis.fetch;
+};
+
+type QueryOptions<C extends OperationContract> =
+  Omit<RemoteResourceOptions<C>, "id"> & { id?: string };
+
+/** Read the current state of a contract-backed query by calling it. */
+export function query<C extends OperationContract>(
+  contract: C,
+  ...[options]: {} extends Infer<C["input"]>
+    ? [options?: QueryOptions<C>]
+    : [options: QueryOptions<C> & Required<Pick<QueryOptions<C>, "input">>]
+): RemoteQuery<C> {
+  return createRemoteResource(contract, {
+    ...options,
+    id: options?.id ?? `${contract.id}.query`,
+  }, true);
+}
+
 export function remote<C extends OperationContract>(
   contract: C,
-  options: {
-    id: string;
-    from?: readonly Readable<any>[];
-    input?: (...values: any[]) => Infer<C["input"]>;
-    baseUrl?: string;
-    fetch?: typeof globalThis.fetch;
-  },
+  options: RemoteResourceOptions<C>,
+): RemoteResource<C> {
+  return createRemoteResource(contract, options, false);
+}
+
+function createRemoteResource<C extends OperationContract>(
+  contract: C,
+  options: RemoteResourceOptions<C>,
+  callable: true,
+): RemoteQuery<C>;
+function createRemoteResource<C extends OperationContract>(
+  contract: C,
+  options: RemoteResourceOptions<C>,
+  callable: false,
+): RemoteResource<C>;
+function createRemoteResource<C extends OperationContract>(
+  contract: C,
+  options: RemoteResourceOptions<C>,
+  callable: boolean,
 ): RemoteResource<C> {
   const client = remoteClient(contract, {
     ...options,
     id: options.id + ".remote",
   });
-  const result = webResource<Infer<C["output"]>, Infer<C["input"]>>({
+  const resource = {
     ...options,
     result: true,
-    load: (input, ctx) => client.call(input, ctx) as any,
-  });
+    load: (input: Infer<C["input"]>, ctx: { signal: AbortSignal; trace: TraceToken }) =>
+      client.call(input, ctx) as any,
+  };
+  const result = callable
+    ? webResource<Infer<C["output"]>, Infer<C["input"]>>({ ...resource, callable: true })
+    : webResource<Infer<C["output"]>, Infer<C["input"]>>(resource);
   result.dependencies = [...(options.from ?? []), client];
   result.relations = [{ to: contract, kind: "REMOTE_CALLS" }];
   const activate = result.activate.bind(result);

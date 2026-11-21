@@ -15,6 +15,21 @@ else if (result.kind === "business_error")
 
 RemoteResult розрізняє `{ok:true,kind:'success',value}` і `{ok:false,kind:'business_error',error,details}`, fault та cancelled. Codes/details виводяться з operation errors. Не всі помилки перетворюються на thrown exceptions.
 
+## Запит зі спільного контракту
+
+```tsx
+// @arc reactive-jsx
+import { query } from "@arc/framework/fullstack";
+import { ListUsers } from "./contracts.ts";
+
+const users = query(ListUsers);
+const status = () => (
+  <p>{users().loading ? "Завантаження…" : users().data?.length}</p>
+);
+```
+
+`users()` повертає поточний знімок із `data`, `loading`, `error` та `stale`. Додайте запит до графа сторінки через `needs`, щоб ARC запускав його разом із застосунком. `remoteForm` приймає цей самий запит у `refresh`. За замовчуванням ID має вигляд `<ID операції>.query`. Для контракту з обов’язковим входом передайте функцію `input`.
+
 ## Форма, що викликає операцію
 
 Для форми з рядковими полями вкажіть у HTML ті самі імена, що й у контракті.

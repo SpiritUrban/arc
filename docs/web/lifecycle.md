@@ -13,7 +13,7 @@ logical graph compile
 
 ## Application та view ownership
 
-Application nodes активуються на start, звільняються на app.dispose. Вони спільні між views, які посилаються на той самий object. Один Workspace має спільні selectedUser/usersData/ordersData, тому вибір користувача змінює dataflow інших панелей.
+Application nodes активуються на start, звільняються на app.dispose. Вони спільні між views, які посилаються на той самий object. Один Workspace має спільні selectedUser/users/ordersData, тому вибір користувача змінює dataflow інших панелей.
 
 `webResource({...,scope: "view"})` не активується application.start. Додайте resource у view.owned, щоб mount активував його, а unmount abort/dispose. scope metadata саме по собі не додає owner: потрібен owned або власний Scope. Суміжні state/derived, які мають належати instance, теж потрібно явно додати до ownership.
 

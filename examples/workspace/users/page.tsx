@@ -5,12 +5,12 @@ import { view } from "@arc/framework/web";
 import { remoteForm } from "@arc/framework/fullstack";
 import { CreateUser } from "./contracts.ts";
 import { failureMessage } from "../ui.ts";
-import { selectedUser, usersData } from "../user-selection.ts";
+import { selectedUser, users } from "../user-selection.ts";
 
 // CreateUser — спільний контракт. На сервері його виконує createUser у ./server.ts.
 const { submit: addUser } = remoteForm(CreateUser, {
   needs: [selectedUser],
-  refresh: [usersData],
+  refresh: [users],
   onSuccess(user, ctx) {
     ctx.set(selectedUser, user.id);
   },
@@ -20,12 +20,12 @@ export { addUser };
 
 export const UsersPage = view({
   id: "users.page",
-  needs: { usersData, selectedUser },
+  needs: { users, selectedUser },
   state: () => ({ search: "" }),
   template: ({ search }) => {
-    function users() {
+    function visible() {
       const query = search().toLowerCase();
-      return (usersData.data.get() ?? []).filter((user) =>
+      return (users().data ?? []).filter((user) =>
         `${user.name} ${user.email}`.toLowerCase().includes(query),
       );
     }
@@ -40,9 +40,9 @@ export const UsersPage = view({
           <span class="badge">LIVE</span>
         </div>
         <p class="muted" data-status>
-          {usersData.loading.get()
+          {users().loading
             ? "Оновлюємо список…"
-            : `${usersData.data.get()?.length ?? 0} у вашому просторі`}
+            : `${users().data?.length ?? 0} у вашому просторі`}
         </p>
         <label class="search-label">
           <span>Пошук</span>
@@ -54,8 +54,8 @@ export const UsersPage = view({
           />
         </label>
         <div class="user-list" data-list aria-label="Користувачі">
-          {!users().length && <div class="empty">Користувачів не знайдено</div>}
-          {users().map((user) => (
+          {!visible().length && <div class="empty">Користувачів не знайдено</div>}
+          {visible().map((user) => (
             <button
               key={user.id}
               type="button"
@@ -108,7 +108,7 @@ export const UsersPage = view({
           </button>
         </form>
         <p class="error" role="alert" data-error>
-          {failureMessage(addUser.error.get() ?? usersData.error.get())}
+          {failureMessage(addUser.error.get() ?? users().error)}
         </p>
       </section>
     );

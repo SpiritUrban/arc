@@ -47,7 +47,7 @@ npm test
 users.create.submit.fields.name / users.create.submit.fields.email
   → users.create.submit [action]
     → users.create.submit.remote → users.create [server] → users.repository
-    INVALIDATES → users.current → users.list [server]
+    INVALIDATES → users.list.query → users.list [server]
 workspace.selected-user
   → orders.list.query → orders.list [server] → auth.currentUser / orders.repository
 orders.create.submit.fields.product / orders.create.submit.fields.quantity

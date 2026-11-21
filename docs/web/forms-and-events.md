@@ -7,7 +7,7 @@ Workspace використовує HTML-форми в TSX, вбудовані о
 ```ts
 const { fields, submit: addUser } = remoteForm(CreateUser, {
   fields: { name: textField(), email: textField() },
-  refresh: [usersData],
+  refresh: [users],
 });
 ```
 

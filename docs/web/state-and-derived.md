@@ -10,4 +10,4 @@
 
 `Scope` прибирає owned cleanup у зворотному порядку. Application nodes живуть до webApplication.dispose. View-owned nodes живуть до unmount; для незалежного state кількох view instances створюйте nodes/view у factory. Один definition object не клонується автоматично на кожний mount.
 
-Практика: [як писати frontend](writing-frontend.md), [input bindings](forms-and-events.md), [ownership](lifecycle.md). У Workspace search — local state, filtered users — derive, usersData — remote resource; їхні semantics не взаємозамінні.
+У Workspace пошук зберігається в локальному стані view, `users()` читає стан запиту, а `visible()` фільтрує результат для JSX. [Як писати frontend](writing-frontend.md)

@@ -9,6 +9,7 @@ import {
 } from "../neutral/protocol.js";
 import {
   state,
+  signal,
   derive,
   batch,
   type Readable,
@@ -35,7 +36,7 @@ export interface WebResource<T, I = unknown> extends Readable<
   dispose(): void;
   relations?: GraphDefinition["relations"];
 }
-export function webResource<T, I = unknown>(def: {
+type WebResourceOptions<T, I> = {
   id: string;
   from?: readonly Readable<any>[];
   input?: (...values: any[]) => I;
@@ -45,8 +46,16 @@ export function webResource<T, I = unknown>(def: {
   ) => Promise<T>;
   result?: boolean;
   scope?: "application" | "view";
-}): WebResource<T, I> {
-  const value = state<ResourceSnapshot<T>>({
+  callable?: boolean;
+};
+
+export function webResource<T, I = unknown>(
+  def: WebResourceOptions<T, I> & { callable: true },
+): WebResource<T, I> & (() => ResourceSnapshot<T>);
+export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebResource<T, I>;
+export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebResource<T, I> {
+  const createValue = def.callable ? signal : state;
+  const value = createValue<ResourceSnapshot<T>>({
     id: def.id,
     initial: {
       input: undefined,
