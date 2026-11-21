@@ -73,10 +73,14 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.0"
   },
   "peerDependenciesMeta": {
     "esbuild": {
+      "optional": true
+    },
+    "typescript": {
       "optional": true
     }
   },

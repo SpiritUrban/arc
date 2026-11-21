@@ -2,6 +2,7 @@ import { pathToFileURL } from "node:url";
 import { join, resolve } from "node:path";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { importApplication } from "./fullstack/reactive-jsx.js";
 import { Application } from "./core.js";
 import { handler, serve, closeServer } from "./http.js";
 import { stand } from "./stand.js";
@@ -14,7 +15,7 @@ if (
   throw new Error(
     "Usage: arc dev|build|graph|inspect <id>|run <id> <json>|start|stand",
   );
-const { default: logical } = await import(
+const { default: logical } = await importApplication(
   pathToFileURL(resolve(process.env.ARC_APP ?? "src/app.ts")).href
 );
 if (!(logical instanceof Application) && logical?.kind !== "arc-graph")

@@ -1,3 +1,4 @@
+import { compileReactiveJsx } from "./reactive-jsx.js";
 import { build } from "esbuild";
 import { resolve, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -50,6 +51,10 @@ export async function buildWeb(
               },
             ],
           }));
+          builder.onLoad({ filter: /\.tsx$/ }, async (args) => {
+            const contents = compileReactiveJsx(await readFile(args.path, "utf8"), args.path);
+            if (contents !== undefined) return { contents, loader: "js", resolveDir: dirname(args.path) };
+          });
           builder.onLoad({ filter: /\.[cm]?[jt]s$/ }, async (args) => {
             if (!serverModules.has(args.path)) return;
             const exports = await import(pathToFileURL(args.path).href);

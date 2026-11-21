@@ -5,12 +5,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import vm from "node:vm";
 import { parseHTML } from "linkedom";
-import { createApp } from "../examples/workspace/app.ts";
+import { importApplication } from "../framework/src/fullstack/reactive-jsx.ts";
 import { buildWeb } from "../framework/src/fullstack/build.ts";
 import { internalTransport } from "../framework/src/fullstack/server.ts";
 import { serve, closeServer, handler } from "../framework/src/http.ts";
 
 test("Workspace browser creates users/orders, handles business errors and isolates selected user data", async () => {
+  const { createApp } = await importApplication(
+    new URL("../examples/workspace/app.ts", import.meta.url),
+  ) as typeof import("../examples/workspace/app.ts");
   const app = createApp();
   const dir = await mkdtemp(join(tmpdir(), "arc-workspace-"));
   let server: Awaited<ReturnType<typeof serve>> | undefined;
@@ -18,7 +21,11 @@ test("Workspace browser creates users/orders, handles business errors and isolat
   const pending = new Set<Promise<any>>();
   try {
     await app.compile();
-    const { edges } = app.graph();
+    const { edges, nodes } = app.graph();
+    assert.equal(
+      nodes.filter(({ id }) => id.startsWith("users.page.dom.") && id.endsWith(".render")).length,
+      2,
+    );
     assert.equal(
       edges.filter((edge) =>
         edge.to.startsWith("orders.page.dom.") &&
@@ -133,6 +140,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     input("[data-email]", "new@example.com");
     submit("#users form");
     await waitFor(() => document.querySelectorAll("[data-user]").length === 2);
+    assert.match(document.querySelector("#users [data-status]")!.textContent!, /^2 /);
     assert.deepEqual(userFields.map((field) => field.value), ["", ""]);
     await waitFor(() =>
       document

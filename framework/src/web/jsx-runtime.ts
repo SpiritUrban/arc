@@ -6,6 +6,7 @@ const templateNode = Symbol("ARC template node");
 const childBinding = Symbol("ARC template child binding");
 const keyedList = Symbol("ARC template keyed list");
 const reactiveBlock = Symbol("ARC reactive JSX block");
+const attributeExpression = Symbol("ARC reactive JSX attribute");
 export const Fragment = Symbol("ARC template fragment");
 
 type TextValue = string | number | boolean | null | undefined;
@@ -66,6 +67,15 @@ export function render(template: RenderBlock["template"]): RenderBlock {
 
 export function isRenderBlock(child: TemplateChild): child is RenderBlock {
   return child != null && typeof child === "object" && reactiveBlock in child;
+}
+
+export function reactiveAttribute(read: () => unknown) {
+  return { [attributeExpression]: read };
+}
+
+export function attributeReader(value: unknown): (() => unknown) | undefined {
+  if (value && typeof value === "object" && attributeExpression in value)
+    return (value as ReturnType<typeof reactiveAttribute>)[attributeExpression];
 }
 
 export function boundChild(binding: Binding): ChildBinding {

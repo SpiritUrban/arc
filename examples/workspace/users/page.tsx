@@ -1,6 +1,7 @@
+// @arc reactive-jsx
 // Браузерна частина користувачів. Мережевий ресурс завантажує записи,
 // локальний пошук фільтрує їх, а вибір рядка змінює список замовлень.
-import { each, project, render, view } from "@arc/framework/web";
+import { each, view } from "@arc/framework/web";
 import { remoteForm } from "@arc/framework/fullstack";
 import { CreateUser } from "./contracts.ts";
 import { failureMessage } from "../ui.ts";
@@ -31,9 +32,9 @@ export const UsersPage = view({
         <span class="badge">LIVE</span>
       </div>
       <p class="muted" data-status>
-        {render(() => usersData.loading.get()
+        {usersData.loading.get()
           ? "Оновлюємо список…"
-          : `${usersData.data.get()?.length ?? 0} у вашому просторі`)}
+          : `${usersData.data.get()?.length ?? 0} у вашому просторі`}
       </p>
       <label class="search-label">
         <span>Пошук</span>
@@ -56,15 +57,12 @@ export const UsersPage = view({
             key: (user) => user.id,
             empty: <div class="empty">Користувачів не знайдено</div>,
             render(user) {
-              const selected = (id: string) => id === user.id;
               return (
                 <button
                   type="button"
-                  bind:class={project(selectedUser, (id) =>
-                    selected(id) ? "user-row selected" : "user-row",
-                  )}
+                  class={selectedUser.get() === user.id ? "user-row selected" : "user-row"}
                   data-user={user.id}
-                  bind:aria-pressed={project(selectedUser, selected)}
+                  aria-pressed={selectedUser.get() === user.id}
                   on:click={(_, { set }) => set(selectedUser, user.id)}
                 >
                   <span class="avatar">{user.name.slice(0, 2).toUpperCase()}</span>
@@ -73,7 +71,7 @@ export const UsersPage = view({
                     <small>{user.email}</small>
                   </span>
                   <span class="select-mark">
-                    {project(selectedUser, (id) => selected(id) ? "✓" : "→")}
+                    {selectedUser.get() === user.id ? "✓" : "→"}
                   </span>
                 </button>
               );
@@ -117,7 +115,7 @@ export const UsersPage = view({
         </button>
       </form>
       <p class="error" role="alert" data-error>
-        {render(() => failureMessage(addUser.error.get() ?? usersData.error.get()))}
+        {failureMessage(addUser.error.get() ?? usersData.error.get())}
       </p>
     </section>
   ),

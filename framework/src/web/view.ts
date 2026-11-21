@@ -8,6 +8,7 @@ import {
 } from "../neutral/protocol.js";
 import type { Action } from "./async.js";
 import {
+  attributeReader,
   boundChild,
   elementBindings,
   Fragment,
@@ -74,6 +75,7 @@ export interface Binding extends GraphDefinition {
   sources: readonly Readable<any>[];
   name?: string;
   format?: (...values: any[]) => unknown;
+  readAttribute?: () => unknown;
   list?: KeyedList;
   block?: RenderBlock;
   handler?:
@@ -176,6 +178,18 @@ function compileTemplate(id: string, root: TemplateChild) {
     const { children, bind, ...attributes } = child.props;
     const attached = [...elementBindings(bind)];
     for (const [name, value] of Object.entries(attributes)) {
+      const readAttribute = attributeReader(value);
+      if (readAttribute) {
+        delete attributes[name];
+        attached.push(binding({
+          id: `${id}.dom.${path}.${name}`,
+          type: "attribute",
+          name: name === "className" ? "class" : name,
+          sources: [],
+          readAttribute,
+        }));
+        continue;
+      }
       if (!name.startsWith("bind:") && !name.startsWith("on:")) continue;
       if (child.tag === Fragment)
         throw new Error(`Attach ${name} to an HTML element in ${id}`);
@@ -596,6 +610,22 @@ export function mount(
     if (node.nodeType !== 1 && b.type !== "text")
       throw new TypeError(`Binding ${b.id} requires an HTML element`);
     const element = node as Element;
+    if (b.readAttribute) {
+      observeReads(scope, b.readAttribute, (value, sources, start) => {
+        const name = b.name!;
+        if (value == null || (value === false && !/^(aria|data)-/.test(name)))
+          element.removeAttribute(name);
+        else if (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+          element.setAttribute(name, String(value));
+        else throw new TypeError(`Expected a primitive TSX attribute: ${name}`);
+        browserEvent(
+          telemetry, telemetryId, "binding.updated",
+          [...sources].find((source) => source._trace)?._trace,
+          { duration: performance.now() - start, data: { view: def.id } },
+        );
+      });
+      return;
+    }
     if (b.type === "event") {
       const listener = (event: Event) => {
         const trace = { traceId: identity() };
