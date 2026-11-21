@@ -391,7 +391,7 @@ export function view<Initial extends Record<string, unknown>>(
   if (!("state" in options)) return buildView(options);
 
   const { state: initialize, template, ...def } = options;
-  return scopedView(def, (local) => {
+  return scopedView(def, ({ local }) => {
     const fields = Object.fromEntries(
       Object.entries(initialize()).map(([key, initial]) => [key, local(initial, key)]),
     ) as LocalState<Initial>;
@@ -403,8 +403,12 @@ type OwnedNode = NonNullable<View["owned"]>[number];
 
 export interface PageContext<Param extends string = string> {
   params: Readonly<Record<Param, string>>;
-  local<T>(initial: T): Signal<T>;
+  local<T>(initial: T, name?: string): Signal<T>;
   own<T extends OwnedNode>(node: T): T;
+  query<T extends OwnedNode, Args extends unknown[]>(
+    client: { query(...args: Args): T },
+    ...args: Args
+  ): T;
 }
 
 export interface PageLayoutContext<Param extends string = string> extends PageContext<Param> {
@@ -417,14 +421,14 @@ export function pageView(
   template: (context: PageContext) => TemplateElement,
   params: Readonly<Record<string, string>> = {},
 ): View {
-  return scopedView({ id }, (local, own) => template({ params, local, own }));
+  return scopedView({ id }, (context) => template({ params, ...context }));
 }
 
 type LocalFactory = <T>(initial: T, name?: string) => Signal<T>;
 
 function scopedView(
   def: Omit<LocalViewOptions<Record<string, unknown>>, "state" | "template">,
-  template: (local: LocalFactory, own: PageContext["own"]) => TemplateElement,
+  template: (context: Pick<PageContext, "local" | "own" | "query">) => TemplateElement,
 ): View {
   function create(scope?: Scope) {
     const fields = new Map<string, GraphDefinition>();
@@ -445,8 +449,9 @@ function scopedView(
       }
       return node;
     };
+    const query: PageContext["query"] = (client, ...args) => own(client.query(...args));
     try {
-      const instance = buildView({ ...def, owned, template: () => template(local, own) });
+      const instance = buildView({ ...def, owned, template: () => template({ local, own, query }) });
       instance.dependencies = [...(instance.dependencies ?? []), ...fields.values()];
       return instance;
     } catch (error) {

@@ -12,11 +12,11 @@ const orderClient = remoteApi({
   headers: (userId) => ({ authorization: `Bearer ${userId}` }),
 });
 
-export default function OrderDetail({ params, own }: PageContext<"id">) {
-  const order = own(orderClient.query(GetOrder, {
+export default function OrderDetail({ params, query }: PageContext<"id">) {
+  const order = query(orderClient, GetOrder, {
     input: () => ({ id: params.id }),
     key: (userId) => userId,
-  }));
+  });
 
   return (
     <section>
