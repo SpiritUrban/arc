@@ -274,6 +274,7 @@ type WebConfig = {
   entry?: string;
   serverModules?: string[];
   bootstrap?: { id: string };
+  pages?: readonly { path: string; entry: string; id: string }[];
 };
 
 type AppOptions = {
@@ -285,7 +286,7 @@ type AppOptions = {
   metricsWindowMs?: number;
   queues?: QueueDefinition[];
   schedules?: ScheduleDefinition[];
-  web?: WebConfig | string;
+  web?: Omit<WebConfig, "pages"> | string | { pages: Readonly<Record<string, string>> };
 };
 export class Application {
   private page?: WebConfig;
@@ -375,29 +376,12 @@ export class Application {
     if (this.state === "closed" || this.state === "closing")
       throw new Error("Application is closed");
     if (this.state !== "new") return this;
-    if (typeof this.options.web === "string" && !this.page) {
+    const web = this.options.web;
+    if ((typeof web === "string" || (web && "pages" in web)) && !this.page) {
       if (!this.loadingPage) {
         if (!options.entry)
-          throw new Error("Pass the application entry URL to compile({ entry }) when using a web page path");
-        const source = new URL(this.options.web, options.entry);
-        const url = options.entry.pathname.endsWith(".js") &&
-            source.pathname.endsWith(".tsx") && !existsSync(source)
-          ? new URL(source.href.replace(/\.tsx$/, ".js"))
-          : source;
-        const entry = fileURLToPath(url);
-        const pagePath = relative(dirname(fileURLToPath(options.entry)), fileURLToPath(source))
-          .split(sep).join("/").replace(/\.[cm]?[jt]sx?$/, "");
-        const id = `page:${pagePath}`;
-        this.loadingPage = (async () => {
-          const { importApplication } = await import("./fullstack/reactive-jsx.js");
-          const { default: root } = await importApplication(url, { loadTsx: true, reactiveEntry: true });
-          // Resolve the optional Web runtime only when the root is a page function.
-          const webRuntime = "@arc/framework/web";
-          const normalize = typeof root === "function"
-            ? (await import(webRuntime) as typeof import("./web/index.js")).pageView
-            : undefined;
-          return { nodes: [rootView(root, id, normalize)], entry, bootstrap: { id } };
-        })();
+          throw new Error("Pass the application entry URL to compile({ entry }) when using web pages");
+        this.loadingPage = this.loadPages(web, options.entry);
       }
       const loading = this.loadingPage;
       try {
@@ -1178,15 +1162,60 @@ export class Application {
       })),
     };
   }
+  private async loadPages(web: string | { pages: Readonly<Record<string, string>> }, appEntry: URL): Promise<WebConfig> {
+    const { importApplication } = await import("./fullstack/reactive-jsx.js");
+    const routes = typeof web === "string" ? [["/", web] as const] : Object.entries(web.pages);
+    if (!routes.length) throw new Error("Declare at least one web page");
+
+    const entries = routes.map(([path, file]) => {
+      if (!path.startsWith("/") || path.startsWith("//") || /[?#!*:\\]/.test(path) ||
+          new URL(path, "http://arc.invalid").pathname !== path ||
+          path === "/app.js" || path === "/openapi.json" ||
+          path.startsWith("/arc-page-") || path.startsWith("/_arc/"))
+        throw new Error(`Invalid web page path: ${path}`);
+
+      const source = new URL(file, appEntry);
+      const url = appEntry.pathname.endsWith(".js") && source.pathname.endsWith(".tsx") &&
+          !existsSync(source)
+        ? new URL(source.href.replace(/\.tsx$/, ".js"))
+        : source;
+      const entry = fileURLToPath(url);
+      const pagePath = relative(dirname(fileURLToPath(appEntry)), fileURLToPath(source))
+        .split(sep).join("/").replace(/\.[cm]?[jt]sx?$/, "");
+      const id = `page:${pagePath}`;
+      return { path, entry, id, url };
+    });
+    const nodes = new Map<string, GraphDefinition>();
+    const reactiveEntries = new Set(entries.map(({ url }) => url.href));
+    for (const { entry, id, url } of entries) {
+      if (nodes.has(entry)) continue;
+      const { default: root } = await importApplication(url, { loadTsx: true, reactiveEntries });
+      const webRuntime = "@arc/framework/web";
+      const normalize = typeof root === "function"
+        ? (await import(webRuntime) as typeof import("./web/index.js")).pageView
+        : undefined;
+      nodes.set(entry, rootView(root, id, normalize));
+    }
+    const pages = entries.map(({ path, entry, id }) => ({ path, entry, id }));
+    const primary = pages.find(({ path }) => path === "/") ?? pages[0];
+    return {
+      nodes: [...new Set(nodes.values())],
+      entry: primary.entry,
+      bootstrap: { id: primary.id },
+      pages: typeof web === "string" ? undefined : pages,
+    };
+  }
   webNodes(): GraphDefinition[] {
     return [
-      ...((typeof this.options.web === "string" ? this.page : this.options.web)?.nodes ?? []),
+      ...((this.page ?? (typeof this.options.web === "object" && "nodes" in this.options.web
+        ? this.options.web : undefined))?.nodes ?? []),
       ...(this.options.modules ?? []).flatMap((m) => m.web?.nodes ?? []),
     ];
   }
-  webConfig() {
-    if (typeof this.options.web === "string") return this.page;
-    return this.options.web ?? this.options.modules?.find((m) => m.web?.entry)?.web;
+  webConfig(): WebConfig | undefined {
+    const web = this.options.web;
+    if (typeof web === "string" || (web && !("nodes" in web))) return this.page;
+    return web ?? this.options.modules?.find((m) => m.web?.entry)?.web;
   }
   graph(): ArchitectureIR {
     const ir = compileArchitecture(this.webNodes(), this.makeGraph());

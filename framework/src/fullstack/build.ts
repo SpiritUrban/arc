@@ -1,42 +1,61 @@
 import { compileReactiveJsx } from "./reactive-jsx.js";
 import { build } from "esbuild";
+import { createHash } from "node:crypto";
 import { resolve, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { wireContract } from "../neutral/descriptor.js";
 import type { ArchitectureIR, GraphDefinition } from "../neutral/graph.js";
 import { fileURLToPath } from "node:url";
+type BuildPage = { path: string; entry: string; id?: string };
+export type PageAssets = { path: string; html: string; script: string; api?: boolean };
+
 export interface BuildHost {
   graph(): ArchitectureIR;
-  webConfig():
-    | { entry?: string; nodes: GraphDefinition[]; serverModules?: string[]; bootstrap?: { id: string } }
-    | undefined;
+  webConfig(): {
+    entry?: string;
+    nodes: GraphDefinition[];
+    serverModules?: string[];
+    bootstrap?: { id: string };
+    pages?: readonly BuildPage[];
+  } | undefined;
 }
-export async function buildWeb(
-  app: BuildHost,
-  options: { outDir?: string } = {},
+
+function pageAssets(path: string): PageAssets {
+  if (path === "/") return { path, html: "index.html", script: "/app.js" };
+  const id = createHash("sha256").update(path).digest("hex").slice(0, 20);
+  return { path, html: `arc-page-${id}.html`, script: `/arc-page-${id}.js` };
+}
+
+function hasReadRoute(path: string, ir: ArchitectureIR) {
+  const segments = path.replace(/\/$/, "").split("/");
+  return ir.routes.some((route) => {
+    if (route.method !== "GET" && route.method !== "HEAD") return false;
+    const parts = route.path.replace(/\/$/, "").split("/");
+    return parts.length === segments.length && parts.every(
+      (part, index) => part === segments[index] || (part.startsWith(":") && segments[index]),
+    );
+  });
+}
+
+async function buildPage(
+  { entry: source, id }: BuildPage,
+  outfile: string,
+  ir: ArchitectureIR,
+  serverModules: Set<string>,
+  reactiveEntries: ReadonlySet<string>,
 ) {
-  const config = app.webConfig();
-  if (!config?.entry)
-    throw new Error("Declare web.entry for browser compilation");
-  const ir = app.graph(),
-    entry = resolve(config.entry),
-    outDir = resolve(options.outDir ?? ".arc/web");
-  await mkdir(outDir, { recursive: true });
-  const serverModules = new Set(
-    (config.serverModules ?? []).map((file) => resolve(file)),
-  );
+  const entry = resolve(source);
   const browserCore = fileURLToPath(
     new URL("../core-entry.js", import.meta.url),
   );
-  const page = config.bootstrap;
-  const input = page
+  const input = id
     ? {
         stdin: {
           contents: [
             `import * as page from ${JSON.stringify(entry)};`,
             `import { bootstrapPage } from ${JSON.stringify(fileURLToPath(new URL("./page-bootstrap.js", import.meta.url)))};`,
-            `bootstrapPage(page, ${JSON.stringify(page.id)});`,
+            `bootstrapPage(page, ${JSON.stringify(id)});`,
           ].join("\n"),
           resolveDir: dirname(entry),
           sourcefile: "arc-page-entry.js",
@@ -45,11 +64,11 @@ export async function buildWeb(
     : { entryPoints: [entry] };
   const result = await build({
     ...input,
-    ...(page ? {
+    ...(id ? {
       jsx: "automatic" as const,
       jsxImportSource: "@arc/framework/web",
     } : {}),
-    outfile: join(outDir, "app.js"),
+    outfile,
     bundle: true,
     platform: "browser",
     conditions: ["arc-source", "browser"],
@@ -71,7 +90,7 @@ export async function buildWeb(
           }));
           builder.onLoad({ filter: /\.tsx$/ }, async (args) => {
             const contents = compileReactiveJsx(await readFile(args.path, "utf8"), args.path, {
-              reactive: Boolean(page) && args.path === entry,
+              reactive: reactiveEntries.has(args.path),
             });
             if (contents !== undefined) return { contents, loader: "js", resolveDir: dirname(args.path) };
           });
@@ -120,44 +139,87 @@ export async function buildWeb(
     throw new Error(
       `ARC201 server implementation reached browser bundle: ${forbidden.join(", ")}`,
     );
+  return { inputs, bytes: Object.values(result.metafile!.outputs)[0]?.bytes ?? 0 };
+}
+
+export async function buildWeb(app: BuildHost, options: { outDir?: string } = {}) {
+  const config = app.webConfig();
+  if (!config?.entry) throw new Error("Declare a web page or web.entry for browser compilation");
+
+  const ir = app.graph();
+  const outDir = resolve(options.outDir ?? ".arc/web");
+  await mkdir(outDir, { recursive: true });
+  const routes = config.pages ?? [{ path: "/", entry: config.entry, id: config.bootstrap?.id }];
+  const pages = routes.map(({ path }) => ({
+    ...pageAssets(path),
+    api: Boolean(config.pages) && hasReadRoute(path, ir),
+  }));
+  const serverModules = new Set((config.serverModules ?? []).map((file) => resolve(file)));
+  const reactiveEntries = new Set(routes.filter(({ id }) => id).map(({ entry }) => resolve(entry)));
+  const builds = await Promise.all(routes.map(async (route, index) => {
+    const { html, script } = pages[index];
+    const result = await buildPage(route, join(outDir, script.slice(1)), ir, serverModules, reactiveEntries);
+    await writeFile(join(outDir, html),
+      `<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ARC Application</title></head><body><div id="app"></div><script type="module" src="${script}"></script></body></html>`,
+    );
+    return result;
+  }));
   const manifest = {
     version: 3,
     entry: config.entry,
     partitions: ir.partitions,
     boundaries: ir.boundaries,
-    inputs,
+    inputs: [...new Set(builds.flatMap((result) => result.inputs))],
     serverModules: [...serverModules],
-    browserBytes:
-      result.metafile!.outputs[join(outDir, "app.js")]?.bytes ??
-      Object.values(result.metafile!.outputs)[0]?.bytes,
+    browserBytes: builds.reduce((sum, result) => sum + result.bytes, 0),
+    ...(config.pages ? { pages } : {}),
   };
-  await writeFile(
-    join(outDir, "manifest.json"),
-    JSON.stringify(manifest, null, 2),
-  );
-  await writeFile(
-    join(outDir, "architecture.json"),
-    JSON.stringify(ir, null, 2),
-  );
-  await writeFile(
-    join(outDir, "index.html"),
-    '<!doctype html><html lang="uk"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ARC Application</title><div id="app"></div><script type="module" src="/app.js"></script></html>',
-  );
-  return { outDir, manifest };
+  await Promise.all([
+    writeFile(join(outDir, "manifest.json"), JSON.stringify(manifest, null, 2)),
+    writeFile(join(outDir, "architecture.json"), JSON.stringify(ir, null, 2)),
+    writeFile(join(outDir, "pages.json"), JSON.stringify(pages)),
+  ]);
+  return { outDir, manifest, pages };
 }
+
+function missingFile(error: unknown) {
+  return (error as NodeJS.ErrnoException | undefined)?.code === "ENOENT";
+}
+
 export async function staticWeb(
   outDir: string,
   request: Request,
+  builtPages?: readonly PageAssets[],
 ): Promise<Response | undefined> {
+  if (request.method !== "GET" && request.method !== "HEAD") return;
   const path = new URL(request.url).pathname;
-  const file =
-    path === "/" ? "index.html" : path === "/app.js" ? "app.js" : undefined;
-  if (!file) return;
-  return new Response(await readFile(join(outDir, file)), {
-    headers: {
-      "content-type": file.endsWith(".js")
-        ? "text/javascript; charset=utf-8"
-        : "text/html; charset=utf-8",
-    },
+  let pages = builtPages;
+  if (!pages) {
+    try {
+      pages = JSON.parse(await readFile(join(outDir, "pages.json"), "utf8")) as PageAssets[];
+    } catch (error) {
+      if (!missingFile(error)) throw error;
+      pages = [pageAssets("/")];
+    }
+  }
+  const acceptsHtml = (request.headers.get("accept") ?? "").split(",").some((entry) => {
+    const [type, ...params] = entry.toLowerCase().split(";").map((part) => part.trim());
+    return (type === "text/html" || type === "application/xhtml+xml") &&
+      !params.some((param) => /^q\s*=\s*0(?:\.0*)?$/.test(param));
   });
+  const script = pages.find((page) => page.script === path);
+  const page = pages.find((page) => page.path === path);
+  const file = script ? script.script.slice(1) : page && (!page.api || acceptsHtml) ? page.html : undefined;
+  if (!file) return;
+
+  try {
+    const contents = await readFile(join(outDir, file));
+    return new Response(request.method === "HEAD" ? null : contents, {
+      headers: script
+        ? { "content-type": "text/javascript; charset=utf-8" }
+        : { "content-type": "text/html; charset=utf-8", ...(page?.api ? { vary: "Accept" } : {}) },
+    });
+  } catch (error) {
+    if (!missingFile(error)) throw error;
+  }
 }

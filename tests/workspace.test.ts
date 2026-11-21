@@ -6,7 +6,7 @@ import { join } from "node:path";
 import vm from "node:vm";
 import { parseHTML } from "linkedom";
 import { importApplication } from "../framework/src/fullstack/reactive-jsx.ts";
-import { buildWeb } from "../framework/src/fullstack/build.ts";
+import { buildWeb, staticWeb } from "../framework/src/fullstack/build.ts";
 import { internalTransport } from "../framework/src/fullstack/server.ts";
 import { serve, closeServer, handler } from "../framework/src/http.ts";
 
@@ -67,13 +67,34 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     }
     await app.start();
     const built = await buildWeb(app, { outDir: dir });
+    assert.ok(nodes.some(({ id }) => id === "page:orders-screen"));
     assert.ok(built.manifest.inputs.includes("examples/workspace/page.tsx"));
     assert.ok(built.manifest.inputs.some((input) => input.endsWith("arc-page-entry.js")));
     assert.ok(!built.manifest.inputs.includes("examples/workspace/users/server.ts"));
     assert.ok(!built.manifest.inputs.includes("examples/workspace/orders/server.ts"));
     assert.ok(!built.manifest.inputs.includes("examples/workspace/auth.ts"));
-    server = await serve(internalTransport(app), { port: 0 });
+    const remote = internalTransport(app);
+    const rest = handler(app);
+    server = await serve(async (request) => {
+      if (new URL(request.url).pathname.startsWith("/_arc/")) return remote(request);
+      return (await staticWeb(built.outDir, request, built.pages)) ?? rest(request);
+    }, { port: 0 });
     const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    const ordersPage = await fetch(`${origin}/orders`, { headers: { accept: "text/html" } });
+    assert.equal(ordersPage.status, 200);
+    assert.match(ordersPage.headers.get("content-type")!, /text\/html/);
+    const { document: ordersDocument, window: ordersWindow } = parseHTML(await ordersPage.text());
+    const ordersScript = ordersDocument.querySelector("script")!.getAttribute("src")!;
+    assert.notEqual(ordersScript, "/app.js");
+    const asset = await fetch(`${origin}${ordersScript}`);
+    assert.equal(asset.status, 200);
+    const ordersCode = await asset.text();
+    const orderApi = await fetch(`${origin}/orders`, {
+      headers: { accept: "application/json", authorization: "Bearer 00000000-0000-4000-8000-000000000001" },
+    });
+    assert.equal(orderApi.status, 200);
+    assert.deepEqual(await orderApi.json(), []);
+    assert.equal((await fetch(`${origin}/unknown-page`, { headers: { accept: "text/html" } })).status, 404);
     const { window, document } = parseHTML(
       '<html><head></head><body><div id="app"></div></body></html>',
     );
@@ -114,9 +135,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
         }
       }
     }
-    const context = vm.createContext({
-      window,
-      document,
+    const browserGlobals = {
       crypto: globalThis.crypto,
       fetch: fetcher,
       Request,
@@ -129,7 +148,17 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       setTimeout,
       clearTimeout,
       console,
-    });
+    };
+    new vm.Script(ordersCode).runInContext(vm.createContext({
+      ...browserGlobals,
+      window: ordersWindow,
+      document: ordersDocument,
+    }));
+    assert.equal(ordersDocument.title, "Замовлення — ARC Workspace");
+    assert.equal(ordersDocument.querySelector("#app h1")!.textContent, "Замовлення");
+    assert.equal(ordersDocument.querySelector("#app a[href='/']")!.textContent!.trim(), "ARC Workspace");
+    ordersWindow.dispatchEvent(new ordersWindow.Event("pagehide"));
+    const context = vm.createContext({ ...browserGlobals, window, document });
     new vm.Script(
       await readFile(join(built.outDir, "app.js"), "utf8"),
     ).runInContext(context);

@@ -332,7 +332,7 @@ export function compileReactiveJsx(
 /** Load a source application with the same opt-in transform as the browser build. */
 export async function importApplication(
   url: URL | string,
-  options: { loadTsx?: boolean; reactiveEntry?: boolean } = {},
+  options: { loadTsx?: boolean; reactiveEntries?: ReadonlySet<string> } = {},
 ) {
   const entry = String(url);
   const hook = registerHooks({
@@ -345,7 +345,7 @@ export async function importApplication(
         const compiled = compileReactiveJsx(
           readFileSync(file, "utf8"),
           fileURLToPath(file),
-          { loadTsx: options.loadTsx, reactive: options.reactiveEntry && moduleUrl === entry },
+          { loadTsx: options.loadTsx, reactive: options.reactiveEntries?.has(moduleUrl) },
         );
         if (compiled !== undefined)
           return { format: "module", source: compiled, shortCircuit: true };

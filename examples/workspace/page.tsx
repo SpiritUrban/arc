@@ -16,7 +16,7 @@ export const WorkspacePage = view({
         <a class="nav-item" href="#users">
           <span>◎</span> Користувачі
         </a>
-        <a class="nav-item" href="#orders">
+        <a class="nav-item" href="/orders">
           <span>▤</span> Замовлення
         </a>
         <div class="sidebar-bottom">

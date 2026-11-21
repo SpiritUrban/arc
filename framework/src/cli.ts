@@ -2,6 +2,7 @@ import { pathToFileURL } from "node:url";
 import { join, resolve } from "node:path";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import type { PageAssets } from "./fullstack/build.js";
 import { importApplication } from "./fullstack/reactive-jsx.js";
 import { Application } from "./core.js";
 import { handler, serve, closeServer } from "./http.js";
@@ -72,13 +73,14 @@ if (["graph", "inspect", "build", "run"].includes(command)) {
 } else {
   const servers: Awaited<ReturnType<typeof serve>>[] = [];
   let webDir: string | undefined;
+  let webPages: PageAssets[] | undefined;
   const removeWebBuild = () =>
     webDir ? rm(webDir, { recursive: true, force: true }) : Promise.resolve();
   try {
     if (logical.webConfig()?.entry) {
       const { buildWeb } = await import("./fullstack/build.js");
       webDir = await mkdtemp(join(tmpdir(), "arc-web-"));
-      await buildWeb(logical, { outDir: webDir });
+      webPages = (await buildWeb(logical, { outDir: webDir })).pages;
     }
     await host.start();
     const port = Number(process.env.PORT ?? 3000),
@@ -93,13 +95,15 @@ if (["graph", "inspect", "build", "run"].includes(command)) {
         async (request) => {
           const path = new URL(request.url).pathname;
           if (path.startsWith("/_arc/")) return bridge(request);
-          const asset = webDir && web ? await web(webDir, request) : undefined;
-          return (
-            asset ??
-            (serverHandler
-              ? await serverHandler(request)
-              : new Response("Not found", { status: 404 }))
-          );
+          const asset = webDir && web ? await web(webDir, request, webPages) : undefined;
+          if (asset) return asset;
+          const response = serverHandler
+            ? await serverHandler(request)
+            : new Response("Not found", { status: 404 });
+          if (webPages?.some((page) => page.path === path && page.api) &&
+              (request.method === "GET" || request.method === "HEAD"))
+            response.headers.append("vary", "Accept");
+          return response;
         },
         { port },
       ),

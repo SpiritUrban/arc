@@ -85,6 +85,19 @@ web: "./page.tsx"
 
 CLI визначає шлях до сторінки відносно файла застосунку. Для програмної компіляції передайте URL цього файла через `app.compile({ entry })`. Завантаження сторінки з TSX потребує TypeScript.
 
+Для кількох сторінок задайте `web.pages`. Ключі — точні URL-шляхи, значення — файли сторінок відносно файла застосунку.
+
+```ts
+web: {
+  pages: {
+    "/": "./page.tsx",
+    "/orders": "./orders-screen.tsx",
+  },
+}
+```
+
+Кожна адреса відкривається напряму й через звичайне посилання. ARC генерує окремий браузерний вхід для кожної сторінки. У Workspace `/orders` також є REST-маршрутом. Запит із `Accept: text/html` відкриває сторінку, а запит JSON викликає серверну операцію.
+
 ## 7. Перевірте boundary та interaction
 
 `npm run graph` показує browser state/action/resource/view, server operation/resource і shared contracts. Stand :3100 має All/Frontend/Backend/Boundaries та interaction traces. `npm run build:app` перевіряє browser reachability; repositories й Node adapters не повинні опинитися в manifest inputs. [Тести](testing.md) перевіряють реальні user flows.
