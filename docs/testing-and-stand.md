@@ -46,7 +46,7 @@ try {
 
 ## Stand та input corpus
 
-`npm run dev` запускає application :3000 і Stand :3100. У графі є ingress, operation, resource, effect, queue, worker і schedule. Клік відкриває contract/plan/analysis. Вузли активності підсвічуються SSE-подіями; polling metrics/traces лишається fallback.
+`npm run dev:workspace` запускає application :3000 і Stand :3100. У графі є ingress, operation, resource, effect, queue, worker і schedule. Клік відкриває contract/plan/analysis. Вузли активності підсвічуються SSE-подіями; polling metrics/traces лишається fallback.
 
 Generate valid/invalid та список cases використовують schema-aware corpus: валідний sample, min/max і сусідні boundary values, empty/unicode, malformed UUID/email, missing/optional fields і wrong types. Обирайте конкретний case зі списку. Генерація детермінована; random/property-based fuzzing ще попереду. Корпус може включати повторні бізнес-дані: schema-valid email не гарантує відсутність такого email у DB.
 

@@ -13,7 +13,7 @@ const doubled = derive({
 count.update((n) => n + 1);
 ```
 
-Для кореневого ARC Workspace запускайте `npm run dev`: UI :3000, Stand :3100. [Як він влаштований](../workspace-app.md). Для pure-Web Counter запустіть `npm run dev:web`. Канонічний приклад: [app.ts](../../examples/web-counter/app.ts), [page.ts](../../examples/web-counter/page.ts), [browser.ts](../../examples/web-counter/browser.ts). `npm run build:web` створює `.arc/web/app.js`, index.html, manifest.json та architecture.json.
+Для кореневого ARC Workspace запускайте `npm run dev:workspace`: UI :3000, Stand :3100. [Як він влаштований](../workspace-app.md). Для pure-Web Counter запустіть `npm run dev:web-counter`. Канонічний приклад: [app.ts](../../examples/web-counter/app.ts), [page.ts](../../examples/web-counter/page.ts), [browser.ts](../../examples/web-counter/browser.ts). `npm run build:web` створює `.arc/web/app.js`, index.html, manifest.json та architecture.json.
 
 `application({modules:[module({id,web:{nodes,entry}})]})` з core описує один logical graph. Node identity задається явно; шлях файлу не визначає runtime. Browser entry створює `webApplication({nodes})`, викликає start і mount, а на pagehide — dispose. Dev CLI обслуговує static assets і telemetry; цей допоміжний Node host не входить у browser graph.
 
@@ -23,9 +23,9 @@ count.update((n) => n + 1);
 
 | Проєкт                  | Dev                   | Browser build           |
 | ----------------------- | --------------------- | ----------------------- |
-| Root Workspace (`src/`) | npm run dev           | npm run build:app       |
-| Pure Web Counter        | npm run dev:web       | npm run build:web       |
-| Fullstack Tasks example | npm run dev:fullstack | npm run build:fullstack |
+| Root Workspace (`src/`) | npm run dev:workspace           | npm run build:app       |
+| Pure Web Counter        | npm run dev:web-counter       | npm run build:web       |
+| Fullstack Tasks example | npm run dev:fullstack-tasks | npm run build:fullstack |
 
 Кожна browser build команда записує .arc/web; наступний build замінює попередні assets. Root npm run build також компілює framework/application ESM і збирає root frontend. Потрібні root development dependencies, зокрема esbuild; production server-only consumer цього tooling не потребує. HMR/watch немає: після source змін перезапустіть dev.
 

@@ -1,0 +1,309 @@
+<main id="content">
+  <section class="hero wrap">
+    <div class="hero-copy">
+      <a class="release-pill" href="docs/migration-0.3.html"
+        ><span></span> ARC 0.3 · Server. Web. Fullstack. <b>↗</b></a
+      >
+      <h1>Один graph.<br />Увесь <span>застосунок.</span></h1>
+      <p class="hero-description">
+        Від browser state до server operations.<br />Опишіть архітектуру явно —
+        нехай ARC<br class="desktop-break" />
+        зробить її виконуваною.
+      </p>
+      <div class="hero-buttons">
+        <a class="button primary" href="docs/getting-started.html"
+          >Get Started <span>→</span></a
+        ><a class="button secondary" href="learn/index.html"
+          >Пройти перший урок <span>↗</span></a
+        >
+      </div>
+      <div class="install-command">
+        <code>npm run dev</code
+        ><button data-copy aria-label="Копіювати команду">⧉</button
+        ><span>у репозиторії ARC</span>
+      </div>
+      <div class="hero-tags">
+        <span>TypeScript</span><i></i><span>Explicit dependencies</span><i></i
+        ><span>Fine-grained Web</span>
+      </div>
+    </div>
+    <div
+      class="graph-window"
+      aria-label="Application graph: browser action remote server operation resource"
+    >
+      <div class="window-bar">
+        <span class="window-dots"><i></i><i></i><i></i></span
+        ><span>application.graph</span
+        ><span class="window-live"><i></i> DECLARED</span>
+      </div>
+      <div class="graph-canvas">
+        <div class="graph-runtime">BROWSER <span>01</span></div>
+        <div class="graph-row">
+          <div class="graph-node state-node">
+            <span class="node-icon">◈</span>
+            <div><strong>title</strong><small>state</small></div>
+            <span class="node-domain">web</span>
+          </div>
+          <div class="graph-node">
+            <span class="node-icon">↗</span>
+            <div><strong>addTask</strong><small>action</small></div>
+            <span class="node-domain">web</span>
+          </div>
+        </div>
+        <div class="graph-connector">
+          <span>↓</span><small>REMOTE_CALLS</small>
+        </div>
+        <div class="graph-runtime server-label">SERVER <span>02</span></div>
+        <div class="graph-node server-node">
+          <span class="node-icon">ƒ</span>
+          <div><strong>tasks.create</strong><small>operation</small></div>
+          <span class="node-domain">server</span>
+        </div>
+        <div class="graph-connector short">
+          <span>↓</span><small>DEPENDS_ON</small>
+        </div>
+        <div class="graph-node resource-node">
+          <span class="node-icon">▱</span>
+          <div><strong>tasks.repository</strong><small>resource</small></div>
+          <span class="node-domain">server</span>
+        </div>
+        <div class="graph-bottom">
+          <span><i></i> explicit boundaries</span><span>IR v3 ↗</span>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="principle-strip">
+    <div class="wrap">
+      <p>
+        Не структура папок.<br /><strong
+          >Архітектура, яку можна виконати.</strong
+        >
+      </p>
+      <span>Один application graph</span><span>Кілька runtime targets</span
+      ><span>Спільні contracts</span>
+    </div>
+  </section>
+  <section class="wrap modes-section">
+    <div class="section-top">
+      <div>
+        <div class="section-label">ОБЕРІТЬ СВІЙ RUNTIME</div>
+        <h2>Від API до повного продукту<span>.</span></h2>
+      </div>
+      <p>
+        Почніть з того, що потрібно зараз.<br />Збережіть ту саму модель, коли
+        застосунок виросте.
+      </p>
+    </div>
+    <div class="mode-grid">
+      <a class="mode-card" href="docs/server/index.html"
+        ><span class="mode-icon">⌘</span
+        ><span class="card-index">01 / SERVER</span>
+        <h3>Зосередьтеся на логіці.</h3>
+        <p>
+          Operations, ресурси та явні needs. HTTP, RPC, queue і schedule
+          виконують сценарії через спільний executor.
+        </p>
+        <span class="card-link">ARC Server <b>↗</b></span></a
+      ><a class="mode-card" href="docs/web/index.html"
+        ><span class="mode-icon">◈</span
+        ><span class="card-index">02 / WEB</span>
+        <h3>Оновлюйте потрібне.</h3>
+        <p>
+          State, derive та DOM bindings. View setup один раз; далі працює
+          fine-grained dataflow без VDOM.
+        </p>
+        <span class="card-link">ARC Web <b>↗</b></span></a
+      ><a class="mode-card" href="docs/fullstack/overview.html"
+        ><span class="mode-icon">⇄</span
+        ><span class="card-index">03 / FULLSTACK</span>
+        <h3>Поєднайте обидві сторони.</h3>
+        <p>
+          Явний remote boundary, спільні schemas та пов’язаний trace. Browser і
+          server залишаються частинами одного graph.
+        </p>
+        <span class="card-link">ARC Fullstack <b>↗</b></span></a
+      >
+    </div>
+  </section>
+  <section class="code-section wrap">
+    <div class="code-intro">
+      <div class="section-label">МЕНШЕ ПРИХОВАНОГО</div>
+      <h2>Залежності видно.<br />Контракти спільні.</h2>
+      <p>
+        Опишіть сценарій і його needs. ARC compiler перевірить graph, а runtime
+        виконає його у відповідному середовищі.
+      </p>
+      <a class="text-link" href="docs/architecture.html"
+        >Як влаштований ARC <span>→</span></a
+      >
+      <div class="code-caption">
+        Показано скорочені приклади API.<br />Повні runnable приклади — в
+        уроках.
+      </div>
+    </div>
+    <div class="code-demo">
+      <div class="code-tabs" role="tablist" aria-label="Runtime прикладу">
+        <button
+          role="tab"
+          aria-selected="true"
+          id="tab-server"
+          aria-controls="demo-server"
+          data-tab="server"
+        >
+          Server</button
+        ><button
+          role="tab"
+          aria-selected="false"
+          id="tab-web"
+          aria-controls="demo-web"
+          data-tab="web"
+        >
+          Web</button
+        ><button
+          role="tab"
+          aria-selected="false"
+          id="tab-fullstack"
+          aria-controls="demo-fullstack"
+          data-tab="fullstack"
+        >
+          Fullstack</button
+        ><span>TypeScript</span>
+      </div>
+      <div
+        class="demo-panel"
+        id="demo-server"
+        role="tabpanel"
+        aria-labelledby="tab-server"
+      >
+        <div class="demo-file">
+          tasks.create.ts <button data-copy>Копіювати</button>
+        </div>
+        <pre><code>const createTask = operation({
+  id: 'tasks.create',
+  input: CreateTaskInput,
+  output: Task,
+  needs: { tasks: tasksRepository },
+
+  async run({ input, tasks }) {
+    return ok(await tasks.create(input.title));
+  },
+});</code></pre>
+      </div>
+      <div
+        class="demo-panel"
+        id="demo-web"
+        role="tabpanel"
+        aria-labelledby="tab-web"
+        hidden
+      >
+        <div class="demo-file">
+          counter.state.ts <button data-copy>Копіювати</button>
+        </div>
+        <pre><code>const count = state({
+  id: 'counter.value',
+  initial: 0,
+});
+
+const doubled = derive({
+  id: 'counter.doubled',
+  from: [count],
+  compute: n =&gt; n * 2,
+});</code></pre>
+      </div>
+      <div
+        class="demo-panel"
+        id="demo-fullstack"
+        role="tabpanel"
+        aria-labelledby="tab-fullstack"
+        hidden
+      >
+        <div class="demo-file">
+          tasks.resource.ts <button data-copy>Копіювати</button>
+        </div>
+        <pre><code>// ListTasks — shared operation contract
+const tasks = remote(ListTasks, {
+  id: 'tasks.current',
+});
+
+const create = remoteClient(CreateTask, {
+  id: 'tasks.create.remote',
+});
+// У action.run передайте signal і trace:
+const result = await create.call(input, ctx);</code></pre>
+      </div>
+      <div class="demo-footer">
+        <span>↳ typed contracts · explicit needs</span
+        ><a href="learn/02-server-operation.html">Повний приклад ↗</a>
+      </div>
+    </div>
+  </section>
+  <section class="stand-section wrap">
+    <div class="stand-preview">
+      <div class="stand-preview-header">
+        <span class="stand-logo">◉ ARC Stand</span
+        ><span>ARCHITECTURE / ACTIVITY</span>
+      </div>
+      <div class="stand-mini-graph">
+        <span class="mini-node browser-mini">action <b>tasks.add</b></span
+        ><span class="mini-edge">remote ↓</span
+        ><span class="mini-node server-mini">operation <b>tasks.create</b></span
+        ><span class="mini-edge">needs ↓</span
+        ><span class="mini-node">resource <b>tasks.repository</b></span>
+      </div>
+      <div class="stand-preview-footer">
+        Схематичний вигляд graph · live Stand працює локально
+      </div>
+    </div>
+    <div class="stand-copy">
+      <div class="section-label">АРХІТЕКТУРА НЕ ПОВИННА БУТИ НЕВИДИМОЮ</div>
+      <h2>Побачте, як усе<br />пов’язано.</h2>
+      <p>
+        Stand читає IR і показує graph, execution traces та metrics. Відрізняйте
+        оголошену архітектуру від фактичної runtime activity.
+      </p>
+      <a class="text-link" href="docs/stand/index.html"
+        >Знайомство зі Stand <span>→</span></a
+      >
+    </div>
+  </section>
+  <section class="learning-section wrap">
+    <div>
+      <div class="section-label">ПОЧНІМО З ПРАКТИКИ</div>
+      <h2>Перший крок —<br />робочий застосунок.</h2>
+      <p>
+        П’ять уроків, реальний код та зрозумілий шлях<br />від першого запуску
+        до fullstack interaction.
+      </p>
+      <a class="button primary" href="learn/01-first-run.html"
+        >Почати навчання <span>→</span></a
+      >
+    </div>
+    <div class="learning-steps">
+      <a href="learn/01-first-run.html"
+        ><span>01</span><strong>Запустіть Workspace</strong><b>↗</b></a
+      ><a href="learn/02-server-operation.html"
+        ><span>02</span><strong>Напишіть першу operation</strong><b>↗</b></a
+      ><a href="learn/03-reactive-view.html"
+        ><span>03</span><strong>Оживіть frontend</strong><b>↗</b></a
+      ><a href="learn/04-fullstack-remote.html"
+        ><span>04</span><strong>З’єднайте runtimes</strong><b>↗</b></a
+      ><a href="learn/05-test-and-inspect.html"
+        ><span>05</span><strong>Перевірте graph і traces</strong><b>↗</b></a
+      >
+    </div>
+  </section>
+  <section class="closing wrap">
+    <span class="section-label">EXPLICIT BY DESIGN</span>
+    <h2>Архітектура — це graph.<br />Тепер він виконується.</h2>
+    <a class="button primary" href="docs/getting-started.html"
+      >Get Started <span>→</span></a
+    >
+    <p>
+      ARC 0.3 — MVP.
+      <a href="docs/audit/web-fullstack-report.html"
+        >Можливості та обмеження ↗</a
+      >
+    </p>
+  </section>
+</main>

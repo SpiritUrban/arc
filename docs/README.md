@@ -46,3 +46,5 @@ node --conditions=arc-source --import tsx --test docs/examples/tasks.test.ts
 Server посібники зберігають приклади root imports; browser code використовує package subpaths.
 
 [ARC Workspace: як запустити та як влаштований кореневий проєкт](workspace-app.md).
+
+[Публічний сайт ARC: окремий проєкт website/, уроки та GitHub Pages](website.md).

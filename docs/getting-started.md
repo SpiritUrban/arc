@@ -7,7 +7,7 @@
 ```sh
 npm install
 npm run build
-npm run dev
+npm run dev:workspace
 ```
 
 Application: http://localhost:3000; Stand: http://localhost:3100; OpenAPI: http://localhost:3000/openapi.json.
@@ -32,7 +32,7 @@ CLI сам викликає compile і start для start/stand/run; graph/inspe
 
 | Команда                            | Призначення                                     |
 | ---------------------------------- | ----------------------------------------------- |
-| `npm run dev`                      | Source development CLI із tsx; без watch/reload |
+| `npm run dev:workspace`                      | Source development CLI із tsx; без watch/reload |
 | `npm start`                        | Development HTTP без Stand                      |
 | `npm run graph`                    | Pure graph, без activation                      |
 | `npm run inspect -- orders.create` | Контракт/plan вузла                             |
@@ -55,7 +55,7 @@ ARC_APP=dist/src/app.js node framework/arc.mjs start
 `ARC_APP` типовий src/app.ts (від cwd), PORT — 3000, STAND_PORT — 3100. Для TypeScript entrypoint Node 22.18+ підтримує erasable syntax; для іншого TS-синтаксису застосунку використовуйте dev script або compiled JS. CLI пакета не залежить від tsx.
 
 ```sh
-PORT=4000 STAND_PORT=4100 npm run dev
+PORT=4000 STAND_PORT=4100 npm run dev:workspace
 ARC_APP=docs/examples/tasks.ts npx arc stand
 ```
 
@@ -92,7 +92,7 @@ import { application, operation, s, ok } from "@arc/framework";
 
 ## Три runtime режими
 
-`npm run dev` запускає кореневий fullstack ARC Workspace, `npm run dev:web` — pure Web counter, `npm run dev:fullstack` — Tasks. Одночасно на default ports запускайте один приклад; PORT змінює application port, STAND_PORT — Stand. Web та internal transport мають один origin.
+`npm run dev:workspace` запускає кореневий fullstack ARC Workspace, `npm run dev:web-counter` — pure Web counter, `npm run dev:fullstack-tasks` — Tasks. Запускайте ці застосунки по одному, бо вони використовують спільний каталог збірки `.arc/web`; PORT змінює application port, STAND_PORT — Stand. Web та internal transport мають один origin.
 
 `npm run build:app` збирає кореневий frontend; `npm run build:web` / `npm run build:fullstack` створюють browser assets навчальних прикладів у .arc/web. CLI `arc dev` compile/build/start/serve і відкриває Stand; це basic build на старті, без watch/HMR. [Web guide](web/getting-started.md), [Fullstack guide](fullstack/overview.md).
 

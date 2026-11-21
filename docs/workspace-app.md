@@ -6,10 +6,10 @@
 
 ```sh
 npm install
-npm run dev
+npm run dev:workspace
 ```
 
-Application і internal transport: http://localhost:3000; Stand: http://localhost:3100. Якщо порти зайняті: `PORT=4323 STAND_PORT=4324 npm run dev`.
+Application і internal transport: http://localhost:3000; Stand: http://localhost:3100. Якщо порти зайняті: `PORT=4323 STAND_PORT=4324 npm run dev:workspace`.
 
 ```sh
 npm run build        # framework ESM, application ESM і .arc/web browser assets
@@ -18,7 +18,7 @@ npm run graph       # єдиний server/browser/shared IR, без activation
 npm test
 ```
 
-`npm run dev:web` і `dev:fullstack` запускають окремі навчальні приклади Counter та Tasks. Dev CLI збирає bundle на старті, без автоматичного watch/HMR: після змін перезапустіть команду.
+`npm run dev:web-counter` і `npm run dev:fullstack-tasks` запускають окремі навчальні приклади Counter та Tasks. Dev CLI збирає bundle на старті, без автоматичного watch/HMR: після змін перезапустіть команду.
 
 ## Що можна зробити
 
