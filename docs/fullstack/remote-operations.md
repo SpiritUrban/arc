@@ -88,6 +88,18 @@ const createOrder = orderClient.mutation(CreateOrder, {
 
 У Workspace зміна джерела в `from` оновлює запити читання, а форма використовує актуальне значення для наступного надсилання. `query` виводить ID як `<ID операції>.query`. Для контракту з обов’язковим входом передайте функцію `input`. [Форма замовлень](../../examples/workspace/orders/page.tsx)
 
+## Дія без форми
+
+```tsx
+const cancelOrder = orderClient.mutation(CancelOrder, { refresh: [orders] });
+
+<button type="button" onClick={() => cancelOrder.run({ id: order.id })}>
+  Скасувати
+</button>
+```
+
+`run(input)` приймає вхід із контракту й перевіряє його перед запитом. Стан дії, бізнес-помилки, `onSuccess` і `refresh` працюють так само, як у формі. Прямий виклик із `onClick` продовжує трасу кліку у Stand.
+
 ## HTTP-транспорт
 
 Server `internalTransport(app)` обслуговує POST /_arc/call/:operation. Операція повинна явно мати `expose:{web:true}` на server. Browser descriptor не надає дозволу. Input/output/error details перевіряються сервером; client також перевіряє output. Internal exception не передає stack чи raw message. AbortSignal передається fetch і request executor настільки, наскільки дозволяє HTTP disconnect.

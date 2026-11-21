@@ -3,7 +3,7 @@
 // а надсилання форми викликає серверну операцію створення.
 import { derive, each, project, view, type Signal } from "@arc/framework/web";
 import { remoteApi } from "@arc/framework/fullstack";
-import { ListOrders, CreateOrder } from "./contracts.ts";
+import { ListOrders, CreateOrder, CancelOrder } from "./contracts.ts";
 import { selectedUser, activeUser } from "../user-selection.ts";
 import { money, failureMessage } from "../ui.ts";
 
@@ -118,7 +118,7 @@ function renderOrdersPage(quantity: Signal<string>) {
               {each(visibleOrders, {
                 key: (order) => order.id,
                 render: (order) => (
-                  <tr>
+                  <tr data-order={order.id}>
                     <td>
                       <strong>{order.product}</strong>
                       <small>#{order.id.slice(0, 8)}</small>
@@ -126,7 +126,20 @@ function renderOrdersPage(quantity: Signal<string>) {
                     <td>{order.quantity}</td>
                     <td>{money(order.total)}</td>
                     <td>
-                      <span class="order-status">Створено</span>
+                      <span class="order-status">
+                        {order.cancelled ? "Скасовано" : "Створено"}
+                      </span>
+                      {!order.cancelled && (
+                        <button
+                          class="button secondary"
+                          type="button"
+                          data-cancel-order
+                          bind:disabled={cancelOrder.running}
+                          onClick={() => cancelOrder.run({ id: order.id })}
+                        >
+                          Скасувати
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ),
@@ -134,6 +147,13 @@ function renderOrdersPage(quantity: Signal<string>) {
             </tbody>
           </table>
         </div>
+        <p class="error" role="alert" data-cancel-error>
+          {cancelOrder.failed("ORDER_ALREADY_CANCELLED")
+            ? "Це замовлення вже скасовано."
+            : cancelOrder.failed("ORDER_NOT_FOUND")
+              ? "Замовлення не знайдено."
+              : failureMessage(cancelOrder().error)}
+        </p>
         <div class="empty order-empty" data-empty bind:visible={history.empty}>
           <span class="empty-symbol">▤</span>
           <strong>Тут з’являться замовлення</strong>
@@ -156,6 +176,8 @@ export const ordersData = orderClient.query(ListOrders);
 export const createOrder = orderClient.mutation(CreateOrder, {
   refresh: [ordersData],
 });
+
+const cancelOrder = orderClient.mutation(CancelOrder, { refresh: [ordersData] });
 
 // Поки новий список завантажується, фільтр приховує кешовані замовлення попереднього користувача.
 export const visibleOrders = derive({

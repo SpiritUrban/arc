@@ -23,6 +23,7 @@ import {
 } from "../web/async.js";
 import {
   batch,
+  currentWriteTrace,
   derive,
   state,
   type Readable,
@@ -254,7 +255,11 @@ export type Mutation<C extends OperationContract, Field extends string = never> 
     fields: RemoteForm<C, Field>["fields"];
     failed(code: keyof C["errors"] & string): boolean;
     invalid(field: InputField<C>): boolean;
+    run(input: Infer<C["input"]>): Promise<RemoteResult<C>>;
   };
+
+const directInput = Symbol("ARC mutation input");
+type DirectSubmission<C extends OperationContract> = { [directInput]: Infer<C["input"]> };
 
 type InputField<C extends OperationContract> =
   Infer<C["input"]> extends Record<string, unknown>
@@ -263,7 +268,9 @@ type InputField<C extends OperationContract> =
 
 function buildRemoteForm<C extends OperationContract, Field extends string>(
   contract: C, options: FormOptions<C, Field>, defaults: RemoteFormDefaults, callable: true,
-): RemoteForm<C, Field> & { submit: CallableAction<void, RemoteResult<C>> };
+): RemoteForm<C, Field> & {
+  submit: CallableAction<void | DirectSubmission<C>, RemoteResult<C>>;
+};
 function buildRemoteForm<C extends OperationContract, Field extends string>(
   contract: C, options: FormOptions<C, Field>, defaults: RemoteFormDefaults,
 ): RemoteForm<C, Field>;
@@ -303,7 +310,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     baseUrl,
     fetch,
   });
-  const definition: ActionOptions<void | HTMLFormElement, RemoteResult<C>> = {
+  const definition: ActionOptions<void | HTMLFormElement | DirectSubmission<C>, RemoteResult<C>> = {
     id,
     needs: Object.fromEntries(
       [
@@ -313,8 +320,13 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
       ].map((node, index) => [index, node]),
     ),
     invalidates: refresh,
-    async run(form, ctx) {
-      const submission = form && readNamedSubmission(form, numericFields);
+    async run(request, ctx) {
+      if (request && directInput in request) {
+        const result = await client.call(contract.input.parse(request[directInput]), ctx);
+        if (result.ok && !ctx.signal.aborted) batch(() => onSuccess?.(result.value, ctx));
+        return result;
+      }
+      const submission = request && readNamedSubmission(request, numericFields);
       const values = Object.fromEntries(
         names.map((name) => [name, fields[name].get()]),
       ) as Record<Field, string>;
@@ -386,6 +398,9 @@ function bindMutation(defaults: RemoteFormDefaults) {
     const { fields, submit } = buildRemoteForm(contract, options, defaults, true);
     return Object.assign(submit, {
       fields,
+      run(payload: Infer<C["input"]>) {
+        return submit.execute({ [directInput]: payload }, { trace: currentWriteTrace() });
+      },
       failed(code: keyof C["errors"] & string) {
         const { status, result } = submit();
         return status === "error" &&

@@ -43,6 +43,9 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       e.from === "orders.create.submit" && e.to === "orders.list.query" && e.kind === "INVALIDATES",
     ));
     assert.ok(edges.some((e) =>
+      e.from === "orders.cancel.submit" && e.to === "orders.list.query" && e.kind === "INVALIDATES",
+    ));
+    assert.ok(edges.some((e) =>
       e.from === "users.create.submit" && e.to === "users.list.query" && e.kind === "INVALIDATES",
     ));
     assert.ok(edges.some((e) =>
@@ -306,6 +309,36 @@ test("Workspace browser creates users/orders, handles business errors and isolat
         (t) => t.operation === "orders.create" && t.id === trace.traceId,
       ),
     );
+    const orderId = document.querySelector("[data-order]")!.getAttribute("data-order");
+    const cancelOverRest = (actor: string) => handler(app)(
+      new Request("http://localhost/orders/cancel", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${actor}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ id: orderId }),
+      }),
+    );
+    const denied = await cancelOverRest("00000000-0000-4000-8000-000000000001");
+    assert.equal(denied.status, 404);
+    assert.match(await denied.text(), /ORDER_NOT_FOUND/);
+    document.querySelector("[data-cancel-order]")!.dispatchEvent(new window.Event("click"));
+    await waitFor(() => document.querySelector("[data-order]")!.textContent!.includes("Скасовано"));
+    assert.equal(document.querySelector("[data-cancel-order]"), null);
+    await waitFor(() => app.browserEvents.some(
+      (event) => event.node === "orders.cancel.submit" && event.type === "action.finished",
+    ));
+    const cancelTrace = app.browserEvents.find(
+      (event) => event.node === "orders.cancel.submit" && event.type === "action.started",
+    )!;
+    assert.ok(app.browserEvents.some((event) =>
+      event.type === "binding.event" && event.node.endsWith(".each") && event.traceId === cancelTrace.traceId,
+    ));
+    assert.ok(app.traces.some((t) => t.operation === "orders.cancel" && t.id === cancelTrace.traceId));
+    const duplicate = await cancelOverRest(userId!);
+    assert.equal(duplicate.status, 409);
+    assert.match(await duplicate.text(), /ORDER_ALREADY_CANCELLED/);
     const createdOverRest = await handler(app)(
       new Request("http://localhost/orders", {
         method: "POST",

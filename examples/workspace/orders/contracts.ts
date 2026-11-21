@@ -7,6 +7,7 @@ export const Order = s.object({
   product: s.string({ min: 1, max: 100 }),
   quantity: s.int({ min: 1, max: 100 }),
   total: s.number({ min: 0 }),
+  cancelled: s.boolean(),
 });
 
 // ID зв’язує браузерний клієнт із серверною реалізацією. expose.web відкриває
@@ -27,5 +28,13 @@ export const CreateOrder = operationContract({
     quantity: s.int({ min: 1, max: 100 }),
   }),
   output: Order,
+  expose: { web: true },
+});
+
+export const CancelOrder = operationContract({
+  id: "orders.cancel",
+  input: s.object({ id: s.uuid() }),
+  output: Order,
+  errors: { ORDER_NOT_FOUND: 404, ORDER_ALREADY_CANCELLED: 409 },
   expose: { web: true },
 });

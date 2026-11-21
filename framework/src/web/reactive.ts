@@ -16,6 +16,10 @@ export type Signal<T> = Writable<T> & (() => T);
 
 let writeTrace: TraceToken | undefined;
 
+export function currentWriteTrace(): TraceToken | undefined {
+  return writeTrace;
+}
+
 export function withWriteTrace<T>(trace: TraceToken, run: () => T): T {
   const previous = writeTrace;
   writeTrace = trace;
