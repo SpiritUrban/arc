@@ -278,9 +278,10 @@ type WebConfig = {
   bootstrap?: { id: string };
   pages?: readonly { path: string; entry: string; id: string }[];
   layout?: string;
+  layouts?: Readonly<Record<string, string>>;
 };
 
-type WebPages = { pages: Readonly<Record<string, string>>; layout?: string };
+type WebPages = { pages: Readonly<Record<string, string>>; layout?: string; layouts?: Readonly<Record<string, string>> };
 
 type AppOptions = {
   operations?: Operation[];
@@ -1183,7 +1184,10 @@ export class Application {
         : source;
       return { source, url, entry: fileURLToPath(url) };
     };
-    const layout = config?.layout ? resolveEntry(config.layout) : undefined;
+    const layoutFiles = new Map<string, ReturnType<typeof resolveEntry>>();
+    if (config && "layout" in config && config.layout) layoutFiles.set("/", resolveEntry(config.layout));
+    for (const [path, file] of Object.entries(config?.layouts ?? {}))
+      layoutFiles.set(path, resolveEntry(file));
     const patterns = new Set<string>();
     const entries = routes.map(([path, file]) => {
       const params = pageParamNames(path);
@@ -1206,10 +1210,10 @@ export class Application {
     });
     const nodes = new Map<string, ReturnType<typeof rootView>>();
     const reactiveEntries = new Set(entries.map(({ url }) => url.href));
-    if (layout) reactiveEntries.add(layout.url.href);
-    const layoutModule = layout
-      ? await importApplication(layout.url, { loadTsx: true, reactiveEntries })
-      : undefined;
+    for (const layout of layoutFiles.values()) reactiveEntries.add(layout.url.href);
+    const layoutModules = new Map<string, { default: unknown }>();
+    for (const [path, layout] of layoutFiles)
+      layoutModules.set(path, await importApplication(layout.url, { loadTsx: true, reactiveEntries }));
     const webRuntime = "@arc/framework/web";
     let pageView: (typeof import("./web/index.js"))["pageView"] | undefined;
     const loadPageView = async () =>
@@ -1226,17 +1230,24 @@ export class Application {
     }
     const pages = entries.map(({ path, entry, id }) => ({ path, entry, id }));
     const primary = pages.find(({ path }) => path === "/") ?? pages[0];
-    const createLayout = layoutModule ? await loadPageView() : undefined;
-    const roots = layoutModule && createLayout
-      ? pages.map(({ path, entry }) => layoutView(
-          layoutModule.default, nodes.get(entry)!, path, createLayout,
-          Object.fromEntries(pageParamNames(path).map((name) => [name, ""])),
-        ))
-      : [...new Set(nodes.values())];
+    if (layoutModules.size) await loadPageView();
+    const roots = pages.map(({ path, entry }) => {
+      const applicable = [...layoutModules].filter(([base]) =>
+        base === "/" || path === base || path.startsWith(`${base}/`),
+      ).sort(([a], [b]) => a.length - b.length);
+      if (!applicable.length) return nodes.get(entry)!;
+      const createLayout = pageView;
+      return applicable.map(([base, layout], index) => ({ base, layout, index })).reduceRight((child, { base, layout, index }) => layoutView(
+        layout.default, child, path, createLayout!,
+        Object.fromEntries(pageParamNames(path).map((name) => [name, ""])),
+        index === 0 ? `layout:${path}` : `layout:${path}:${base}`,
+      ), nodes.get(entry)!);
+    });
     return {
       nodes: roots,
       entry: primary.entry,
-      layout: layout?.entry,
+      layout: config && "layout" in config && config.layout ? layoutFiles.get("/")?.entry : undefined,
+      layouts: config?.layouts && Object.fromEntries([...layoutFiles].map(([path, layout]) => [path, layout.entry])),
       bootstrap: { id: primary.id },
       pages: config ? pages : undefined,
     };

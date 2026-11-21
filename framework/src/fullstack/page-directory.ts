@@ -18,7 +18,7 @@ export async function discoverPageDirectory(url: URL) {
   if (!info?.isDirectory()) return;
 
   const pages = new Map<string, string>();
-  let layout: string | undefined;
+  const layouts: Record<string, string> = {};
   async function visit(folder: string, segments: readonly string[]) {
     const entries = await readdir(folder, { withFileTypes: true });
     entries.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
@@ -32,9 +32,10 @@ export async function discoverPageDirectory(url: URL) {
       if (!entry.isFile() || !/\.(tsx|js)$/.test(entry.name)) continue;
       const name = entry.name.replace(/\.(tsx|js)$/, "");
       const source = pathToFileURL(filename).href;
-      if (!segments.length && name === "layout") {
-        if (layout) throw new Error(`Duplicate layout in ${directory}`);
-        layout = source;
+      if (name === "layout") {
+        const route = `/${segments.join("/")}`;
+        if (layouts[route]) throw new Error(`Duplicate layout for ${route} in ${directory}`);
+        layouts[route] = source;
         continue;
       }
       const parts = name === "index" ? segments : [...segments, routeSegment(name)];
@@ -44,5 +45,5 @@ export async function discoverPageDirectory(url: URL) {
     }
   }
   await visit(directory, []);
-  return { pages: Object.fromEntries(pages), layout };
+  return { pages: Object.fromEntries(pages), layouts };
 }

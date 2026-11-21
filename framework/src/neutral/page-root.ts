@@ -16,10 +16,11 @@ export function layoutView(
   route: string,
   createView: typeof pageView,
   params: Readonly<Record<string, string>>,
+  id = `layout:${route}`,
 ): View {
   if (typeof layout !== "function") throw new Error("Default-export a function from the ARC layout");
   const render = layout as (context: PageLayoutContext) => TemplateElement;
-  return createView(`layout:${route}`, (context) =>
+  return createView(id, (context) =>
     render({ ...context, route, children: child }), params,
   );
 }

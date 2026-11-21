@@ -8,7 +8,7 @@ import { wireContract } from "../neutral/descriptor.js";
 import { comparePagePaths, matchPagePath } from "../neutral/page-path.js";
 import type { ArchitectureIR, GraphDefinition } from "../neutral/graph.js";
 import { fileURLToPath } from "node:url";
-type BuildPage = { path: string; entry: string; id?: string };
+type BuildPage = { path: string; entry: string; id?: string; layouts?: readonly string[] };
 export type PageAssets = { path: string; html: string; script: string; api?: boolean };
 
 export interface BuildHost {
@@ -20,6 +20,7 @@ export interface BuildHost {
     bootstrap?: { id: string };
     pages?: readonly BuildPage[];
     layout?: string;
+    layouts?: Readonly<Record<string, string>>;
   } | undefined;
 }
 
@@ -46,7 +47,7 @@ async function buildPage(
   ir: ArchitectureIR,
   serverModules: Set<string>,
   reactiveEntries: ReadonlySet<string>,
-  layout?: string,
+  layouts: readonly string[] = [],
 ) {
   const entry = resolve(source);
   const browserCore = fileURLToPath(
@@ -57,9 +58,9 @@ async function buildPage(
         stdin: {
           contents: [
             `import * as page from ${JSON.stringify(entry)};`,
-            ...(layout ? [`import * as layout from ${JSON.stringify(layout)};`] : []),
+            ...layouts.map((layout, index) => `import * as layout${index} from ${JSON.stringify(layout)};`),
             `import { bootstrapPage } from ${JSON.stringify(fileURLToPath(new URL("./page-bootstrap.js", import.meta.url)))};`,
-            `bootstrapPage(page, ${JSON.stringify(id)}, ${JSON.stringify(path)}${layout ? ", layout" : ""});`,
+            `bootstrapPage(page, ${JSON.stringify(id)}, ${JSON.stringify(path)}${layouts.length ? `, [${layouts.map((_, index) => `layout${index}`).join(", ")}]` : ""});`,
           ].join("\n"),
           resolveDir: dirname(entry),
           sourcefile: "arc-page-entry.js",
@@ -153,18 +154,25 @@ export async function buildWeb(app: BuildHost, options: { outDir?: string } = {}
   const ir = app.graph();
   const outDir = resolve(options.outDir ?? ".arc/web");
   await mkdir(outDir, { recursive: true });
-  const routes = config.pages ?? [{ path: "/", entry: config.entry, id: config.bootstrap?.id }];
-  const pages = routes.map(({ path }) => ({
+  const declaredRoutes = config.pages ?? [{ path: "/", entry: config.entry, id: config.bootstrap?.id }];
+  const pages = declaredRoutes.map(({ path }) => ({
     ...pageAssets(path),
     api: Boolean(config.pages) && hasReadRoute(path, ir),
   }));
   const serverModules = new Set((config.serverModules ?? []).map((file) => resolve(file)));
-  const reactiveEntries = new Set(routes.filter(({ id }) => id).map(({ entry }) => resolve(entry)));
-  const layout = config.layout && resolve(config.layout);
-  if (layout) reactiveEntries.add(layout);
+  const reactiveEntries = new Set(declaredRoutes.filter(({ id }) => id).map(({ entry }) => resolve(entry)));
+  const layouts = new Map<string, string>();
+  if (config.layout) layouts.set("/", config.layout);
+  for (const [path, file] of Object.entries(config.layouts ?? {})) layouts.set(path, file);
+  const routes = declaredRoutes.map((route) => {
+    const applicable = [...layouts].filter(([base]) => base === "/" || route.path === base || route.path.startsWith(`${base}/`))
+      .sort(([a], [b]) => a.length - b.length).map(([, file]) => resolve(file));
+    return { ...route, layouts: applicable };
+  });
+  for (const layout of layouts.values()) reactiveEntries.add(resolve(layout));
   const builds = await Promise.all(routes.map(async (route, index) => {
     const { html, script } = pages[index];
-    const result = await buildPage(route, join(outDir, script.slice(1)), ir, serverModules, reactiveEntries, layout);
+    const result = await buildPage(route, join(outDir, script.slice(1)), ir, serverModules, reactiveEntries, route.layouts);
     await writeFile(join(outDir, html),
       `<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ARC Application</title></head><body><div id="app"></div><script type="module" src="${script}"></script></body></html>`,
     );

@@ -10,14 +10,14 @@ export function bootstrapPage(
   page: PageModule,
   id: string,
   path: string,
-  layout?: PageModule,
+  layouts: readonly PageModule[] = [],
 ) {
   const target = document.getElementById("app");
   if (!target) throw new Error("ARC page requires an #app container");
 
-  const title = page.title ?? layout?.title;
+  const title = page.title ?? [...layouts].reverse().find((layout) => layout.title)?.title;
   if (title) document.title = title;
-  const styles = [layout?.styles, page.styles].filter(Boolean).join("\n");
+  const styles = [...layouts.map((layout) => layout.styles), page.styles].filter(Boolean).join("\n");
   const style = styles ? document.createElement("style") : undefined;
   if (style) {
     style.textContent = styles;
@@ -28,7 +28,10 @@ export function bootstrapPage(
     const params = pageParamNames(path).length ? matchPagePath(path, window.location.pathname) : {};
     if (!params) throw new Error(`URL does not match ARC page ${path}`);
     const pageRoot = rootView(page.default, id, pageView, params);
-    const root = layout ? layoutView(layout.default, pageRoot, path, pageView, params) : pageRoot;
+    const root = layouts.reduceRight((child, layout, index) => layoutView(
+      layout.default, child, path, pageView, params,
+      index === 0 ? `layout:${path}` : `layout:${path}:${index}`,
+    ), pageRoot);
     const app = startWeb(root, target, { telemetry });
     window.addEventListener("pagehide", () => {
       try {
