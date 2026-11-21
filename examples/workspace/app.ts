@@ -16,6 +16,7 @@ export const createApp = () =>
   application({
     modules: [users, orders],
     web: {
+      layout: "./layout.tsx",
       pages: {
         "/": "./page.tsx",
         "/orders": "./orders-screen.tsx",

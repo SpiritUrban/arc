@@ -6,6 +6,7 @@ const output = new URL("../dist/examples/", import.meta.url);
 const pageEntries = new Set([
   "fullstack-tasks/page.tsx",
   "workspace/page.tsx",
+  "workspace/layout.tsx",
   "workspace/orders-screen.tsx",
   "workspace/order-detail.tsx",
 ]);

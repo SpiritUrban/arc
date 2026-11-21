@@ -69,7 +69,11 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     const built = await buildWeb(app, { outDir: dir });
     assert.ok(nodes.some(({ id }) => id === "page:orders-screen"));
     assert.ok(nodes.some(({ id }) => id === "page:order-detail"));
+    for (const route of ["/", "/orders", "/orders/:id"]) {
+      assert.ok(edges.some(({ from, kind }) => from === `layout:${route}` && kind === "DEPENDS_ON"));
+    }
     assert.ok(built.manifest.inputs.includes("examples/workspace/page.tsx"));
+    assert.ok(built.manifest.inputs.includes("examples/workspace/layout.tsx"));
     assert.ok(built.manifest.inputs.some((input) => input.endsWith("arc-page-entry.js")));
     assert.ok(!built.manifest.inputs.includes("examples/workspace/users/server.ts"));
     assert.ok(!built.manifest.inputs.includes("examples/workspace/orders/server.ts"));
@@ -157,13 +161,16 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     }));
     assert.equal(ordersDocument.title, "Замовлення — ARC Workspace");
     assert.equal(ordersDocument.querySelector("#app h1")!.textContent, "Замовлення");
-    assert.equal(ordersDocument.querySelector("#app a[href='/']")!.textContent!.trim(), "ARC Workspace");
+    assert.ok(ordersDocument.querySelector('#app a[href="/"][aria-label="ARC Workspace"]'));
+    assert.ok(ordersDocument.querySelector('#app nav a[href="/orders"][aria-current="page"]'));
+    assert.ok(ordersDocument.head.querySelector("style")?.textContent?.includes(".workspace"));
     ordersWindow.dispatchEvent(new ordersWindow.Event("pagehide"));
     const context = vm.createContext({ ...browserGlobals, window, document });
     new vm.Script(
       await readFile(join(built.outDir, "app.js"), "utf8"),
     ).runInContext(context);
     assert.match(document.title, /ARC Workspace/);
+    assert.ok(document.querySelector('#app nav a[href="/"][aria-current="page"]'));
     assert.ok(document.head.querySelector("style")?.textContent?.includes(".workspace"));
     cleanupBrowser = () => window.dispatchEvent(new window.Event("pagehide"));
     const waitFor = async (predicate: () => boolean) => {
@@ -533,6 +540,9 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       },
     }));
     try {
+      assert.equal(detailDocument.title, "Деталі замовлення — ARC Workspace");
+      assert.ok(detailDocument.querySelector('#app nav a[href="/orders"].active'));
+      assert.ok(detailDocument.head.querySelector("style")?.textContent?.includes(".workspace"));
       await waitFor(() => detailDocument.querySelector('section[aria-label="Замовлення"] [role=alert]')?.textContent?.includes("недоступне") === true);
       assert.equal(detailDocument.querySelector("[data-order-detail]"), null);
       await waitFor(() => Boolean(detailDocument.querySelector(`[data-user="${userId}"]`)));

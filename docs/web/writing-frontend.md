@@ -101,6 +101,18 @@ web: {
 
 Сторінка з параметром `:id` отримує декодоване значення через `params.id` у `PageContext<"id">`. Запит, створений усередині функції сторінки, обгорніть у `own(query(...))`, щоб ARC запускав його під час монтування й звільняв під час виходу. [Деталі замовлення](../../examples/workspace/order-detail.tsx)
 
+Додайте `layout: "./layout.tsx"` поруч із `pages`, щоб усі адреси використовували спільну оболонку. Файл макета експортує функцію, яка отримує `children` для вмісту сторінки та `route` для поточного шаблону шляху.
+
+```tsx
+import type { PageLayoutContext } from "@arc/framework/web";
+
+export default function Layout({ children }: PageLayoutContext) {
+  return <main>{children}</main>;
+}
+```
+
+`title` макета задає спільний заголовок, який може перевизначити сторінка. ARC додає CSS макета перед CSS сторінки. [Макет Workspace](../../examples/workspace/layout.tsx)
+
 ## 7. Перевірте boundary та interaction
 
 `npm run graph` показує browser state/action/resource/view, server operation/resource і shared contracts. Stand :3100 має All/Frontend/Backend/Boundaries та interaction traces. `npm run build:app` перевіряє browser reachability; repositories й Node adapters не повинні опинитися в manifest inputs. [Тести](testing.md) перевіряють реальні user flows.

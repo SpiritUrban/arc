@@ -4,7 +4,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { dirname, relative, sep } from "node:path";
-import { rootView } from "./neutral/page-root.js";
+import { layoutView, rootView } from "./neutral/page-root.js";
 import { pageParamNames } from "./neutral/page-path.js";
 import {
   Schema,
@@ -276,7 +276,10 @@ type WebConfig = {
   serverModules?: string[];
   bootstrap?: { id: string };
   pages?: readonly { path: string; entry: string; id: string }[];
+  layout?: string;
 };
+
+type WebPages = { pages: Readonly<Record<string, string>>; layout?: string };
 
 type AppOptions = {
   operations?: Operation[];
@@ -287,7 +290,7 @@ type AppOptions = {
   metricsWindowMs?: number;
   queues?: QueueDefinition[];
   schedules?: ScheduleDefinition[];
-  web?: Omit<WebConfig, "pages"> | string | { pages: Readonly<Record<string, string>> };
+  web?: Omit<WebConfig, "pages" | "layout"> | string | WebPages;
 };
 export class Application {
   private page?: WebConfig;
@@ -1163,11 +1166,20 @@ export class Application {
       })),
     };
   }
-  private async loadPages(web: string | { pages: Readonly<Record<string, string>> }, appEntry: URL): Promise<WebConfig> {
+  private async loadPages(web: string | WebPages, appEntry: URL): Promise<WebConfig> {
     const { importApplication } = await import("./fullstack/reactive-jsx.js");
     const routes = typeof web === "string" ? [["/", web] as const] : Object.entries(web.pages);
     if (!routes.length) throw new Error("Declare at least one web page");
 
+    const resolveEntry = (file: string) => {
+      const source = new URL(file, appEntry);
+      const url = appEntry.pathname.endsWith(".js") && source.pathname.endsWith(".tsx") &&
+          !existsSync(source)
+        ? new URL(source.href.replace(/\.tsx$/, ".js"))
+        : source;
+      return { source, url, entry: fileURLToPath(url) };
+    };
+    const layout = typeof web !== "string" && web.layout ? resolveEntry(web.layout) : undefined;
     const patterns = new Set<string>();
     const entries = routes.map(([path, file]) => {
       const params = pageParamNames(path);
@@ -1182,26 +1194,27 @@ export class Application {
       if (patterns.has(shape)) throw new Error(`Duplicate web page pattern: ${path}`);
       patterns.add(shape);
 
-      const source = new URL(file, appEntry);
-      const url = appEntry.pathname.endsWith(".js") && source.pathname.endsWith(".tsx") &&
-          !existsSync(source)
-        ? new URL(source.href.replace(/\.tsx$/, ".js"))
-        : source;
-      const entry = fileURLToPath(url);
+      const { source, url, entry } = resolveEntry(file);
       const pagePath = relative(dirname(fileURLToPath(appEntry)), fileURLToPath(source))
         .split(sep).join("/").replace(/\.[cm]?[jt]sx?$/, "");
       const id = `page:${pagePath}`;
       return { path, entry, id, url };
     });
-    const nodes = new Map<string, GraphDefinition>();
+    const nodes = new Map<string, ReturnType<typeof rootView>>();
     const reactiveEntries = new Set(entries.map(({ url }) => url.href));
+    if (layout) reactiveEntries.add(layout.url.href);
+    const layoutModule = layout
+      ? await importApplication(layout.url, { loadTsx: true, reactiveEntries })
+      : undefined;
+    const webRuntime = "@arc/framework/web";
+    let pageView: (typeof import("./web/index.js"))["pageView"] | undefined;
+    const loadPageView = async () =>
+      pageView ??= (await import(webRuntime) as typeof import("./web/index.js")).pageView;
+
     for (const { entry, id, url } of entries) {
       if (nodes.has(entry)) continue;
       const { default: root } = await importApplication(url, { loadTsx: true, reactiveEntries });
-      const webRuntime = "@arc/framework/web";
-      const normalize = typeof root === "function"
-        ? (await import(webRuntime) as typeof import("./web/index.js")).pageView
-        : undefined;
+      const normalize = typeof root === "function" ? await loadPageView() : undefined;
       const params = Object.fromEntries(entries
         .filter((page) => page.entry === entry)
         .flatMap((page) => pageParamNames(page.path).map((name) => [name, ""])));
@@ -1209,9 +1222,17 @@ export class Application {
     }
     const pages = entries.map(({ path, entry, id }) => ({ path, entry, id }));
     const primary = pages.find(({ path }) => path === "/") ?? pages[0];
+    const createLayout = layoutModule ? await loadPageView() : undefined;
+    const roots = layoutModule && createLayout
+      ? pages.map(({ path, entry }) => layoutView(
+          layoutModule.default, nodes.get(entry)!, path, createLayout,
+          Object.fromEntries(pageParamNames(path).map((name) => [name, ""])),
+        ))
+      : [...new Set(nodes.values())];
     return {
-      nodes: [...new Set(nodes.values())],
+      nodes: roots,
       entry: primary.entry,
+      layout: layout?.entry,
       bootstrap: { id: primary.id },
       pages: typeof web === "string" ? undefined : pages,
     };

@@ -5,7 +5,6 @@ import { selectedUser } from "./user-selection.ts";
 import { UsersPage } from "./users/page.tsx";
 import { money } from "./ui.ts";
 
-export { styles } from "./styles.ts";
 export const title = "Деталі замовлення — ARC Workspace";
 
 const orderClient = remoteApi({
@@ -20,7 +19,7 @@ export default function OrderDetail({ params, own }: PageContext<"id">) {
   }));
 
   return (
-    <main>
+    <section>
       <a href="/orders">← Усі замовлення</a>
       <h1>Деталі замовлення</h1>
       <div class="content-grid">
@@ -38,6 +37,6 @@ export default function OrderDetail({ params, own }: PageContext<"id">) {
           )}
         </section>
       </div>
-    </main>
+    </section>
   );
 }

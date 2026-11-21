@@ -407,6 +407,11 @@ export interface PageContext<Param extends string = string> {
   own<T extends OwnedNode>(node: T): T;
 }
 
+export interface PageLayoutContext<Param extends string = string> extends PageContext<Param> {
+  children: View;
+  route: string;
+}
+
 export function pageView(
   id: string,
   template: (context: PageContext) => TemplateElement,

@@ -19,6 +19,7 @@ export interface BuildHost {
     serverModules?: string[];
     bootstrap?: { id: string };
     pages?: readonly BuildPage[];
+    layout?: string;
   } | undefined;
 }
 
@@ -45,6 +46,7 @@ async function buildPage(
   ir: ArchitectureIR,
   serverModules: Set<string>,
   reactiveEntries: ReadonlySet<string>,
+  layout?: string,
 ) {
   const entry = resolve(source);
   const browserCore = fileURLToPath(
@@ -55,8 +57,9 @@ async function buildPage(
         stdin: {
           contents: [
             `import * as page from ${JSON.stringify(entry)};`,
+            ...(layout ? [`import * as layout from ${JSON.stringify(layout)};`] : []),
             `import { bootstrapPage } from ${JSON.stringify(fileURLToPath(new URL("./page-bootstrap.js", import.meta.url)))};`,
-            `bootstrapPage(page, ${JSON.stringify(id)}, ${JSON.stringify(path)});`,
+            `bootstrapPage(page, ${JSON.stringify(id)}, ${JSON.stringify(path)}${layout ? ", layout" : ""});`,
           ].join("\n"),
           resolveDir: dirname(entry),
           sourcefile: "arc-page-entry.js",
@@ -157,9 +160,11 @@ export async function buildWeb(app: BuildHost, options: { outDir?: string } = {}
   }));
   const serverModules = new Set((config.serverModules ?? []).map((file) => resolve(file)));
   const reactiveEntries = new Set(routes.filter(({ id }) => id).map(({ entry }) => resolve(entry)));
+  const layout = config.layout && resolve(config.layout);
+  if (layout) reactiveEntries.add(layout);
   const builds = await Promise.all(routes.map(async (route, index) => {
     const { html, script } = pages[index];
-    const result = await buildPage(route, join(outDir, script.slice(1)), ir, serverModules, reactiveEntries);
+    const result = await buildPage(route, join(outDir, script.slice(1)), ir, serverModules, reactiveEntries, layout);
     await writeFile(join(outDir, html),
       `<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ARC Application</title></head><body><div id="app"></div><script type="module" src="${script}"></script></body></html>`,
     );
