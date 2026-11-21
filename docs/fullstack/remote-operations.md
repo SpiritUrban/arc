@@ -49,6 +49,8 @@ const form = () => (
 
 Під час submit ARC читає значення через `FormData`, обрізає зовнішні пробіли та перевіряє дані за схемою операції перед запитом. `addTask()` повертає знімок дії з `running`, `result` і `error`. Для реактивних значень до submit або перетворення типів задайте `fields` і передайте потрібне поле в `bind:value`.
 
+`mutation.failed(code)` перевіряє конкретну бізнес-помилку. TypeScript приймає лише коди з контракту. Наприклад, у реактивному JSX `aria-invalid={addUser.failed("EMAIL_EXISTS")}` позначає поле email після відмови сервера. Перевірка скидається при наступному надсиланні.
+
 ```tsx
 import { mutation, textField } from "@arc/framework/fullstack";
 

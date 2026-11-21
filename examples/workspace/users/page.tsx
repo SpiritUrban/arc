@@ -91,23 +91,32 @@ export const UsersPage = view({
               name="name"
             />
           </label>
-          <label>
-            Email
-            <input
-              data-email
-              required
-              type="email"
-              placeholder="olena@example.com"
-              autocomplete="email"
-              name="email"
-            />
-          </label>
+          <div>
+            <label>
+              Email
+              <input
+                data-email
+                required
+                type="email"
+                placeholder="olena@example.com"
+                autocomplete="email"
+                name="email"
+                aria-invalid={addUser.failed("EMAIL_EXISTS")}
+              />
+            </label>
+            <p class="error" role="alert" data-email-error>
+              {addUser.failed("EMAIL_EXISTS") && "Користувач із такою поштою вже існує."}
+            </p>
+          </div>
           <button class="button secondary" type="submit">
             ＋ Додати користувача
           </button>
         </form>
         <p class="error" role="alert" data-error>
-          {failureMessage(addUser().error ?? users().error)}
+          {failureMessage(
+            (addUser.failed("EMAIL_EXISTS") ? undefined : addUser().error) ??
+              users().error,
+          )}
         </p>
       </section>
     );

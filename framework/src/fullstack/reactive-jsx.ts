@@ -148,6 +148,13 @@ export function compileReactiveJsx(
               return false;
             if (
               ts.isCallExpression(node) &&
+              ts.isPropertyAccessExpression(node.expression) &&
+              node.expression.name.text === "failed" &&
+              node.arguments.length === 1
+            )
+              return true;
+            if (
+              ts.isCallExpression(node) &&
               (ts.isIdentifier(node.expression) ||
                 (ts.isPropertyAccessExpression(node.expression) &&
                   node.expression.name.text === "get")) &&

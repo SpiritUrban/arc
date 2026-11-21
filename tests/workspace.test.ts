@@ -24,7 +24,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     const { edges, nodes } = app.graph();
     assert.equal(
       nodes.filter(({ id }) => id.startsWith("users.page.dom.") && id.endsWith(".render")).length,
-      3,
+      4,
     );
     assert.ok(nodes.some(({ id }) => id.startsWith("users.page.dom.") && id.endsWith(".each")));
     assert.equal(
@@ -215,9 +215,11 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     submit("#users form");
     await waitFor(() =>
       document
-        .querySelector("#users [role=alert]")!
+        .querySelector("#users [data-email-error]")!
         .textContent!.includes("вже існує"),
     );
+    assert.equal(document.querySelector("[data-email]")!.getAttribute("aria-invalid"), "true");
+    assert.equal(document.querySelector("#users [data-error]")!.textContent, "");
     assert.equal(
       document.querySelector<HTMLInputElement>("[data-name]")!.value,
       "Duplicate User",
@@ -226,6 +228,13 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       document.querySelector("[data-user].selected")!.textContent!,
       /New User/,
     );
+    input("[data-name]", "x");
+    submit("#users form");
+    await waitFor(() =>
+      document.querySelector("#users [data-error]")!.textContent!.includes("Перевірте введені дані"),
+    );
+    assert.equal(document.querySelector("[data-email]")!.getAttribute("aria-invalid"), "false");
+    assert.equal(document.querySelector("#users [data-email-error]")!.textContent, "");
     assert.equal(document.querySelectorAll("[data-user]").length, 2);
     const newUserRow = document.querySelector("[data-user].selected")!;
     const demoUserRow = document.querySelector(

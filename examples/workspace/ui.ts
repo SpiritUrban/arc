@@ -7,8 +7,6 @@ export const money = (value: number) =>
 // ARC передає бізнес-помилки в error, а збої виконання в fault. Тут перетворюємо їх на текст для UI.
 export function failureMessage(failure: any): string {
   if (!failure) return "";
-  if (failure.error === "EMAIL_EXISTS")
-    return "Користувач із такою поштою вже існує.";
   if (failure.fault?.code === "UNAUTHORIZED")
     return "Виберіть користувача, щоб працювати із замовленнями.";
   if (failure.fault?.code === "VALIDATION_ERROR" || failure.issues)

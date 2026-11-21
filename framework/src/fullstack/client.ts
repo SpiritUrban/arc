@@ -235,7 +235,10 @@ type FormOptions<C extends OperationContract, Field extends string> =
   };
 
 export type Mutation<C extends OperationContract, Field extends string = never> =
-  CallableAction<void, RemoteResult<C>> & { fields: RemoteForm<C, Field>["fields"] };
+  CallableAction<void, RemoteResult<C>> & {
+    fields: RemoteForm<C, Field>["fields"];
+    failed(code: keyof C["errors"] & string): boolean;
+  };
 
 function buildRemoteForm<C extends OperationContract, Field extends string>(
   contract: C, options: FormOptions<C, Field>, defaults: RemoteFormDefaults, callable: true,
@@ -353,7 +356,15 @@ function bindMutation(defaults: RemoteFormDefaults) {
     contract: C, options: FormOptions<C, Field> = {},
   ): Mutation<C, Field> {
     const { fields, submit } = buildRemoteForm(contract, options, defaults, true);
-    return Object.assign(submit, { fields });
+    return Object.assign(submit, {
+      fields,
+      failed(code: keyof C["errors"] & string) {
+        const { status, result } = submit();
+        return status === "error" &&
+          result?.kind === "business_error" &&
+          result.error === code;
+      },
+    });
   }
   return mutate;
 }
