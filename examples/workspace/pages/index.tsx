@@ -1,6 +1,6 @@
 import { view } from "@arc/framework/web";
-import { UsersPage } from "./users/page.tsx";
-import { OrdersPage } from "./orders/page.tsx";
+import { UsersPage } from "../users/page.tsx";
+import { OrdersPage } from "../orders/page.tsx";
 
 export default view({
   id: "workspace.page",

@@ -24,7 +24,7 @@ test("static website resolves all local assets, routes and anchors under root an
     for (const path of [
       "index.html",
       "learn/03-reactive-view.html",
-      "source/examples/workspace/page.tsx.html",
+      "source/examples/workspace/pages/index.tsx.html",
     ]) {
       const { document } = parseHTML(await readFile(join(dir, path), "utf8"));
       assert.ok(

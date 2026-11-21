@@ -40,8 +40,8 @@ npm test
 - `examples/workspace/user-selection.ts` — спільний браузерний стан вибору та дані користувача.
 - `examples/workspace/users/page.tsx` — пошук, список користувачів і форма створення через `mutation`.
 - `examples/workspace/orders/page.tsx` — список замовлень через `query`, форма через `mutation` і підсумки для вибраного користувача.
-- `examples/workspace/layout.tsx` і `styles.ts` — спільна оболонка, меню та стилі. `page.tsx` описує вміст огляду.
-- `app.ts` задає `web.pages` для огляду на `/`, списку на `/orders` і деталей на `/orders/:id`. За прямим посиланням операція `GetOrder` показує замовлення лише вибраному власнику.
+- `examples/workspace/pages/layout.tsx` і `styles.ts` — спільна оболонка, меню та стилі. `pages/index.tsx` описує вміст огляду.
+- `app.ts` підключає `web: "./pages"`. Файли каталогу задають огляд на `/`, список на `/orders` і деталі на `/orders/:id`. За прямим посиланням операція `GetOrder` показує замовлення лише вибраному власнику.
 - `examples/workspace/ui.ts` — допоміжні функції для input bindings, форматування сум і повідомлень про помилки.
 
 ```text

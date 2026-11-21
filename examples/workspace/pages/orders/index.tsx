@@ -1,5 +1,5 @@
-import { OrdersPage } from "./orders/page.tsx";
-import { UsersPage } from "./users/page.tsx";
+import { OrdersPage } from "../../orders/page.tsx";
+import { UsersPage } from "../../users/page.tsx";
 
 export const title = "Замовлення — ARC Workspace";
 

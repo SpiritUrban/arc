@@ -1,6 +1,6 @@
 import type { PageLayoutContext } from "@arc/framework/web";
 
-export { styles } from "./styles.ts";
+export { styles } from "../styles.ts";
 export const title = "ARC Workspace — користувачі та замовлення";
 
 export default function Layout({ children, route }: PageLayoutContext) {

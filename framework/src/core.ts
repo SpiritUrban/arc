@@ -4,6 +4,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { dirname, relative, sep } from "node:path";
+import { discoverPageDirectory } from "./fullstack/page-directory.js";
 import { layoutView, rootView } from "./neutral/page-root.js";
 import { pageParamNames } from "./neutral/page-path.js";
 import {
@@ -1168,7 +1169,10 @@ export class Application {
   }
   private async loadPages(web: string | WebPages, appEntry: URL): Promise<WebConfig> {
     const { importApplication } = await import("./fullstack/reactive-jsx.js");
-    const routes = typeof web === "string" ? [["/", web] as const] : Object.entries(web.pages);
+    const config = typeof web === "string"
+      ? await discoverPageDirectory(new URL(web, appEntry))
+      : web;
+    const routes = config ? Object.entries(config.pages) : [["/", web as string] as const];
     if (!routes.length) throw new Error("Declare at least one web page");
 
     const resolveEntry = (file: string) => {
@@ -1179,7 +1183,7 @@ export class Application {
         : source;
       return { source, url, entry: fileURLToPath(url) };
     };
-    const layout = typeof web !== "string" && web.layout ? resolveEntry(web.layout) : undefined;
+    const layout = config?.layout ? resolveEntry(config.layout) : undefined;
     const patterns = new Set<string>();
     const entries = routes.map(([path, file]) => {
       const params = pageParamNames(path);
@@ -1234,7 +1238,7 @@ export class Application {
       entry: primary.entry,
       layout: layout?.entry,
       bootstrap: { id: primary.id },
-      pages: typeof web === "string" ? undefined : pages,
+      pages: config ? pages : undefined,
     };
   }
   webNodes(): GraphDefinition[] {

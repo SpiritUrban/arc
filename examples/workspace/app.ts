@@ -15,14 +15,7 @@ const health = operation({
 export const createApp = () =>
   application({
     modules: [users, orders],
-    web: {
-      layout: "./layout.tsx",
-      pages: {
-        "/": "./page.tsx",
-        "/orders": "./orders-screen.tsx",
-        "/orders/:id": "./order-detail.tsx",
-      },
-    },
+    web: "./pages",
     operations: [health],
     routes: [http.get("/health", health)],
   });

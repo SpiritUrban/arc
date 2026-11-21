@@ -67,13 +67,13 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     }
     await app.start();
     const built = await buildWeb(app, { outDir: dir });
-    assert.ok(nodes.some(({ id }) => id === "page:orders-screen"));
-    assert.ok(nodes.some(({ id }) => id === "page:order-detail"));
+    assert.ok(nodes.some(({ id }) => id === "page:pages/orders/index"));
+    assert.ok(nodes.some(({ id }) => id === "page:pages/orders/[id]"));
     for (const route of ["/", "/orders", "/orders/:id"]) {
       assert.ok(edges.some(({ from, kind }) => from === `layout:${route}` && kind === "DEPENDS_ON"));
     }
-    assert.ok(built.manifest.inputs.includes("examples/workspace/page.tsx"));
-    assert.ok(built.manifest.inputs.includes("examples/workspace/layout.tsx"));
+    assert.ok(built.manifest.inputs.includes("examples/workspace/pages/index.tsx"));
+    assert.ok(built.manifest.inputs.includes("examples/workspace/pages/layout.tsx"));
     assert.ok(built.manifest.inputs.some((input) => input.endsWith("arc-page-entry.js")));
     assert.ok(!built.manifest.inputs.includes("examples/workspace/users/server.ts"));
     assert.ok(!built.manifest.inputs.includes("examples/workspace/orders/server.ts"));

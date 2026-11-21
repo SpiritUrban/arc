@@ -1,9 +1,9 @@
 import { remoteApi } from "@arc/framework/fullstack";
 import type { PageContext } from "@arc/framework/web";
-import { GetOrder } from "./orders/contracts.ts";
-import { selectedUser } from "./user-selection.ts";
-import { UsersPage } from "./users/page.tsx";
-import { money } from "./ui.ts";
+import { GetOrder } from "../../orders/contracts.ts";
+import { selectedUser } from "../../user-selection.ts";
+import { UsersPage } from "../../users/page.tsx";
+import { money } from "../../ui.ts";
 
 export const title = "Деталі замовлення — ARC Workspace";
 
