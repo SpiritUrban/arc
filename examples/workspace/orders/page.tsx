@@ -171,7 +171,6 @@ const orderClient = remoteApi({
 });
 
 export const ordersData = orderClient.query(ListOrders, {
-  key: () => selectedUser(),
   cache: true,
 });
 

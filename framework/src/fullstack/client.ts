@@ -508,8 +508,45 @@ type SourceValues<Sources extends readonly Readable<unknown>[]> = {
     : never;
 };
 
+function encodeCacheValue(value: unknown, ancestors = new Set<object>()): string {
+  if (value === null) return "null";
+  switch (typeof value) {
+    case "undefined": return "undefined";
+    case "string": return `string:${JSON.stringify(value)}`;
+    case "boolean": return `boolean:${value}`;
+    case "number": return `number:${Object.is(value, -0) ? "-0" : String(value)}`;
+    case "bigint": return `bigint:${value}`;
+    case "symbol":
+    case "function":
+      throw new TypeError("Cached remoteApi queries need JSON-like from values or an explicit key");
+    case "object": {
+      if (ancestors.has(value))
+        throw new TypeError("Cached remoteApi queries need acyclic from values or an explicit key");
+      ancestors.add(value);
+      try {
+        if (Array.isArray(value))
+          return `array:${JSON.stringify(value.map((item) => encodeCacheValue(item, ancestors)))}`;
+        const prototype = Object.getPrototypeOf(value);
+        if (prototype !== Object.prototype && prototype !== null)
+          throw new TypeError("Cached remoteApi queries need plain from values or an explicit key");
+        const entries = Object.entries(value).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
+        return `object:${JSON.stringify(entries.map(([key, item]) => [key, encodeCacheValue(item, ancestors)]))}`;
+      } finally {
+        ancestors.delete(value);
+      }
+    }
+    default:
+      throw new TypeError("Cached remoteApi queries need JSON-like from values or an explicit key");
+  }
+}
+
+function querySourceKey(values: readonly unknown[]) {
+  return JSON.stringify(values.map((value) => encodeCacheValue(value)));
+}
+
 type ClientQueryOptions<C extends OperationContract, Sources extends readonly Readable<unknown>[]> = {
   id?: string;
+  /** Override the cache context. By default, cached queries use all `from` values. */
   key?: (...values: SourceValues<Sources>) => string | number;
   cache?: boolean;
 } & ({} extends Infer<C["input"]>
@@ -553,7 +590,9 @@ export function remoteApi<
         ? [options?: ClientQueryOptions<C, Sources>]
         : [options: ClientQueryOptions<C, Sources>]
     ): RemoteQuery<C> {
-      const key = query?.key;
+      const key = query?.key ?? (query?.cache
+        ? (...values: SourceValues<Sources>) => querySourceKey(values)
+        : undefined);
       return createRemoteResource(contract, {
         id: query?.id ?? `${contract.id}.query`,
         from,
