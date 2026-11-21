@@ -132,6 +132,19 @@ const SearchPage = view({
 
 ARC викликає ініціалізатор під час побудови графа й для кожного монтування, тож тримайте його без побічних ефектів. Кожен екземпляр отримує власні значення. Під час демонтажу ARC очищає їхні підписки, а Stand використовує стабільний ID `search.page.state.search`.
 
+У кореневій функції сторінки використовуйте `local` із `PageContext`.
+
+```tsx
+import type { PageContext } from "@arc/framework/web";
+
+export default function Page({ local }: PageContext) {
+  const search = local("");
+  return <input type="search" bind:value={search} />;
+}
+```
+
+ARC створює новий сигнал під час кожного монтування. Для прямого оголошення `const search = local("")` ID у Stand містить назву змінної, наприклад `page:page.state.search` для `page.tsx`.
+
 ## Вкладені view
 
 Вставте оголошений view як дочірній елемент статичного TSX-шаблону.

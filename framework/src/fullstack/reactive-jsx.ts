@@ -56,6 +56,38 @@ export function compileReactiveJsx(
             return expression;
           }
 
+          const localNames = new Map<TS.CallExpression, string>();
+          if (options.reactive) {
+            const exported = file.statements.find((statement) =>
+              (ts.isFunctionDeclaration(statement) &&
+                statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword)) ||
+              (ts.isExportAssignment(statement) && !statement.isExportEquals),
+            );
+            const page = exported && ts.isExportAssignment(exported) ? unwrap(exported.expression) : exported;
+            if (page && (ts.isFunctionDeclaration(page) || ts.isFunctionExpression(page) ||
+                ts.isArrowFunction(page)) && page.body && ts.isBlock(page.body)) {
+              const context = page.parameters[0]?.name;
+              const local = context && ts.isObjectBindingPattern(context)
+                ? context.elements.find((field) => (field.propertyName ?? field.name).getText(file) === "local")?.name
+                : undefined;
+              for (const statement of page.body.statements) {
+                if (!ts.isVariableStatement(statement)) continue;
+                for (const declaration of statement.declarationList.declarations) {
+                  if (!declaration.initializer || !ts.isIdentifier(declaration.name)) continue;
+                  const call = unwrap(declaration.initializer);
+                  if (!ts.isCallExpression(call) || call.arguments.length !== 1) continue;
+                  const callee = call.expression;
+                  const matches = local && ts.isIdentifier(local) && ts.isIdentifier(callee)
+                    ? callee.text === local.text
+                    : context && ts.isIdentifier(context) && ts.isPropertyAccessExpression(callee) &&
+                      ts.isIdentifier(callee.expression) && callee.expression.text === context.text &&
+                      callee.name.text === "local";
+                  if (matches) localNames.set(call, declaration.name.text);
+                }
+              }
+            }
+          }
+
           function keyedMap(
             expression: TS.Expression,
           ): TS.Expression | undefined {
@@ -195,6 +227,16 @@ export function compileReactiveJsx(
 
           const visit: TS.Visitor = (node) => {
             const transformed = ts.visitEachChild(node, visit, context);
+            if (ts.isCallExpression(node)) {
+              const name = localNames.get(node);
+              if (name) {
+                const call = transformed as TS.CallExpression;
+                return factory.updateCallExpression(call, call.expression, call.typeArguments, [
+                  ...call.arguments,
+                  factory.createStringLiteral(name),
+                ]);
+              }
+            }
             if (
               !ts.isJsxExpression(node) ||
               !node.expression ||

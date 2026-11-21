@@ -10,6 +10,7 @@ import { createApp } from "../examples/fullstack-tasks/app.ts";
 import { application } from "../framework/src/index.ts";
 import { remoteClient } from "../framework/src/fullstack/client.ts";
 import { read } from "../examples/leak-check/server.ts";
+import { mount, tick, type View } from "../framework/src/web/index.ts";
 const tasksEntry = new URL("../examples/fullstack-tasks/app.ts", import.meta.url);
 test("pure Web and Fullstack build manifests have no Node/server implementation in browser", async () => {
   const tasks = createApp();
@@ -33,6 +34,7 @@ test("pure Web and Fullstack build manifests have no Node/server implementation 
       assert.equal(result.manifest.version, 3);
     }
     assert.ok(tasks.graph().partitions?.browser.includes("page:page"));
+    assert.ok(tasks.graph().partitions?.browser.includes("page:page.state.search"));
     assert.ok(tasks.graph().edges.some((edge) =>
       edge.from === "tasks.list.query" && edge.kind === "BINDS" && edge.to.endsWith(".each"),
     ));
@@ -40,6 +42,37 @@ test("pure Web and Fullstack build manifests have no Node/server implementation 
   } finally {
     await tasks.close();
     await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("plain page functions create independent local state on each mount", async () => {
+  const { parseHTML } = await import("linkedom");
+  const { document, window } = parseHTML('<div id="first"></div><div id="second"></div>');
+  const app = createApp();
+  await app.compile({ entry: tasksEntry });
+  const page = app.webConfig()!.nodes[0] as View;
+  const left = document.getElementById("first")!;
+  const right = document.getElementById("second")!;
+  const first = mount(page, left);
+  const second = mount(page, right);
+  try {
+    const search = left.querySelector<HTMLInputElement>("input[type=search]")!;
+    search.value = "first";
+    search.dispatchEvent(new window.Event("input"));
+    await tick();
+    assert.equal(search.value, "first");
+    assert.equal(right.querySelector<HTMLInputElement>("input[type=search]")!.value, "");
+    first.unmount();
+    const remounted = mount(page, left);
+    try {
+      assert.equal(left.querySelector<HTMLInputElement>("input[type=search]")!.value, "");
+    } finally {
+      remounted.unmount();
+    }
+  } finally {
+    first.unmount();
+    second.unmount();
+    await app.close();
   }
 });
 test("direct remote(serverOperation) compiles server module to descriptors; unmarked server import fails browser build", async () => {
@@ -188,6 +221,13 @@ test("canonical compiled browser bundle submits Tasks across actual HTTP and joi
     await waitFor(() =>
       document.querySelector("[data-tasks]")!.textContent!.includes("Network task"),
     );
+    const search = document.querySelector<HTMLInputElement>("input[type=search]")!;
+    search.value = "missing";
+    search.dispatchEvent(new window.Event("input"));
+    await waitFor(() => document.querySelectorAll("[data-tasks] li").length === 0);
+    search.value = "network";
+    search.dispatchEvent(new window.Event("input"));
+    await waitFor(() => document.querySelector("[data-tasks] li")?.textContent === "Network task");
     await waitFor(() =>
       app.browserEvents.some((e) => e.type === "action.finished"),
     );

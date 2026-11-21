@@ -391,15 +391,41 @@ export function view<Initial extends Record<string, unknown>>(
   if (!("state" in options)) return buildView(options);
 
   const { state: initialize, template, ...def } = options;
-  function create(scope?: Scope) {
-    const local = Object.fromEntries(
-      Object.entries(initialize()).map(([key, initial]) => {
-        const field = signal({ id: `${def.id}.state.${key}`, initial, scope: "view" });
-        return [key, scope ? scope.own(field) : field];
-      }),
+  return scopedView(def, (local) => {
+    const fields = Object.fromEntries(
+      Object.entries(initialize()).map(([key, initial]) => [key, local(initial, key)]),
     ) as LocalState<Initial>;
+    return template(fields);
+  });
+}
+
+export interface PageContext {
+  local<T>(initial: T): Signal<T>;
+}
+
+export function pageView(id: string, template: (context: PageContext) => TemplateElement): View {
+  return scopedView({ id }, (local) => template({ local }));
+}
+
+type LocalFactory = <T>(initial: T, name?: string) => Signal<T>;
+
+function scopedView(
+  def: Omit<LocalViewOptions<Record<string, unknown>>, "state" | "template">,
+  template: (local: LocalFactory) => TemplateElement,
+): View {
+  function create(scope?: Scope) {
+    const fields = new Map<string, GraphDefinition>();
+    let building = true;
+    const local: LocalFactory = (initial, name = String(fields.size)) => {
+      if (!building) throw new Error(`Declare local state while building ${def.id}`);
+      if (fields.has(name)) throw new Error(`Duplicate local state ${name} in ${def.id}`);
+      const field = signal({ id: `${def.id}.state.${name}`, initial, scope: "view" });
+      fields.set(name, scope ? scope.own(field) : field);
+      return field;
+    };
     const instance = buildView({ ...def, template: () => template(local) });
-    instance.dependencies = [...(instance.dependencies ?? []), ...Object.values(local)];
+    building = false;
+    instance.dependencies = [...(instance.dependencies ?? []), ...fields.values()];
     return instance;
   }
 

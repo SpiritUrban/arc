@@ -1,6 +1,6 @@
 import { startWeb } from "../web/runtime.js";
 import { rootView } from "../neutral/page-root.js";
-import { view } from "../web/view.js";
+import { pageView } from "../web/view.js";
 import { telemetryTransport } from "./client.js";
 
 export function bootstrapPage(
@@ -18,7 +18,7 @@ export function bootstrapPage(
   }
   const telemetry = telemetryTransport();
   try {
-    const app = startWeb(rootView(page.default, id, view), target, { telemetry });
+    const app = startWeb(rootView(page.default, id, pageView), target, { telemetry });
     window.addEventListener("pagehide", () => {
       try {
         app.dispose();

@@ -394,7 +394,7 @@ export class Application {
           // Resolve the optional Web runtime only when the root is a page function.
           const webRuntime = "@arc/framework/web";
           const normalize = typeof root === "function"
-            ? (await import(webRuntime) as typeof import("./web/index.js")).view
+            ? (await import(webRuntime) as typeof import("./web/index.js")).pageView
             : undefined;
           return { nodes: [rootView(root, id, normalize)], entry, bootstrap: { id } };
         })();
