@@ -48,7 +48,7 @@ export const UsersPage = view({
       <div class="user-list" data-list aria-label="Користувачі">
         {each(
           () => {
-            const query = search.get().toLowerCase();
+            const query = search().toLowerCase();
             return (usersData.data.get() ?? []).filter((user) =>
               `${user.name} ${user.email}`.toLowerCase().includes(query),
             );
@@ -60,10 +60,10 @@ export const UsersPage = view({
               return (
                 <button
                   type="button"
-                  class={selectedUser.get() === user.id ? "user-row selected" : "user-row"}
+                  class={selectedUser() === user.id ? "user-row selected" : "user-row"}
                   data-user={user.id}
-                  aria-pressed={selectedUser.get() === user.id}
-                  on:click={(_, { set }) => set(selectedUser, user.id)}
+                  aria-pressed={selectedUser() === user.id}
+                  onClick={() => selectedUser.set(user.id)}
                 >
                   <span class="avatar">{user.name.slice(0, 2).toUpperCase()}</span>
                   <span class="user-info">
@@ -71,7 +71,7 @@ export const UsersPage = view({
                     <small>{user.email}</small>
                   </span>
                   <span class="select-mark">
-                    {selectedUser.get() === user.id ? "✓" : "→"}
+                    {selectedUser() === user.id ? "✓" : "→"}
                   </span>
                 </button>
               );

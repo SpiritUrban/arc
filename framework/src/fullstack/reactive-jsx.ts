@@ -40,8 +40,9 @@ export function compileReactiveJsx(
               return false;
             if (
               ts.isCallExpression(node) &&
-              ts.isPropertyAccessExpression(node.expression) &&
-              node.expression.name.text === "get" &&
+              (ts.isIdentifier(node.expression) ||
+                (ts.isPropertyAccessExpression(node.expression) &&
+                  node.expression.name.text === "get")) &&
               node.arguments.length === 0
             )
               return true;

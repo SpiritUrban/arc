@@ -1,3 +1,4 @@
+import type { TraceToken } from "../neutral/protocol.js";
 import type { GraphDefinition } from "../neutral/graph.js";
 export interface Readable<T> extends GraphDefinition {
   _trace?: import("../neutral/protocol.js").TraceToken;
@@ -11,6 +12,20 @@ export interface Writable<T> extends Readable<T> {
   set(value: T): void;
   update(fn: (value: T) => T): void;
 }
+export type Signal<T> = Writable<T> & (() => T);
+
+let writeTrace: TraceToken | undefined;
+
+export function withWriteTrace<T>(trace: TraceToken, run: () => T): T {
+  const previous = writeTrace;
+  writeTrace = trace;
+  try {
+    return run();
+  } finally {
+    writeTrace = previous;
+  }
+}
+
 const dirty = new Set<Computed<any>>(),
   notifications = new Set<() => void>();
 let activeReads: Set<Readable<unknown>> | undefined;
@@ -86,17 +101,28 @@ export function batch<T>(fn: () => T): T {
     enqueue();
   }
 }
-export function state<T>(def: {
+type StateOptions<T> = {
   id: string;
   initial: T;
   scope?: "application" | "view";
-}): Writable<T> {
+};
+
+export function state<T>(def: StateOptions<T>): Writable<T> {
+  return createState(def, {});
+}
+
+export function signal<T>(def: StateOptions<T>): Signal<T> {
+  const node: Signal<T> = createState(def, () => node.get());
+  return node;
+}
+
+function createState<T, Target extends object>(def: StateOptions<T>, target: Target) {
   let value = def.initial,
     disposed = false;
-  const node: Writable<T> = {
+  const node = Object.assign<Target, Writable<T>>(target, {
     id: def.id,
-    kind: "state",
-    runtime: "browser",
+    kind: "state" as const,
+    runtime: "browser" as const,
     metadata: { scope: def.scope ?? "application" },
     _children: new Set(),
     _listeners: new Set(),
@@ -104,17 +130,18 @@ export function state<T>(def: {
       activeReads?.add(node);
       return value;
     },
-    set(next) {
+    set(next: T) {
       if (disposed) throw new Error(`Disposed state: ${def.id}`);
       if (!Object.is(next, value)) {
         value = next;
+        if (writeTrace) node._trace = writeTrace;
         notify(node);
       }
     },
-    update(fn) {
+    update(fn: (value: T) => T) {
       node.set(fn(value));
     },
-    subscribe(fn) {
+    subscribe(fn: () => void) {
       if (disposed) throw new Error("Disposed state");
       node._listeners.add(fn);
       return () => {
@@ -128,7 +155,7 @@ export function state<T>(def: {
       node._listeners.clear();
       node._children.clear();
     },
-  };
+  });
   return node;
 }
 export interface Computed<T> extends Readable<T> {

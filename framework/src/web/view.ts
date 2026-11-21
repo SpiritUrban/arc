@@ -22,7 +22,7 @@ import {
   type TemplateChild,
   type TemplateElement,
 } from "./jsx-runtime.js";
-import { Scope, state, trackReads, type Readable, type Writable } from "./reactive.js";
+import { Scope, signal, trackReads, withWriteTrace, type Readable, type Signal, type Writable } from "./reactive.js";
 
 const projection = Symbol("ARC binding projection");
 const instantiateView = Symbol("ARC view instance");
@@ -162,7 +162,7 @@ function compileTemplate(id: string, root: TemplateChild) {
       const list = binding({
         id: `${id}.dom.${path}.each`,
         type: "each",
-        sources: typeof child.source === "function" ? [] : [child.source],
+        sources: isReadable(child.source) ? [child.source] : [],
         list: child,
       });
       bindings.add(list);
@@ -178,6 +178,20 @@ function compileTemplate(id: string, root: TemplateChild) {
     const { children, bind, ...attributes } = child.props;
     const attached = [...elementBindings(bind)];
     for (const [name, value] of Object.entries(attributes)) {
+      if (name === "onClick") {
+        delete attributes[name];
+        if (value == null) continue;
+        if (child.tag === Fragment || typeof value !== "function")
+          throw new TypeError("onClick expects a function on an HTML element");
+        attached.push(binding({
+          id: `${id}.dom.${path}.onClick`,
+          type: "event",
+          name: "click",
+          sources: [],
+          handler: (event, trace) => withWriteTrace(trace, () => value(event)),
+        }));
+        continue;
+      }
       const readAttribute = attributeReader(value);
       if (readAttribute) {
         delete attributes[name];
@@ -331,7 +345,7 @@ function directive(id: string, name: string, value: unknown): Binding[] {
 }
 
 type LocalState<Initial extends Record<string, unknown>> = {
-  [Key in keyof Initial]: Writable<Initial[Key]>;
+  [Key in keyof Initial]: Signal<Initial[Key]>;
 };
 
 type LocalViewOptions<Initial extends Record<string, unknown>> = Omit<
@@ -356,7 +370,7 @@ export function view<Initial extends Record<string, unknown>>(
   function create(scope?: Scope) {
     const local = Object.fromEntries(
       Object.entries(initialize()).map(([key, initial]) => {
-        const field = state({ id: `${def.id}.state.${key}`, initial, scope: "view" });
+        const field = signal({ id: `${def.id}.state.${key}`, initial, scope: "view" });
         return [key, scope ? scope.own(field) : field];
       }),
     ) as LocalState<Initial>;
@@ -566,7 +580,7 @@ export function mount(
         if (!list) throw new TypeError(`Binding ${b.id} requires a list`);
         const instance = scope.own(mountList(list, node as Comment, b.id, renderContent));
         const source = list.source;
-        observeReads(scope, typeof source === "function" ? source : () => source.get(),
+        observeReads(scope, isReadable(source) ? () => source.get() : source,
           (items, sources, start) => {
             instance.update(items ?? []);
             updated(sources, start);

@@ -5,7 +5,7 @@ import { jsx } from "@arc/framework/web/jsx-runtime";
 import { compileArchitecture } from "@arc/framework/core";
 import {
   state,
-  type EventHandler,
+  signal,
   action,
   binding,
   each,
@@ -116,18 +116,17 @@ test("render tracks only the active JSX branch and unsubscribes on unmount", asy
   assert.equal(show._listeners.size, 0);
 });
 
-test("render cleans up row events and preserves the trace of inline state writes", async () => {
+test("render cleans up onClick and traces writes to callable state", async () => {
   const { document, window } = parseHTML('<div id="app"></div>');
   const target = document.querySelector("#app")!;
-  const row = state({ id: "row", initial: "first" });
-  const selected = state({ id: "selected-row", initial: "" });
+  const row = signal({ id: "row", initial: "first" });
+  const selected = signal({ id: "selected-row", initial: "" });
   const page = view({
     id: "row-events",
     template: () => jsx("div", {
       children: render(() => {
-        const id = row.get();
-        const select: EventHandler = (_, { set }) => set(selected, id);
-        return jsx("button", { children: id, "on:click": select });
+        const id = row();
+        return jsx("button", { children: id, onClick: () => selected.set(id) });
       }),
     }),
   });
@@ -139,7 +138,7 @@ test("render cleans up row events and preserves the trace of inline state writes
   assert.equal(selected.get(), "");
   const second = target.querySelector("button")!;
   second.dispatchEvent(new window.Event("click"));
-  assert.equal(selected.get(), "second");
+  assert.equal(selected(), "second");
   assert.ok(selected._trace?.traceId);
   mounted.unmount();
   selected.set("");

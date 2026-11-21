@@ -90,6 +90,7 @@ interface TemplateProps {
   "bind:disabled"?: Readable<boolean> | Projection<boolean>;
   "bind:visible"?: Readable<boolean> | Projection<boolean>;
   "bind:value"?: Writable<string>;
+  onClick?: (event: MouseEvent) => unknown;
   [event: `on:${string}`]: Action<void, unknown> | EventHandler | undefined;
   [attribute: string]: unknown;
 }
