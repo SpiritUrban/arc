@@ -172,6 +172,7 @@ const orderClient = remoteApi({
 
 export const ordersData = orderClient.query(ListOrders, {
   key: () => selectedUser(),
+  cache: true,
 });
 
 // CreateOrder — спільний контракт. На сервері його реалізує маршрут createOrder у ./server.ts.

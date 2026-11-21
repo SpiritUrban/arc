@@ -48,7 +48,10 @@ type WebResourceOptions<T, I> = {
   scope?: "application" | "view";
   callable?: boolean;
   key?: () => string | number;
+  cache?: boolean;
 };
+
+const queryCacheLimit = 32;
 
 export function webResource<T, I = unknown>(
   def: WebResourceOptions<T, I> & { callable: true },
@@ -77,13 +80,27 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
   const originalDispose = value.dispose.bind(value);
   const readSnapshot = value.get.bind(value);
   const key = def.key;
+  if (def.cache && !key) throw new TypeError("A cached query requires a key");
+  const cache = def.cache ? new Map<string | number, ResourceSnapshot<T>>() : undefined;
+  function remember(requestKey: string | number, snapshot: ResourceSnapshot<T>) {
+    if (!cache) return;
+    cache.delete(requestKey);
+    cache.set(requestKey, snapshot);
+    if (cache.size > queryCacheLimit) {
+      const oldest = cache.keys().next().value;
+      if (oldest !== undefined) cache.delete(oldest);
+    }
+  }
   let snapshotKey: string | number | undefined;
   if (key) {
     const switching = { ...initial, loading: true };
     value.get = () => {
       const snapshot = readSnapshot();
-      if ((active || snapshotKey !== undefined) && !Object.is(snapshotKey, key()))
-        return active ? switching : initial;
+      if (active || snapshotKey !== undefined) {
+        const currentKey = key();
+        if (!Object.is(snapshotKey, currentKey))
+          return active ? cache?.get(currentKey) ?? switching : initial;
+      }
       return snapshot;
     };
   }
@@ -130,7 +147,9 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
       try {
         requestKey = key?.();
         keyResolved = true;
-        const previous = Object.is(snapshotKey, requestKey) ? readSnapshot() : initial;
+        const cached = requestKey === undefined ? undefined : cache?.get(requestKey);
+        if (cached && requestKey !== undefined) remember(requestKey, cached);
+        const previous = Object.is(snapshotKey, requestKey) ? readSnapshot() : cached ?? initial;
         snapshotKey = requestKey;
         set({ ...previous, loading: true, error: undefined, stale: true }, trace);
         input = def.input
@@ -163,17 +182,17 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
           );
         } else {
           outcome = "ok";
-          set(
-            {
-              input,
-              data: def.result ? loaded.value : loaded,
-              loading: false,
-              error: undefined,
-              stale: false,
-              outcome,
-            },
-            trace,
-          );
+          const next = {
+            input,
+            data: def.result ? loaded.value : loaded,
+            loading: false,
+            error: undefined,
+            stale: false,
+            outcome,
+          };
+          if (requestKey !== undefined)
+            remember(requestKey, { ...next, loading: true, stale: true });
+          set(next, trace);
         }
       } catch (error) {
         outcome = currentRequest() ? "fault" : "cancelled";
@@ -217,6 +236,7 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
       if (disposed) return;
       disposed = true;
       generation++;
+      cache?.clear();
       controller?.abort();
       for (const stop of stops) stop();
       for (const p of projections) p.dispose();

@@ -20,6 +20,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
   let cleanupBrowser: (() => void) | undefined;
   const pending = new Set<Promise<any>>();
   const releaseCancellations = new Map<string, () => void>();
+  let returningOrders: { owner: string; wait: Promise<void>; release(): void } | undefined;
   try {
     await app.compile();
     const { edges, nodes } = app.graph();
@@ -82,6 +83,10 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       const url = new URL(String(input), origin);
       if (url.pathname === "/_arc/call/orders.create") createOrderRequests++;
       let ready = Promise.resolve();
+      if (url.pathname === "/_arc/call/orders.list" &&
+          returningOrders && new Headers(init?.headers).get("authorization") === `Bearer ${returningOrders.owner}`) {
+        ready = returningOrders.wait;
+      }
       if (url.pathname === "/_arc/call/orders.cancel") {
         cancelOrderRequests++;
         const { id } = JSON.parse(String(init?.body));
@@ -302,6 +307,23 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     input("[data-search]", "new@example.com");
     await waitFor(() => document.querySelectorAll("[data-user]").length === 1);
     assert.equal(document.querySelector("[data-user]"), newUserRow);
+    const createdWhileAway = await handler(app)(
+      new Request("http://localhost/orders", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${userId}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ product: "Added while away", quantity: 2 }),
+      }),
+    );
+    assert.equal(createdWhileAway.status, 201);
+    let releaseOrders!: () => void;
+    returningOrders = {
+      owner: userId!,
+      wait: new Promise<void>((resolve) => { releaseOrders = resolve; }),
+      release: releaseOrders,
+    };
     document
       .querySelector("[data-user]")!
       .dispatchEvent(new window.Event("click", { bubbles: true }));
@@ -309,6 +331,13 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       document
         .querySelector("[data-rows]")!
         .textContent!.includes("ARC Notebook"),
+    );
+    assert.equal(document.querySelectorAll("[data-order]").length, 1);
+    assert.match(document.querySelector("[data-loading]")!.textContent!, /Завантажуємо/);
+    returningOrders.release();
+    returningOrders = undefined;
+    await waitFor(() =>
+      document.querySelector("[data-rows]")!.textContent!.includes("Added while away"),
     );
     await waitFor(() =>
       app.browserEvents.some(
@@ -323,10 +352,6 @@ test("Workspace browser creates users/orders, handles business errors and isolat
         (t) => t.operation === "orders.create" && t.id === trace.traceId,
       ),
     );
-    input("[data-product]", "Second order");
-    input("[data-quantity]", "2");
-    submit("#orders form");
-    await waitFor(() => document.querySelectorAll("[data-order]").length === 2);
     const [firstRow, secondRow] = document.querySelectorAll("[data-order]");
     const orderId = firstRow.getAttribute("data-order")!;
     const secondId = secondRow.getAttribute("data-order")!;
@@ -410,6 +435,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     assert.equal(document.querySelector("#app")!.children.length, 0);
   } finally {
     cleanupBrowser?.();
+    returningOrders?.release();
     for (const release of releaseCancellations.values()) release();
     await Promise.allSettled([...pending]);
     app.publish("application.stopping", "application");

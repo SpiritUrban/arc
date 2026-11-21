@@ -80,7 +80,10 @@ const orderClient = remoteApi({
   from: [selectedUser],
   headers: (userId) => ({ authorization: `Bearer ${userId}` }),
 });
-const orders = orderClient.query(ListOrders, { key: () => selectedUser() });
+const orders = orderClient.query(ListOrders, {
+  key: () => selectedUser(),
+  cache: true,
+});
 const createOrder = orderClient.mutation(CreateOrder, {
   refresh: [orders],
 });
@@ -88,7 +91,7 @@ const createOrder = orderClient.mutation(CreateOrder, {
 
 У Workspace зміна джерела в `from` оновлює запити читання, а форма використовує актуальне значення для наступного надсилання. `query` виводить ID як `<ID операції>.query`. Для контракту з обов’язковим входом передайте функцію `input`. [Форма замовлень](../../examples/workspace/orders/page.tsx)
 
-`key` визначає, до якого контексту належать дані й помилки. Використовуйте значення з `from`, наприклад ID поточного користувача. При зміні ключа запит одразу відкриває порожній стан завантаження й відкидає відповіді попереднього ключа. При поверненні до попереднього ключа запит завантажує дані заново.
+`key` визначає, до якого контексту належать дані й помилки. Використовуйте значення з `from`, наприклад ID поточного користувача. При зміні ключа ARC відкидає відповіді попереднього ключа. З `cache: true` ARC одразу показує останній успішний результат нового ключа, якщо він є, і завантажує свіжі дані у фоні. Під час фонового запиту `loading` і `stale` мають значення `true`. Кеш тримає до 32 ключів у пам’яті та очищається разом із запитом.
 
 ## Дія без форми
 

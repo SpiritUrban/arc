@@ -500,6 +500,7 @@ type ClientQueryOptions<C extends OperationContract, Sources extends readonly Re
   id?: string;
   input?: (...values: SourceValues<Sources>) => Infer<C["input"]>;
   key?: (...values: SourceValues<Sources>) => string | number;
+  cache?: boolean;
 };
 
 /** Share request headers and their reactive dependencies between queries and forms. */
@@ -537,6 +538,7 @@ export function remoteApi<
         from,
         input: query?.input,
         key: key && (() => key(...from.map((source) => source.get()) as SourceValues<Sources>)),
+        cache: query?.cache,
         baseUrl,
         fetch: fetchWithHeaders,
       }, true);
@@ -559,6 +561,7 @@ type RemoteResourceOptions<C extends OperationContract> = {
   from?: readonly Readable<any>[];
   input?: (...values: any[]) => Infer<C["input"]>;
   key?: () => string | number;
+  cache?: boolean;
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
 };
