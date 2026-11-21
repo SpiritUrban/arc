@@ -94,8 +94,10 @@ async function buildPage(
             ],
           }));
           builder.onLoad({ filter: /\.tsx$/ }, async (args) => {
+            const reactive = reactiveEntries.has(args.path) ||
+              !args.path.replaceAll("\\", "/").includes("/node_modules/");
             const contents = compileReactiveJsx(await readFile(args.path, "utf8"), args.path, {
-              reactive: reactiveEntries.has(args.path),
+              reactive,
             });
             if (contents !== undefined) return { contents, loader: "js", resolveDir: dirname(args.path) };
           });

@@ -46,7 +46,7 @@ Production CLI: `ARC_APP=dist/examples/workspace/app.js node framework/arc.mjs s
 
 ## TSX-шаблони
 
-Задайте `"jsx": "react-jsx"` і `"jsxImportSource": "@arc/framework/web"` у параметрах TypeScript. Сторінка читає дані з `query(contract)`, а форма передає `mutation(contract)` в `onSubmit`. ARC оновлює залежні ділянки DOM. Для звичайних реактивних JSX-виразів у браузерній збірці є режим `// @arc reactive-jsx`.
+Задайте `"jsx": "react-jsx"` і `"jsxImportSource": "@arc/framework/web"` у параметрах TypeScript. Сторінка читає дані з `query(contract)`, а форма передає `mutation(contract)` в `onSubmit`. ARC оновлює залежні ділянки DOM. Файлові сторінки автоматично вмикають реактивний JSX у своїх TSX-модулях; для окремих TSX-файлів лишається директива `// @arc reactive-jsx`.
 
 ## Документація репозиторію
 

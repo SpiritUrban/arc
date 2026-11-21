@@ -329,14 +329,26 @@ export function compileReactiveJsx(
   }).outputText;
 }
 
-/** Load a source application with the same opt-in transform as the browser build. */
+/** Load a source application with reactive JSX across each ARC page's TSX graph. */
 export async function importApplication(
   url: URL | string,
   options: { loadTsx?: boolean; reactiveEntries?: ReadonlySet<string> } = {},
 ) {
   const entry = String(url);
+  const reactiveModules = new Set(options.reactiveEntries);
   const hook = registerHooks({
+    resolve(specifier, context, nextResolve) {
+      const resolved = nextResolve(specifier, context);
+      const source = resolved.url.replaceAll("\\", "/");
+      if (context.parentURL && reactiveModules.has(context.parentURL) &&
+          source.startsWith("file:") && !source.includes("/node_modules/"))
+        reactiveModules.add(resolved.url);
+      return resolved;
+    },
     load(moduleUrl, context, nextLoad) {
+      const applicationFile = moduleUrl.startsWith("file:") &&
+        !moduleUrl.replaceAll("\\", "/").includes("/node_modules/");
+      const reactive = applicationFile && reactiveModules.has(moduleUrl);
       if (
         moduleUrl.startsWith("file:") &&
         new URL(moduleUrl).pathname.endsWith(".tsx")
@@ -345,7 +357,7 @@ export async function importApplication(
         const compiled = compileReactiveJsx(
           readFileSync(file, "utf8"),
           fileURLToPath(file),
-          { loadTsx: options.loadTsx, reactive: options.reactiveEntries?.has(moduleUrl) },
+          { loadTsx: options.loadTsx, reactive },
         );
         if (compiled !== undefined)
           return { format: "module", source: compiled, shortCircuit: true };

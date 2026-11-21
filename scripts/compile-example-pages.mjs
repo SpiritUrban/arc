@@ -6,7 +6,7 @@ const output = new URL("../dist/examples/", import.meta.url);
 for (const file of await readdir(examples, { recursive: true })) {
   if (!file.endsWith(".tsx")) continue;
   const source = await readFile(new URL(file, examples), "utf8");
-  const compiled = compileReactiveJsx(source, file, { rewriteImports: true, reactive: file === "fullstack-tasks/page.tsx" || file.split(/[\\/]/).includes("pages") });
+  const compiled = compileReactiveJsx(source, file, { rewriteImports: true, reactive: file === "fullstack-tasks/page.tsx" || file.startsWith("workspace/") || file.split(/[\\/]/).includes("pages") });
   if (compiled !== undefined)
     await writeFile(new URL(file.replace(/\.tsx$/, ".js"), output), compiled);
 }

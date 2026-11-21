@@ -1,4 +1,3 @@
-// @arc reactive-jsx
 // Браузерна частина замовлень. Зміна користувача оновлює список,
 // а надсилання форми викликає серверну операцію створення.
 import { derive, each, project, view, type Signal } from "@arc/framework/web";
