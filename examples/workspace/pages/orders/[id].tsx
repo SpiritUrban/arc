@@ -14,7 +14,7 @@ const orderClient = remoteApi({
 
 export default function OrderDetail({ params, query }: PageContext<"id">) {
   const order = query(orderClient, GetOrder, {
-    input: () => ({ id: params.id }),
+    params,
     key: (userId) => userId,
   });
 

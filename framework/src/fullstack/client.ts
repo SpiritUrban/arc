@@ -510,10 +510,19 @@ type SourceValues<Sources extends readonly Readable<unknown>[]> = {
 
 type ClientQueryOptions<C extends OperationContract, Sources extends readonly Readable<unknown>[]> = {
   id?: string;
-  input?: (...values: SourceValues<Sources>) => Infer<C["input"]>;
   key?: (...values: SourceValues<Sources>) => string | number;
   cache?: boolean;
-};
+} & ({} extends Infer<C["input"]>
+  ? {
+      input?: (...values: SourceValues<Sources>) => Infer<C["input"]>;
+      params?: Infer<C["input"]>;
+    }
+  : {
+      input: (...values: SourceValues<Sources>) => Infer<C["input"]>;
+    } | {
+      /** Use route parameters directly when they form the complete operation input. */
+      params: Infer<C["input"]>;
+    });
 
 /** Share request headers and their reactive dependencies between queries and forms. */
 export function remoteApi<
@@ -542,13 +551,15 @@ export function remoteApi<
       contract: C,
       ...[query]: {} extends Infer<C["input"]>
         ? [options?: ClientQueryOptions<C, Sources>]
-        : [options: ClientQueryOptions<C, Sources> & Required<Pick<ClientQueryOptions<C, Sources>, "input">>]
+        : [options: ClientQueryOptions<C, Sources>]
     ): RemoteQuery<C> {
       const key = query?.key;
       return createRemoteResource(contract, {
         id: query?.id ?? `${contract.id}.query`,
         from,
-        input: query?.input,
+        input: query && "input" in query ? query.input : query && "params" in query
+          ? () => query.params as Infer<C["input"]>
+          : undefined,
         key: key && (() => key(...from.map((source) => source.get()) as SourceValues<Sources>)),
         cache: query?.cache,
         baseUrl,
