@@ -162,7 +162,7 @@ export function compileReactiveJsx(
                   const method = callee.name.text;
                   if (
                     (method === "get" && child.arguments.length === 0) ||
-                    ((method === "failed" || method === "invalid") &&
+                    ((method === "failed" || method === "invalid" || method === "pending") &&
                       child.arguments.length === 1)
                   ) {
                     reference = callee.expression;
@@ -215,6 +215,7 @@ export function compileReactiveJsx(
               if (
                 name !== "class" &&
                 name !== "className" &&
+                name !== "disabled" &&
                 !/^(aria|data)-[\w-]+$/.test(name)
               )
                 return transformed;

@@ -650,6 +650,7 @@ export function mount(
       throw new TypeError(`Binding ${b.id} requires an HTML element`);
     const element = node as Element;
     if (b.readAttribute) {
+      if (b.name === "disabled") boundDisabled.add(element);
       observeReads(scope, b.readAttribute, (value, sources, start) => {
         const name = b.name!;
         if (value == null || (value === false && !/^(aria|data)-/.test(name)))

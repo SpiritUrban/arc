@@ -100,6 +100,18 @@ const cancelOrder = orderClient.mutation(CancelOrder, { refresh: [orders] });
 
 `run(input)` приймає вхід із контракту й перевіряє його перед запитом. Стан дії, бізнес-помилки, `onSuccess` і `refresh` працюють так само, як у формі. Прямий виклик із `onClick` продовжує трасу кліку у Stand.
 
+Для дій над рядками задайте ключ через `key: ({ id }) => id`. Тоді `cancelOrder.pending(order.id)` показує, чи триває виклик для цього рядка, включно з оновленням запитів із `refresh`. Повторний `run` із тим самим ключем повертає той самий Promise, а інші ключі можуть виконуватися паралельно.
+
+```tsx
+<button
+  type="button"
+  disabled={cancelOrder.pending(order.id)}
+  onClick={() => cancelOrder.run({ id: order.id })}
+>
+  {cancelOrder.pending(order.id) ? "Скасовуємо…" : "Скасувати"}
+</button>
+```
+
 ## HTTP-транспорт
 
 Server `internalTransport(app)` обслуговує POST /_arc/call/:operation. Операція повинна явно мати `expose:{web:true}` на server. Browser descriptor не надає дозволу. Input/output/error details перевіряються сервером; client також перевіряє output. Internal exception не передає stack чи raw message. AbortSignal передається fetch і request executor настільки, наскільки дозволяє HTTP disconnect.

@@ -250,12 +250,22 @@ type FormOptions<C extends OperationContract, Field extends string> =
     input?: (values: Readonly<Record<Field, string>>) => Infer<C["input"]>;
   };
 
-export type Mutation<C extends OperationContract, Field extends string = never> =
+type MutationKey = string | number;
+type KeyedMutationOptions<C extends OperationContract, Key extends MutationKey> = {
+  key?: (input: Infer<C["input"]>) => Key;
+};
+
+export type Mutation<
+  C extends OperationContract,
+  Field extends string = never,
+  Key extends MutationKey = MutationKey,
+> =
   CallableAction<void, RemoteResult<C>> & {
     fields: RemoteForm<C, Field>["fields"];
     failed(code: keyof C["errors"] & string): boolean;
     invalid(field: InputField<C>): boolean;
     run(input: Infer<C["input"]>): Promise<RemoteResult<C>>;
+    pending(key: Key): boolean;
   };
 
 const directInput = Symbol("ARC mutation input");
@@ -383,23 +393,56 @@ function bindRemoteForm(defaults: RemoteFormDefaults) {
 }
 
 function bindMutation(defaults: RemoteFormDefaults) {
-  function mutate<C extends OperationContract>(
-    contract: C, options?: NamedFormOptions<C>,
-  ): Mutation<C>;
-  function mutate<C extends OperationContract>(
-    contract: C, options: ReactiveFormOptions<C>,
-  ): Mutation<C, Extract<keyof Infer<C["input"]>, string>>;
-  function mutate<C extends OperationContract, Field extends string>(
-    contract: C, options: MappedFormOptions<C, Field>,
-  ): Mutation<C, Field>;
-  function mutate<C extends OperationContract, Field extends string>(
-    contract: C, options: FormOptions<C, Field> = {},
-  ): Mutation<C, Field> {
+  function mutate<C extends OperationContract, Key extends MutationKey = MutationKey>(
+    contract: C, options?: NamedFormOptions<C> & KeyedMutationOptions<C, Key>,
+  ): Mutation<C, never, Key>;
+  function mutate<C extends OperationContract, Key extends MutationKey = MutationKey>(
+    contract: C, options: ReactiveFormOptions<C> & KeyedMutationOptions<C, Key>,
+  ): Mutation<C, Extract<keyof Infer<C["input"]>, string>, Key>;
+  function mutate<C extends OperationContract, Field extends string, Key extends MutationKey = MutationKey>(
+    contract: C, options: MappedFormOptions<C, Field> & KeyedMutationOptions<C, Key>,
+  ): Mutation<C, Field, Key>;
+  function mutate<C extends OperationContract, Field extends string, Key extends MutationKey>(
+    contract: C, options: FormOptions<C, Field> & KeyedMutationOptions<C, Key> = {},
+  ): Mutation<C, Field, Key> {
     const { fields, submit } = buildRemoteForm(contract, options, defaults, true);
+    const keyOf = options.key;
+    const requests = new Map<Key, Promise<RemoteResult<C>>>();
+    const revision = keyOf && state({ id: `${submit.id}.pending`, initial: 0 });
+    let disposed = false;
+    if (revision) {
+      submit.dependencies = [...(submit.dependencies ?? []), revision];
+      const dispose = submit.dispose.bind(submit);
+      submit.dispose = () => {
+        disposed = true;
+        requests.clear();
+        revision.dispose();
+        dispose();
+      };
+    }
     return Object.assign(submit, {
       fields,
       run(payload: Infer<C["input"]>) {
-        return submit.execute({ [directInput]: payload }, { trace: currentWriteTrace() });
+        const trace = currentWriteTrace();
+        if (!keyOf || !revision || disposed)
+          return submit.execute({ [directInput]: payload }, { trace });
+        const key = keyOf(payload);
+        const existing = requests.get(key);
+        if (existing) return existing;
+        let start!: () => void;
+        const request = new Promise<RemoteResult<C>>((resolve) => {
+          start = () => resolve(submit.execute({ [directInput]: payload }, { trace }));
+        }).finally(() => {
+          if (requests.delete(key)) revision.update((value) => value + 1);
+        });
+        requests.set(key, request);
+        revision.update((value) => value + 1);
+        start();
+        return request;
+      },
+      pending(key: Key) {
+        revision?.get();
+        return requests.has(key);
       },
       failed(code: keyof C["errors"] & string) {
         const { status, result } = submit();

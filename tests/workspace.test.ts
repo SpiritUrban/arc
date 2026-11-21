@@ -19,6 +19,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
   let server: Awaited<ReturnType<typeof serve>> | undefined;
   let cleanupBrowser: (() => void) | undefined;
   const pending = new Set<Promise<any>>();
+  const releaseCancellations = new Map<string, () => void>();
   try {
     await app.compile();
     const { edges, nodes } = app.graph();
@@ -76,10 +77,23 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       '<html><head></head><body><div id="app"></div></body></html>',
     );
     let createOrderRequests = 0;
+    let cancelOrderRequests = 0;
     const fetcher: typeof fetch = (input, init) => {
       const url = new URL(String(input), origin);
       if (url.pathname === "/_arc/call/orders.create") createOrderRequests++;
-      const promise = fetch(url, init);
+      let ready = Promise.resolve();
+      if (url.pathname === "/_arc/call/orders.cancel") {
+        cancelOrderRequests++;
+        const { id } = JSON.parse(String(init?.body));
+        const previous = releaseCancellations.get(id);
+        ready = new Promise<void>((resolve) => {
+          releaseCancellations.set(id, () => {
+            previous?.();
+            resolve();
+          });
+        });
+      }
+      const promise = ready.then(() => fetch(url, init));
       pending.add(promise);
       void promise.finally(() => pending.delete(promise)).catch(() => {});
       return promise;
@@ -309,7 +323,13 @@ test("Workspace browser creates users/orders, handles business errors and isolat
         (t) => t.operation === "orders.create" && t.id === trace.traceId,
       ),
     );
-    const orderId = document.querySelector("[data-order]")!.getAttribute("data-order");
+    input("[data-product]", "Second order");
+    input("[data-quantity]", "2");
+    submit("#orders form");
+    await waitFor(() => document.querySelectorAll("[data-order]").length === 2);
+    const [firstRow, secondRow] = document.querySelectorAll("[data-order]");
+    const orderId = firstRow.getAttribute("data-order")!;
+    const secondId = secondRow.getAttribute("data-order")!;
     const cancelOverRest = (actor: string) => handler(app)(
       new Request("http://localhost/orders/cancel", {
         method: "POST",
@@ -323,8 +343,26 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     const denied = await cancelOverRest("00000000-0000-4000-8000-000000000001");
     assert.equal(denied.status, 404);
     assert.match(await denied.text(), /ORDER_NOT_FOUND/);
-    document.querySelector("[data-cancel-order]")!.dispatchEvent(new window.Event("click"));
-    await waitFor(() => document.querySelector("[data-order]")!.textContent!.includes("Скасовано"));
+    const firstButton = firstRow.querySelector<HTMLButtonElement>("[data-cancel-order]")!;
+    const secondButton = secondRow.querySelector<HTMLButtonElement>("[data-cancel-order]")!;
+    const click = (button: HTMLButtonElement) =>
+      button.dispatchEvent(new window.Event("click"));
+    click(firstButton);
+    click(firstButton);
+    await waitFor(() => firstButton.disabled && releaseCancellations.has(orderId));
+    assert.match(firstButton.textContent!, /Скасовуємо/);
+    assert.equal(secondButton.disabled, false);
+    assert.equal(cancelOrderRequests, 1);
+    click(secondButton);
+    await waitFor(() => secondButton.disabled && releaseCancellations.has(secondId));
+    assert.equal(cancelOrderRequests, 2);
+    const status = (id: string) => document.querySelector(`[data-order="${id}"] .order-status`)!.textContent;
+    releaseCancellations.get(orderId)!();
+    await waitFor(() => status(orderId)?.includes("Скасовано") === true);
+    assert.equal(secondButton.disabled, true);
+    assert.match(secondButton.textContent!, /Скасовуємо/);
+    releaseCancellations.get(secondId)!();
+    await waitFor(() => status(secondId)?.includes("Скасовано") === true);
     assert.equal(document.querySelector("[data-cancel-order]"), null);
     await waitFor(() => app.browserEvents.some(
       (event) => event.node === "orders.cancel.submit" && event.type === "action.finished",
@@ -356,6 +394,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     assert.equal(document.querySelector("#app")!.children.length, 0);
   } finally {
     cleanupBrowser?.();
+    for (const release of releaseCancellations.values()) release();
     await Promise.allSettled([...pending]);
     app.publish("application.stopping", "application");
     if (server) await closeServer(server);

@@ -134,10 +134,10 @@ function renderOrdersPage(quantity: Signal<string>) {
                           class="button secondary"
                           type="button"
                           data-cancel-order
-                          bind:disabled={cancelOrder.running}
+                          disabled={cancelOrder.pending(order.id)}
                           onClick={() => cancelOrder.run({ id: order.id })}
                         >
-                          Скасувати
+                          {cancelOrder.pending(order.id) ? "Скасовуємо…" : "Скасувати"}
                         </button>
                       )}
                     </td>
@@ -177,7 +177,10 @@ export const createOrder = orderClient.mutation(CreateOrder, {
   refresh: [ordersData],
 });
 
-const cancelOrder = orderClient.mutation(CancelOrder, { refresh: [ordersData] });
+const cancelOrder = orderClient.mutation(CancelOrder, {
+  key: ({ id }) => id,
+  refresh: [ordersData],
+});
 
 // Поки новий список завантажується, фільтр приховує кешовані замовлення попереднього користувача.
 export const visibleOrders = derive({
