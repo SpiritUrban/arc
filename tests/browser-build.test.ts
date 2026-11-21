@@ -10,15 +10,16 @@ import { createApp } from "../examples/fullstack-tasks/app.ts";
 import { application } from "../framework/src/index.ts";
 import { remoteClient } from "../framework/src/fullstack/client.ts";
 import { read } from "../examples/leak-check/server.ts";
+const tasksEntry = new URL("../examples/fullstack-tasks/app.ts", import.meta.url);
 test("pure Web and Fullstack build manifests have no Node/server implementation in browser", async () => {
   const tasks = createApp();
   const dir = await mkdtemp(join(tmpdir(), "arc-browser-"));
   try {
+    await Promise.all([counter.compile(), tasks.compile({ entry: tasksEntry })]);
     for (const [name, app] of [
       ["counter", counter],
       ["tasks", tasks],
     ] as const) {
-      await app.compile();
       const result = await buildWeb(app, { outDir: join(dir, name) });
       const code = await readFile(join(result.outDir, "app.js"), "utf8");
       assert.ok(!code.includes("node:http"));
@@ -31,6 +32,10 @@ test("pure Web and Fullstack build manifests have no Node/server implementation 
       );
       assert.equal(result.manifest.version, 3);
     }
+    assert.ok(tasks.graph().partitions?.browser.includes("page:page"));
+    assert.ok(tasks.graph().edges.some((edge) =>
+      edge.from === "tasks.list.query" && edge.kind === "BINDS" && edge.to.endsWith(".each"),
+    ));
     assert.equal(counter.graph().partitions?.server.length, 0);
   } finally {
     await tasks.close();
@@ -123,13 +128,13 @@ test("canonical compiled browser bundle submits Tasks across actual HTTP and joi
   // Import a fresh logical app before server activation; browser bundle executes its own state instances.
   const app = createApp();
   try {
-    await app.compile();
+    await app.compile({ entry: tasksEntry });
     await app.start();
     const built = await buildWeb(app, { outDir: dir });
     server = await serve(internalTransport(app), { port: 0 });
     const port = (server.address() as { port: number }).port,
       origin = `http://127.0.0.1:${port}`;
-    const { window, document } = parseHTML('<div id="app"></div>');
+    const { window, document } = parseHTML('<html><head></head><body><div id="app"></div></body></html>');
     const pending = new Set<Promise<any>>();
     const fetcher: typeof fetch = (input, init) => {
       const task = fetch(new URL(String(input), origin), init);
@@ -145,6 +150,13 @@ test("canonical compiled browser bundle submits Tasks across actual HTTP and joi
       Request,
       Response,
       Headers,
+      FormData: class extends FormData {
+        constructor(form: HTMLFormElement) {
+          super();
+          const input = form.querySelector<HTMLInputElement>("input[name=title]")!;
+          this.append(input.name, input.value);
+        }
+      },
       AbortController,
       performance,
       queueMicrotask,
@@ -166,14 +178,15 @@ test("canonical compiled browser bundle submits Tasks across actual HTTP and joi
     await waitFor(
       () => !document.querySelector("main")!.textContent.includes("Loading"),
     );
-    const input = document.querySelector("input")!;
+    const input = document.querySelector<HTMLInputElement>("input")!;
+    const form = document.querySelector("form")!;
+    Object.defineProperty(form, "elements", { value: [input] });
+    Object.defineProperties(input, { form: { value: form }, defaultValue: { value: "" } });
     input.value = "Network task";
     input.dispatchEvent(new window.Event("input"));
-    document
-      .querySelector("form")!
-      .dispatchEvent(new window.Event("submit", { cancelable: true }));
+    form.dispatchEvent(new window.Event("submit", { cancelable: true }));
     await waitFor(() =>
-      document.querySelector("pre")!.textContent.includes("Network task"),
+      document.querySelector("[data-tasks]")!.textContent!.includes("Network task"),
     );
     await waitFor(() =>
       app.browserEvents.some((e) => e.type === "action.finished"),

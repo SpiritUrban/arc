@@ -7,10 +7,10 @@ trace abc
 browser tasks.create.submit
   remote tasks.create.submit.remote
     server tasks.create → tasks.repository
-  tasks.current.invalidate
-    remote tasks.current.remote
+  tasks.list.query.invalidate
+    remote tasks.list.query.remote
       server tasks.list → tasks.repository
-  tasks.current.data → текстова прив’язка у TasksPage
+  tasks.list.query → прив’язка списку на сторінці
 ```
 
 Передавайте ctx.trace явно через async boundaries; ctx.set переносить trace на local state. Browser не має прихованого AsyncLocalStorage. Незв’язані програмні writes без trace можуть почати окрему activity.

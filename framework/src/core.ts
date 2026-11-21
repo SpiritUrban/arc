@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
+import { dirname, relative, sep } from "node:path";
+import { rootView } from "./neutral/page-root.js";
 import {
   Schema,
   ValidationError,
@@ -271,7 +273,7 @@ type WebConfig = {
   nodes: GraphDefinition[];
   entry?: string;
   serverModules?: string[];
-  bootstrap?: "page";
+  bootstrap?: { id: string };
 };
 
 type AppOptions = {
@@ -383,12 +385,18 @@ export class Application {
           ? new URL(source.href.replace(/\.tsx$/, ".js"))
           : source;
         const entry = fileURLToPath(url);
+        const pagePath = relative(dirname(fileURLToPath(options.entry)), fileURLToPath(source))
+          .split(sep).join("/").replace(/\.[cm]?[jt]sx?$/, "");
+        const id = `page:${pagePath}`;
         this.loadingPage = (async () => {
           const { importApplication } = await import("./fullstack/reactive-jsx.js");
-          const { default: root } = await importApplication(url, { loadTsx: true });
-          if (root?.kind !== "view" || typeof root.setup !== "function")
-            throw new Error(`Default-export an ARC view from ${entry}`);
-          return { nodes: [root], entry, bootstrap: "page" };
+          const { default: root } = await importApplication(url, { loadTsx: true, reactiveEntry: true });
+          // Resolve the optional Web runtime only when the root is a page function.
+          const webRuntime = "@arc/framework/web";
+          const normalize = typeof root === "function"
+            ? (await import(webRuntime) as typeof import("./web/index.js")).view
+            : undefined;
+          return { nodes: [rootView(root, id, normalize)], entry, bootstrap: { id } };
         })();
       }
       const loading = this.loadingPage;

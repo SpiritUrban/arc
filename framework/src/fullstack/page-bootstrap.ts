@@ -1,8 +1,12 @@
 import { startWeb } from "../web/runtime.js";
-import type { View } from "../web/view.js";
+import { rootView } from "../neutral/page-root.js";
+import { view } from "../web/view.js";
 import { telemetryTransport } from "./client.js";
 
-export function bootstrapPage(page: { default: View; title?: string; styles?: string }) {
+export function bootstrapPage(
+  page: { default: unknown; title?: string; styles?: string },
+  id: string,
+) {
   const target = document.getElementById("app");
   if (!target) throw new Error("ARC page requires an #app container");
 
@@ -14,7 +18,7 @@ export function bootstrapPage(page: { default: View; title?: string; styles?: st
   }
   const telemetry = telemetryTransport();
   try {
-    const app = startWeb(page.default, target, { telemetry });
+    const app = startWeb(rootView(page.default, id, view), target, { telemetry });
     window.addEventListener("pagehide", () => {
       try {
         app.dispose();

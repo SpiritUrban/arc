@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createRequire, registerHooks } from "node:module";
+import { fileURLToPath } from "node:url";
 import type * as TS from "typescript";
 
 const require = createRequire(import.meta.url);
@@ -7,9 +8,9 @@ const require = createRequire(import.meta.url);
 export function compileReactiveJsx(
   source: string,
   filename: string,
-  options: { loadTsx?: boolean; rewriteImports?: boolean } = {},
+  options: { loadTsx?: boolean; rewriteImports?: boolean; reactive?: boolean } = {},
 ): string | undefined {
-  const reactive = /^\s*\/\/ @arc reactive-jsx\s*$/m.test(source);
+  const reactive = options.reactive || /^\s*\/\/ @arc reactive-jsx\s*$/m.test(source);
   if (!reactive && !options.loadTsx) return;
   const ts: typeof TS = require("typescript");
   return ts.transpileModule(source, {
@@ -63,7 +64,6 @@ export function compileReactiveJsx(
               !ts.isCallExpression(call) ||
               call.questionDotToken ||
               !ts.isPropertyAccessExpression(call.expression) ||
-              call.expression.questionDotToken ||
               call.expression.name.text !== "map" ||
               call.arguments.length !== 1
             )
@@ -290,8 +290,9 @@ export function compileReactiveJsx(
 /** Load a source application with the same opt-in transform as the browser build. */
 export async function importApplication(
   url: URL | string,
-  options: { loadTsx?: boolean } = {},
+  options: { loadTsx?: boolean; reactiveEntry?: boolean } = {},
 ) {
+  const entry = String(url);
   const hook = registerHooks({
     load(moduleUrl, context, nextLoad) {
       if (
@@ -301,8 +302,8 @@ export async function importApplication(
         const file = new URL(moduleUrl);
         const compiled = compileReactiveJsx(
           readFileSync(file, "utf8"),
-          file.pathname,
-          options,
+          fileURLToPath(file),
+          { loadTsx: options.loadTsx, reactive: options.reactiveEntry && moduleUrl === entry },
         );
         if (compiled !== undefined)
           return { format: "module", source: compiled, shortCircuit: true };
@@ -311,7 +312,7 @@ export async function importApplication(
     },
   });
   try {
-    return await import(String(url));
+    return await import(entry);
   } finally {
     hook.deregister();
   }

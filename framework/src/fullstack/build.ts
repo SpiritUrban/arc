@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 export interface BuildHost {
   graph(): ArchitectureIR;
   webConfig():
-    | { entry?: string; nodes: GraphDefinition[]; serverModules?: string[]; bootstrap?: "page" }
+    | { entry?: string; nodes: GraphDefinition[]; serverModules?: string[]; bootstrap?: { id: string } }
     | undefined;
 }
 export async function buildWeb(
@@ -29,13 +29,14 @@ export async function buildWeb(
   const browserCore = fileURLToPath(
     new URL("../core-entry.js", import.meta.url),
   );
-  const input = config.bootstrap === "page"
+  const page = config.bootstrap;
+  const input = page
     ? {
         stdin: {
           contents: [
             `import * as page from ${JSON.stringify(entry)};`,
             `import { bootstrapPage } from ${JSON.stringify(fileURLToPath(new URL("./page-bootstrap.js", import.meta.url)))};`,
-            "bootstrapPage(page);",
+            `bootstrapPage(page, ${JSON.stringify(page.id)});`,
           ].join("\n"),
           resolveDir: dirname(entry),
           sourcefile: "arc-page-entry.js",
@@ -44,7 +45,7 @@ export async function buildWeb(
     : { entryPoints: [entry] };
   const result = await build({
     ...input,
-    ...(config.bootstrap === "page" ? {
+    ...(page ? {
       jsx: "automatic" as const,
       jsxImportSource: "@arc/framework/web",
     } : {}),
@@ -69,7 +70,9 @@ export async function buildWeb(
             ],
           }));
           builder.onLoad({ filter: /\.tsx$/ }, async (args) => {
-            const contents = compileReactiveJsx(await readFile(args.path, "utf8"), args.path);
+            const contents = compileReactiveJsx(await readFile(args.path, "utf8"), args.path, {
+              reactive: Boolean(page) && args.path === entry,
+            });
             if (contents !== undefined) return { contents, loader: "js", resolveDir: dirname(args.path) };
           });
           builder.onLoad({ filter: /\.[cm]?[jt]s$/ }, async (args) => {
