@@ -1,38 +1,10 @@
-import { binding, type Writable } from "@arc/framework/web";
-export const escapeHTML = (value: unknown) =>
-  String(value ?? "").replace(
-    /[&<>"']/g,
-    (c) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        c
-      ]!,
-  );
 export const money = (value: number) =>
   new Intl.NumberFormat("uk-UA", {
     style: "currency",
     currency: "UAH",
     maximumFractionDigits: 0,
   }).format(value);
-export function inputBindings(id: string, source: Writable<string>) {
-  return [
-    binding({
-      id: id + ".value",
-      type: "property",
-      name: "value",
-      sources: [source],
-    }),
-    binding({
-      id: id + ".edit",
-      type: "event",
-      name: "input",
-      sources: [source],
-      handler(event, trace) {
-        source._trace = trace;
-        source.set((event.target as HTMLInputElement).value);
-      },
-    }),
-  ] as const;
-}
+// ARC передає бізнес-помилки в error, а збої виконання в fault. Тут перетворюємо їх на текст для UI.
 export function failureMessage(failure: any): string {
   if (!failure) return "";
   if (failure.error === "EMAIL_EXISTS")

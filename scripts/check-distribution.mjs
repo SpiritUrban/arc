@@ -73,11 +73,26 @@ export default application({operations:[operation({id:'ping',input:s.object({}),
     `import {operation,s,ok} from '@arc/framework';
 operation({id:'typed',input:s.object({n:s.int()}),output:s.int(),errors:{MISSING:{status:404,details:s.object({id:s.uuid()})}},run({input,fail}){if(input.n===0)return fail('MISSING',{id:'00000000-0000-4000-8000-000000000001'});return ok(input.n)}});`,
   );
+  await writeFile(
+    join(temp, "consumer-view.tsx"),
+    `import {binding,state,view} from '@arc/framework/web';
+const name=state({id:'consumer.name',initial:'ARC'});
+const label=binding({id:'consumer.label',type:'text',sources:[name]});
+function Heading({title}: {title: string}) { return <h1>{title}</h1>; }
+export default view({id:'consumer.page',bindings:[label],template:()=>(
+  <main><><Heading title="Welcome" /><p bind={label} /></></main>
+)});`,
+  );
   execFileSync(
     process.execPath,
     [
       join(root, "node_modules/typescript/bin/tsc"),
-      "--noEmit",
+      "--outDir",
+      "dist",
+      "--jsx",
+      "react-jsxdev",
+      "--jsxImportSource",
+      "@arc/framework/web",
       "--strict",
       "--target",
       "ES2023",
@@ -88,11 +103,23 @@ operation({id:'typed',input:s.object({n:s.int()}),output:s.int(),errors:{MISSING
       "--typeRoots",
       join(root, "node_modules/@types"),
       "consumer.ts",
+      "consumer-view.tsx",
     ],
     { cwd: temp, stdio: "pipe" },
   );
+  execFileSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      `import page from './dist/consumer-view.js';
+import {jsx} from '@arc/framework/web/jsx-runtime';
+if(page.kind !== 'view' || typeof jsx !== 'function') throw Error('TSX runtime export failure');`,
+    ],
+    { cwd: temp, stdio: "pipe", env: { ...process.env, NODE_OPTIONS: "" } },
+  );
   console.log(
-    "Packed ESM package import, CLI graph without resource activation, execution without tsx, and strict TypeScript consumer: passed",
+    "Packed ESM package import, CLI graph without resource activation, execution without tsx, and strict TypeScript/TSX consumers: passed",
   );
 } finally {
   await rm(temp, { recursive: true, force: true });

@@ -1,4 +1,4 @@
-# Як писати код на ARC 0.3
+# Як писати код на ARC
 
 [← Зміст](README.md)
 
@@ -168,7 +168,7 @@ export default application({ modules: [tasks] });
 
 Не викликайте `compile()` у default-export entrypoint для CLI: CLI зробить це сам. Якщо запускаєте application програмно, викликайте `compile`, потім `start` перед будь-яким `execute` та `close` у `finally`.
 
-Масив `operations` робить намір модуля явним. Операції, указані тільки в `routes`, компілятор теж знаходить. Досяжні через `needs` ресурси реєструються автоматично.
+ARC знаходить операції в `operations` і `routes`, а ресурси — через `needs`. Якщо маршрут має власну реалізацію, її можна оголосити разом із контрактом через `http.post(path, contract, implementation)`. Готовий приклад далі використовує цей запис для створення задачі.
 
 ## 7. Запустіть готовий навчальний приклад
 
@@ -193,7 +193,7 @@ curl -X POST http://localhost:3000/tasks \
 curl http://localhost:3000/tasks/REPLACE_WITH_ID
 ```
 
-Для перенесення прикладу до основного застосунку розкладіть визначення у `src/tasks/` за схемою вище та додайте модуль до `modules` у `src/app.ts`.
+Щоб додати Tasks до Workspace, розкладіть визначення у `examples/workspace/tasks/` за схемою вище та додайте модуль до `modules` у `examples/workspace/app.ts`.
 
 ## Авторизація через request-capability
 
@@ -303,8 +303,8 @@ const titleLookup = resource({
 
 В операції додайте `needs: { titleLookup }` та викличте `await titleLookup.find(input.id)`. У IR з’явиться effect `tasks.titleLookup.find`. Це явне обгортання async methods application-ресурсів; синхронні методи прикладу не слід позначати instrument без зміни їхнього контракту на Promise. Докладніше — [API](api.md#resource--capability) та [Stand](testing-and-stand.md#failure-injection).
 
-## ARC Web / Fullstack 0.3
+## ARC Web / Fullstack
 
 Цей розділ описує server API. Browser та fullstack: [Web guide](web/getting-started.md), [remote contracts](fullstack/remote-operations.md), [Stand graph і interaction traces](stand/README.md). Поточний unified IR має version 3; IR v2 приклади аудиту 0.2 є історичними.
 
-Frontend код кореневого застосунку: [покроковий посібник](web/writing-frontend.md), [forms/events](web/forms-and-events.md), [Workspace structure](workspace-app.md).
+Frontend код Workspace: [покроковий посібник](web/writing-frontend.md), [forms/events](web/forms-and-events.md), [Workspace structure](workspace-app.md).

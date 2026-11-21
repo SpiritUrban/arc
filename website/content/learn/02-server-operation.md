@@ -7,16 +7,18 @@ Operation — конкретний сценарій із input/output contract �
 Цей приклад можна зберегти як hello.mjs у корені після npm run build:
 
 ```js
-import { application, operation, resource, s, ok } from "@arc/framework/server";
+import { application, operation, operationContract, resource, s, ok } from "@arc/framework/server";
 
 const greeting = resource({
   id: "greeting.config",
   open: () => ({ prefix: "Привіт" }),
 });
-const hello = operation({
+const Hello = operationContract({
   id: "greeting.hello",
   input: s.object({ name: s.string({ min: 1 }) }),
   output: s.string(),
+});
+const hello = operation(Hello, {
   needs: { greeting },
   run: ({ input, greeting }) => ok(`${greeting.prefix}, ${input.name}!`),
 });
@@ -42,6 +44,8 @@ greeting.hello [operation/server]
 ```
 
 needs — явна dependency, а не пошук service за string ID усередині run. Для виклику іншої operation існує declared calls та ctx.call; не створюйте новий application execution, якщо потрібен той самий request scope.
+
+Для реалізації поруч із HTTP-маршрутом можна використати `http.post(path, contract, implementation)` і додати результат у `routes`. [Приклад POST замовлення](../../../examples/workspace/orders/server.ts)
 
 ## Business errors
 

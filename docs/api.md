@@ -1,4 +1,4 @@
-# API ARC 0.3
+# API ARC
 
 [← Зміст](README.md) · [Міграція](audit/README.md)
 
@@ -50,6 +50,24 @@ const read = operation({
 `Result<T,E>`, `OperationResult<O,E>`, `BusinessError<E>`, `ErrorContracts`, `Fail<E>` експортуються. Runtime відхиляє `UNDECLARED_ERROR`, `INVALID_ERROR_DETAILS`, `INVALID_OUTPUT`, `INVALID_RESULT`. `Fault(code, status=500, details?)` — exception для framework/capabilities. Після abort результат не повертається як успіх.
 
 Зарезервовані needs keys: input, signal, request, call, fail, **proto**, constructor, prototype. ID спільні між усіма node kinds.
+
+Для спільного контракту використовуйте `operation(contract, { needs, calls, run, ...metadata })`. Схеми, помилки й ID беруться з контракту, а `run` отримує їхні типи разом із типами ресурсів.
+
+Для HTTP можна оголосити контракт і реалізацію в одному виклику маршруту:
+
+```ts
+const createRoute = http.post("/tasks", CreateTask, {
+  status: 201,
+  needs: { tasks: tasksRepository },
+  run: ({ input, tasks }) => ok(tasks.create(input.title)),
+});
+
+const tasks = module({ id: "tasks", routes: [createRoute] });
+```
+
+Такий запис доступний для `get`, `post`, `put`, `patch` і `delete`. ARC знаходить операцію через `routes`. Для повторного використання готової операції підходить `http.post(path, operation, { status })`.
+
+Експериментальний `@handles(contract, { needs, effects, route })` з `@arc/framework/server` позначає публічний статичний метод. `handlerModule(id, Class)` збирає власні декоровані методи класу в операції та маршрути. Контекст методу можна типізувати через `HandlerContext<typeof Contract, typeof needs>`. Використовуйте компіляцію TypeScript або `tsx` для виконання коду з декораторами. [Два варіанти маршруту у Workspace](../examples/workspace/orders/server.ts)
 
 ## resource / capability
 
@@ -163,7 +181,7 @@ Legacy `queue(app, op, options)` та `schedule(app, op, options)` лишают�
 
 ## Package subpaths і browser API
 
-`/core`: neutral contracts, schemas, graph/module/application metadata, compiler diagnostics, instrumentation protocol. `/server`: operations/resources/transports. `/web`: state, derive, batch/flush/tick, Scope, action, webResource, binding/view/mount, webApplication. `/fullstack`: remote, remoteClient, remoteCall, telemetryTransport. `/fullstack/server`: internalTransport. `/fullstack/build`: buildWeb/staticWeb. `/stand`: Node Stand.
+`/core`: neutral contracts, schemas, graph/module/application metadata, compiler diagnostics, instrumentation protocol. `/server`: operations/resources/transports, `handles`, `handlerModule`. `/web`: state, derive, batch/flush/tick, Scope, action, webResource, binding/view/mount, `project`, webApplication. `/fullstack`: remote, remoteApi, remoteForm, `textField`, `integerField`, remoteClient, remoteCall, telemetryTransport. `/fullstack/server`: internalTransport. `/fullstack/build`: buildWeb/staticWeb. `/stand`: Node Stand.
 
 Повні сигнатури browser API та практичні приклади: [Web](web/getting-started.md), [remote](fullstack/remote-operations.md). Server `resource` і browser `webResource` мають різну semantics; fullstack imports не вводять двозначний resource alias.
 

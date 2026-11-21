@@ -4,6 +4,8 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "@arc/framework/web",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "outDir": "dist",
@@ -14,11 +16,11 @@
   },
   "include": [
     "framework/src/**/*.ts",
-    "src/**/*.ts",
     "tests/**/*.ts",
     "docs/examples/**/*.ts",
     "benchmarks/**/*.ts",
     "scripts/**/*.ts",
-    "examples/**/*.ts"
+    "examples/**/*.ts",
+    "examples/**/*.tsx"
   ]
 }

@@ -1,6 +1,7 @@
 import { Application, Fault } from "./core.js";
 import { handler, problem } from "./http.js";
 import { standHTML } from "./stand-ui.js";
+import { standLayouts } from "./stand-layout.js";
 import { generateCases } from "./generator.js";
 import { runLoad, findBreakingPoint, type LoadOutcome } from "./load.js";
 import { runTestSpec, type StandTestSpec } from "./test-spec.js";
@@ -67,7 +68,12 @@ export function stand(app: Application, options: StandOptions = {}) {
                 "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'",
             },
           });
-        if (url.pathname === "/api/graph") return Response.json(app.graph());
+        if (url.pathname === "/api/graph") {
+          const graph = app.graph();
+          return Response.json(url.searchParams.get("layout") === "1"
+            ? { ...graph, layouts: standLayouts(graph) }
+            : graph);
+        }
         if (url.pathname === "/api/live")
           return Response.json({
             browserMetrics: app.browserMetrics.snapshot(),

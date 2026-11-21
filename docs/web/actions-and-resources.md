@@ -12,7 +12,7 @@ Network data слід завантажувати через resource, mutations 
 
 ## Resource залежно від вибраного користувача
 
-Workspace [orders/page.ts](../../src/orders/page.ts) має remote(ListOrders,{from:[selectedUser],input:()=>({}),fetch:authenticatedFetch}). from робить identity dependency видимою у graph. Fetch adapter читає selectedUser на кожний request і додає Authorization Bearer UUID; operation використовує існуючу request-scoped currentUser capability. Browser contract не містить auth implementation. Це demo identity, не production login.
+У [сторінці замовлень](../../examples/workspace/orders/page.tsx) клієнт `remoteApi` бере вибраного користувача зі [спільного стану](../../examples/workspace/user-selection.ts). Залежність `from` запускає нове завантаження після зміни вибору. Клієнт додає UUID користувача до заголовка `Authorization`, а серверний ресурс `currentUser` читає його для поточного запиту.
 
 Cached data попереднього input може залишатися під час loading. Workspace visibleOrders додатково фільтрує data за selectedUser, щоб до завершення нового load не показувати чужу projection. При invalidation того самого input попередній список може залишатися видимим до reload.
 

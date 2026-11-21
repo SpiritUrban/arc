@@ -1,6 +1,6 @@
-# ARC Workspace — кореневий проєкт
+# ARC Workspace — fullstack-приклад
 
-Це застосунок на ARC, який лежить у `src/`, окремо від реалізації фреймворку у `framework/`. Він використовує server operations/resources, Web state/derive/action/view/bindings і fullstack remote bridge. Приклади в `examples/` не замінюють цей проєкт.
+ARC Workspace — приклад застосунку з користувачами та замовленнями в `examples/workspace/`. Він використовує server operations/resources, Web state/derive/action/view/bindings і fullstack remote bridge.
 
 ## Запуск
 
@@ -13,7 +13,7 @@ Application і internal transport: http://localhost:3000; Stand: http://localhos
 
 ```sh
 npm run build        # framework ESM, application ESM і .arc/web browser assets
-npm run build:app    # лише browser assets кореневого застосунку
+npm run build:app    # лише browser assets Workspace
 npm run graph       # єдиний server/browser/shared IR, без activation
 npm test
 ```
@@ -32,42 +32,44 @@ npm test
 
 ## Структура та graph
 
-- `src/app.ts` — composition users/orders, health route, Workspace web entry, createApp factory.
-- `src/users/contracts.ts`, `src/orders/contracts.ts` — shared schema/operation descriptors. Input/output/error source один для server і browser.
-- `src/users/index.ts`, `src/orders/index.ts` — існуючі server repositories, request auth capability, operations та REST routes.
-- `src/users/page.ts` — users resource, search/local fields, create action, active user, bindings/view.
-- `src/orders/page.ts` — user-dependent remote resource, create action, totals, table bindings/view.
-- `src/page.ts`, `src/styles.ts` — responsive Workspace shell та стилі.
-- `src/browser.ts` — browser composition, mount, telemetry та pagehide disposal.
-- `src/ui.ts` — input binding helpers, escaping dynamic HTML і friendly error messages.
+- `examples/workspace/app.ts` — composition users/orders, health route, Workspace web entry, createApp factory.
+- `examples/workspace/users/contracts.ts`, `examples/workspace/orders/contracts.ts` — shared schema/operation descriptors. Input/output/error source один для server і browser.
+- `examples/workspace/users/server.ts`, `examples/workspace/orders/server.ts` — існуючі серверні сховища, операції та REST-маршрути.
+- `examples/workspace/auth.ts` — визначення користувача в межах HTTP-запиту.
+- `examples/workspace/user-selection.ts` — спільний браузерний стан вибору та дані користувача.
+- `examples/workspace/users/page.tsx` — users resource, search/local fields, create action, active user, bindings/view.
+- `examples/workspace/orders/page.tsx` — віддалений список замовлень, форма на `remoteForm` і підсумки, залежні від вибраного користувача.
+- `examples/workspace/page.tsx`, `examples/workspace/styles.ts` — responsive Workspace shell та стилі.
+- `examples/workspace/browser.ts` — browser composition, mount, telemetry та pagehide disposal.
+- `examples/workspace/ui.ts` — допоміжні функції для input bindings, форматування сум і повідомлень про помилки.
 
 ```text
-users.new-name / users.new-email
-  → users.add [action]
-    → users.create.remote → users.create [server] → users.repository
+users.create.submit.fields.name / users.create.submit.fields.email
+  → users.create.submit [action]
+    → users.create.submit.remote → users.create [server] → users.repository
     INVALIDATES → users.current → users.list [server]
 workspace.selected-user
-  → orders.current → orders.list [server] → auth.currentUser / orders.repository
-orders.new-product / orders.new-quantity
-  → orders.add → orders.create.remote → orders.create [server]
-    INVALIDATES → orders.current
-orders.current → orders.visible → orders.total → DOM bindings
+  → orders.list.query → orders.list [server] → auth.currentUser / orders.repository
+orders.create.submit.fields.product / orders.create.submit.fields.quantity
+  → orders.create.submit → orders.create.submit.remote → orders.create [server]
+    INVALIDATES → orders.list.query
+orders.list.query → orders.visible → DOM bindings підсумку
 ```
 
 Remote order requests використовують request-scoped Authorization header з поточним selected user. При зміні identity resource abort попередній запит; framework generation guard відкидає старий результат. Додатковий derived filter не показує попереднього користувача під час reload.
 
-View setup виконується один раз на mount. Input, totals, loading/errors і list/table regions оновлюються bindings. Таблиця й список використовують escaped HTML у property binding; keyed row reconciliation ще немає. Довільний user text екранується перед вставкою. Native form validation доповнюється server contract validation.
+ARC створює вузли прив’язок із TSX до mount. Bindings оновлюють поля вводу, підсумки, повідомлення та списки. `each` зберігає незмінні рядки таблиці замовлень за ID, а `bind:children` будує список користувачів із TSX; введені дані стають текстовими вузлами. Native form validation доповнюється server contract validation.
 
 Browser bundle містить shared contracts та UI, але не repositories, Node crypto чи request auth implementation. Compile перевіряє remote exposure і contract compatibility. REST `/users`, `/orders`, `/health` збережені; `/` тепер application UI. Browser telemetry й server traces видно в одному Stand graph.
 
 ## Перевірка
 
-`tests/workspace.test.ts` збирає фактичний root browser bundle та виконує його в isolated VM/Linkedom із real HTTP transport. Перевіряє створення користувача й замовлення, суму, duplicate email, escaping, пошук, identity switching, trace continuity, disposal та відсутність server implementation у browser manifest. Це integration coverage, не візуальна перевірка в реальному браузері.
+`tests/workspace.test.ts` збирає browser bundle Workspace та виконує його в isolated VM/Linkedom із real HTTP transport. Перевіряє створення користувача й замовлення, суму, duplicate email, escaping, пошук, identity switching, trace continuity, disposal та відсутність server implementation у browser manifest. Це integration coverage, не візуальна перевірка в реальному браузері.
 
 ## Як змінювати frontend
 
-Почніть із [покрокового frontend guide](web/writing-frontend.md). [Forms/events](web/forms-and-events.md) пояснює inputBindings, native submit, явний TRIGGERS і escaped list regions. [Lifecycle](web/lifecycle.md) описує mount панелей та ownership; [тести](web/testing.md) — перевірку feature без зовнішніх систем.
+Почніть із [покрокового frontend guide](web/writing-frontend.md). [Forms/events](web/forms-and-events.md) пояснює `bind:value`, `on:submit` і TSX-списки. [Lifecycle](web/lifecycle.md) описує mount панелей та ownership; [тести](web/testing.md) — перевірку feature без зовнішніх систем.
 
-Додаючи новий remote operation, змініть shared contract і server operation, явно дозвольте expose.web, додайте browser remoteClient/resource і graph dependency. Для нового поля форми задайте унікальний state ID, property/input bindings, включіть їх у view.bindings та викличте bind у setup. Для нового async mutation використовуйте action і invalidates замість ручного isLoading та повторного fetch у event callback.
+Для нового браузерного виклику оголосіть спільний контракт із `expose.web` і підключіть його на сервері. У формі опишіть поле в `remoteForm` і прив’яжіть його через `bind:value={fields.name}`. Додайте потрібний список у `refresh`, щоб ARC оновив його після успішного запиту.
 
-Стилі належать application src/styles.ts, а не framework. Shell навігація — anchor links до секцій, не SPA router. Немає повноцінного forms layer, keyed lists чи автоматичного CSS pipeline.
+Стилі належать application examples/workspace/styles.ts, а не framework. Shell навігація — anchor links до секцій, не SPA router. Форми використовують браузерні перевірки та серверні схеми, а `remoteForm` керує надсиланням і оновленням ресурсів.

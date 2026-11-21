@@ -8,7 +8,7 @@ Web tests не потребують зовнішньої DB чи справжн�
 npm run test:web       # tests/web-*.test.ts
 npm run test:fullstack # transport і browser-build tests навчальних прикладів
 node --conditions=arc-source --import tsx --test tests/workspace.test.ts
-npm test              # включає і root Workspace integration test
+npm test              # включає і Workspace integration test
 npm run typecheck
 npm run typecheck:core
 npm run build
@@ -54,12 +54,12 @@ quantity.dispose();
 [tests/workspace.test.ts](../../tests/workspace.test.ts):
 
 1. Створює fresh server application, compile/start.
-2. Збирає src/browser.ts через той самий buildWeb, що використовує CLI.
+2. Збирає examples/workspace/browser.ts через той самий buildWeb, що використовує CLI.
 3. Виконує bundle в isolated VM з Linkedom та real HTTP fetch.
 4. Створює користувача, вибирає його, створює замовлення і перевіряє суму.
 5. Перевіряє duplicate email, escaped user text, search і відсутність чужих orders після selection change.
 6. Зіставляє browser action trace з server orders.create, перевіряє teardown.
-7. Перевіряє, що browser manifest не містить src/users/index.ts і src/orders/index.ts.
+7. Перевіряє, що browser manifest не містить examples/workspace/users/server.ts і examples/workspace/orders/server.ts.
 
 HTTP server та temporary build output закриваються/видаляються у finally. Server createApp створює fresh repository state; browser bundle має власні state instances. Не перевикористовуйте disposed application singleton між tests.
 

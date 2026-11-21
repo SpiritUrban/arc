@@ -1,4 +1,4 @@
-# @arc/framework 0.3
+# @arc/framework
 
 ARC — executable architecture graph із contracts, operations, resources/capabilities, explicit needs/calls, dependency-ready runtime та Stand. Node.js 22.18+, ESM.
 
@@ -40,11 +40,15 @@ npm test
 npm run test:distribution
 ```
 
-Production CLI: `ARC_APP=dist/src/app.js node framework/arc.mjs start`. Після встановлення зібраного пакета в інший ESM-проєкт: `ARC_APP=src/app.js npx arc start`, де app.js default-export містить результат application(...).
+Production CLI: `ARC_APP=dist/examples/workspace/app.js node framework/arc.mjs start`. Після встановлення зібраного пакета в інший ESM-проєкт: `ARC_APP=src/app.js npx arc start`, де app.js default-export містить результат application(...).
+
+## TSX-шаблони
+
+Задайте `"jsx": "react-jsx"` і `"jsxImportSource": "@arc/framework/web"` у compiler options TypeScript. У файлі `.tsx` оголосіть view, наприклад `view({ id: "page", template: () => <main>Привіт!</main> })`. Динамічні значення та події підключайте через `bind:text={state}` і `on:click={action}`. ARC додає прив’язки до графа ще до mount, а потім використовує їх для оновлення DOM.
 
 ## Документація репозиторію
 
-[Посібник](../docs/README.md), [архітектура](../docs/architecture.md), [написання коду](../docs/writing-code.md), [API](../docs/api.md), [тести та Stand](../docs/testing-and-stand.md), [міграція 0.1 → 0.2](../docs/migration-0.2.md), [аудит і roadmap](../docs/audit/README.md).
+[Журнал змін](../CHANGELOG.md), [посібник](../docs/README.md), [архітектура](../docs/architecture.md), [написання коду](../docs/writing-code.md), [API](../docs/api.md), [тести та Stand](../docs/testing-and-stand.md), [міграція 0.1 → 0.2](../docs/migration-0.2.md), [аудит і roadmap](../docs/audit/README.md).
 
 Ці відносні посилання працюють у монорепозиторії. Каталог docs не входить у npm tarball; цей README містить standalone bootstrap, повний посібник зберігається в репозиторії ARC.
 
@@ -52,6 +56,6 @@ Production CLI: `ARC_APP=dist/src/app.js node framework/arc.mjs start`. Післ
 
 `@arc/framework/core` — neutral graph/contracts; `/server` — server; `/web` — fine-grained browser runtime; `/fullstack` — browser remote bridge; `/fullstack/server` і `/fullstack/build` — Node integration; `/stand` — tooling. Один physical package, підготовлений до майбутнього розділення. Browser build/dev потребує optional peer esbuild; server-only JS — ні.
 
-[Web](../docs/web/getting-started.md), [Fullstack](../docs/fullstack/overview.md), [IR v3 migration](../docs/migration-0.3.md). SSR/SSG/router/forms не реалізовані.
+[Web](../docs/web/getting-started.md), [Fullstack](../docs/fullstack/overview.md), [IR v3 migration](../docs/migration-0.3.md). `remoteForm` зв’язує поля й оновлення ресурсів із серверним контрактом, а `project` обчислює значення в TSX-прив’язці.
 
-Frontend посібники: [зміст ARC Web](../docs/web/README.md), [як писати feature](../docs/web/writing-frontend.md), [forms/events](../docs/web/forms-and-events.md), [lifecycle](../docs/web/lifecycle.md), [тести](../docs/web/testing.md). Кореневий application: [ARC Workspace](../docs/workspace-app.md).
+Frontend посібники: [зміст ARC Web](../docs/web/README.md), [як писати feature](../docs/web/writing-frontend.md), [forms/events](../docs/web/forms-and-events.md), [lifecycle](../docs/web/lifecycle.md), [тести](../docs/web/testing.md). Fullstack-приклад: [ARC Workspace](../docs/workspace-app.md).

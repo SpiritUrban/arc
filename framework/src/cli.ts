@@ -1,5 +1,7 @@
 import { pathToFileURL } from "node:url";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { Application } from "./core.js";
 import { handler, serve, closeServer } from "./http.js";
 import { stand } from "./stand.js";
@@ -69,11 +71,14 @@ if (["graph", "inspect", "build", "run"].includes(command)) {
   }
 } else {
   const servers: Awaited<ReturnType<typeof serve>>[] = [];
+  let webDir: string | undefined;
+  const removeWebBuild = () =>
+    webDir ? rm(webDir, { recursive: true, force: true }) : Promise.resolve();
   try {
-    let webDir: string | undefined;
     if (logical.webConfig()?.entry) {
       const { buildWeb } = await import("./fullstack/build.js");
-      webDir = (await buildWeb(logical)).outDir;
+      webDir = await mkdtemp(join(tmpdir(), "arc-web-"));
+      await buildWeb(logical, { outDir: webDir });
     }
     await host.start();
     const port = Number(process.env.PORT ?? 3000),
@@ -133,14 +138,23 @@ if (["graph", "inspect", "build", "run"].includes(command)) {
       } catch (error) {
         console.error(error);
         process.exitCode = 1;
+      } finally {
+        await removeWebBuild().catch((error) => {
+          console.error(error);
+          process.exitCode = 1;
+        });
       }
     };
     process.once("SIGINT", stop);
     process.once("SIGTERM", stop);
   } catch (error) {
     host.publish("application.stopping", "application");
-    await Promise.all(servers.map(closeServer));
-    await host.close();
+    try {
+      await Promise.all(servers.map(closeServer));
+      await host.close();
+    } finally {
+      await removeWebBuild();
+    }
     throw error;
   }
 }

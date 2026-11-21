@@ -22,6 +22,7 @@ import {
   errorStatus,
   type Result,
   type ErrorContracts,
+  type OperationContract,
   type OperationResult,
   type Fail,
 } from "./neutral/contracts.js";
@@ -96,6 +97,41 @@ export interface Operation<
   estimateMs?: number;
   budgetMs?: number;
 }
+type OperationDefinition<
+  I,
+  O,
+  N extends Needs,
+  E extends ErrorContracts,
+  C extends Calls,
+> = Omit<Operation<I, O, N, E, C>, "kind" | "needs" | "errors" | "calls"> & {
+  needs?: N;
+  errors?: E;
+  calls?: C;
+};
+type OperationImplementation<
+  I,
+  O,
+  N extends Needs,
+  E extends ErrorContracts,
+  C extends Calls,
+> = Omit<OperationDefinition<I, O, N, E, C>, keyof OperationContract>;
+
+export function operation<
+  I,
+  O,
+  const E extends ErrorContracts,
+  N extends Needs = {},
+  C extends Calls = {},
+>(
+  contract: OperationContract<I, O, E>,
+  implementation: OperationImplementation<
+    NoInfer<I>,
+    NoInfer<O>,
+    N,
+    NoInfer<E>,
+    C
+  >,
+): Operation<I, O, N, E, C>;
 export function operation<
   I,
   O,
@@ -103,19 +139,28 @@ export function operation<
   const E extends ErrorContracts = {},
   C extends Calls = {},
 >(
-  def: Omit<Operation<I, O, N, E, C>, "kind" | "needs" | "errors" | "calls"> & {
-    needs?: N;
-    errors?: E;
-    calls?: C;
-  },
+  def: OperationDefinition<I, O, N, E, C>,
+): Operation<I, O, N, E, C>;
+export function operation<
+  I,
+  O,
+  N extends Needs,
+  E extends ErrorContracts,
+  C extends Calls,
+>(
+  def: OperationDefinition<I, O, N, E, C> | OperationContract<I, O, E>,
+  implementation?: OperationImplementation<I, O, N, E, C>,
 ): Operation<I, O, N, E, C> {
+  const definition = implementation
+    ? { ...implementation, ...def }
+    : (def as OperationDefinition<I, O, N, E, C>);
   return Object.freeze({
     kind: "operation",
     runtime: "server",
     needs: {} as N,
     errors: {} as E,
     calls: {} as C,
-    ...def,
+    ...definition,
   });
 }
 export interface QueueDefinition {
@@ -143,22 +188,53 @@ import {
 export interface Route {
   method: string;
   path: string;
-  operation: Operation;
+  operation: Calls[string];
   status?: number;
 }
-export const http = Object.fromEntries(
-  ["get", "post", "put", "patch", "delete"].map((method) => [
-    method,
-    (
-      path: string,
-      operation: Operation,
-      options: { status?: number } = {},
-    ) => ({ method: method.toUpperCase(), path, operation, ...options }),
-  ]),
-) as Record<
-  "get" | "post" | "put" | "patch" | "delete",
-  (path: string, operation: Operation, options?: { status?: number }) => Route
->;
+type RouteOptions = { status?: number };
+
+function routeFor(method: string) {
+  function route<
+    I,
+    O,
+    const E extends ErrorContracts,
+    N extends Needs = {},
+    C extends Calls = {},
+  >(
+    path: string,
+    contract: OperationContract<I, O, E>,
+    implementation: OperationImplementation<
+      NoInfer<I>,
+      NoInfer<O>,
+      N,
+      NoInfer<E>,
+      C
+    > & RouteOptions,
+  ): Route;
+  function route(path: string, op: Route["operation"], options?: RouteOptions): Route;
+  function route<I, O, E extends ErrorContracts, N extends Needs, C extends Calls>(
+    path: string,
+    target: OperationContract<I, O, E> | Operation<I, O, N, E, C>,
+    options: (OperationImplementation<I, O, N, E, C> & RouteOptions) | RouteOptions = {},
+  ): Route {
+    if ("run" in target)
+      return { method, path, operation: target, ...options };
+
+    if (!("run" in options))
+      throw new TypeError("A route contract requires an implementation");
+    const { status, ...implementation } = options;
+    return { method, path, operation: operation(target, implementation), status };
+  }
+  return route;
+}
+
+export const http = {
+  get: routeFor("GET"),
+  post: routeFor("POST"),
+  put: routeFor("PUT"),
+  patch: routeFor("PATCH"),
+  delete: routeFor("DELETE"),
+};
 export const module = (def: {
   id: string;
   operations?: Operation[];

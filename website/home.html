@@ -1,8 +1,8 @@
 <main id="content">
   <section class="hero wrap">
     <div class="hero-copy">
-      <a class="release-pill" href="docs/migration-0.3.html"
-        ><span></span> ARC 0.3 · Server. Web. Fullstack. <b>↗</b></a
+      <a class="release-pill" href="docs/changelog.html"
+        ><span></span> ARC {{version}} · Server. Web. Fullstack. <b>↗</b></a
       >
       <h1>Один graph.<br />Увесь <span>застосунок.</span></h1>
       <p class="hero-description">
@@ -96,7 +96,7 @@
         ><span class="card-index">02 / WEB</span>
         <h3>Оновлюйте потрібне.</h3>
         <p>
-          State, derive та DOM bindings. View setup один раз; далі працює
+          State, derive та короткі TSX-прив’язки. DOM оновлює
           fine-grained dataflow без VDOM.
         </p>
         <span class="card-link">ARC Web <b>↗</b></span></a
@@ -163,12 +163,9 @@
         aria-labelledby="tab-server"
       >
         <div class="demo-file">
-          tasks.create.ts <button data-copy>Копіювати</button>
+          tasks/server.ts <button data-copy>Копіювати</button>
         </div>
-        <pre><code>const createTask = operation({
-  id: 'tasks.create',
-  input: CreateTaskInput,
-  output: Task,
+        <pre><code>const createTask = operation(CreateTask, {
   needs: { tasks: tasksRepository },
 
   async run({ input, tasks }) {
@@ -184,17 +181,13 @@
         hidden
       >
         <div class="demo-file">
-          counter.state.ts <button data-copy>Копіювати</button>
+          counter.page.tsx <button data-copy>Копіювати</button>
         </div>
-        <pre><code>const count = state({
-  id: 'counter.value',
-  initial: 0,
-});
+        <pre><code>const count = state({ id: 'counter.value', initial: 0 });
 
-const doubled = derive({
-  id: 'counter.doubled',
-  from: [count],
-  compute: n =&gt; n * 2,
+export const Counter = view({
+  id: 'counter.page',
+  template: () =&gt; &lt;p bind:text={project(count, n =&gt; n * 2)} /&gt;,
 });</code></pre>
       </div>
       <div
@@ -205,18 +198,17 @@ const doubled = derive({
         hidden
       >
         <div class="demo-file">
-          tasks.resource.ts <button data-copy>Копіювати</button>
+          tasks/page.tsx <button data-copy>Копіювати</button>
         </div>
         <pre><code>// ListTasks — shared operation contract
 const tasks = remote(ListTasks, {
   id: 'tasks.current',
 });
 
-const create = remoteClient(CreateTask, {
-  id: 'tasks.create.remote',
-});
-// У action.run передайте signal і trace:
-const result = await create.call(input, ctx);</code></pre>
+const { fields, submit } = remoteForm(CreateTask, {
+  fields: { title: textField() },
+  refresh: [tasks],
+});</code></pre>
       </div>
       <div class="demo-footer">
         <span>↳ typed contracts · explicit needs</span
@@ -231,7 +223,7 @@ const result = await create.call(input, ctx);</code></pre>
         ><span>ARCHITECTURE / ACTIVITY</span>
       </div>
       <div class="stand-mini-graph">
-        <span class="mini-node browser-mini">action <b>tasks.add</b></span
+        <span class="mini-node browser-mini">action <b>tasks.create.submit</b></span
         ><span class="mini-edge">remote ↓</span
         ><span class="mini-node server-mini">operation <b>tasks.create</b></span
         ><span class="mini-edge">needs ↓</span
@@ -286,7 +278,7 @@ const result = await create.call(input, ctx);</code></pre>
       >Get Started <span>→</span></a
     >
     <p>
-      ARC 0.3 — MVP.
+      ARC {{version}} у розробці.
       <a href="docs/audit/web-fullstack-report.html"
         >Можливості та обмеження ↗</a
       >

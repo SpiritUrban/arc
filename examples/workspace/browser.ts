@@ -1,20 +1,15 @@
-import { webApplication } from "@arc/framework/web";
+import { startWeb } from "@arc/framework/web";
 import { telemetryTransport } from "@arc/framework/fullstack";
-import { WorkspacePage } from "./page.ts";
-import { UsersPage } from "./users/page.ts";
-import { OrdersPage } from "./orders/page.ts";
+import { WorkspacePage } from "./page.tsx";
 import { styles } from "./styles.ts";
 document.title = "ARC Workspace — користувачі та замовлення";
 const style = document.createElement("style");
 style.textContent = styles;
 document.head.append(style);
+// Телеметрія пов’язує браузерні дії та зміни UI із серверними викликами в Stand.
 const telemetry = telemetryTransport();
-const app = webApplication({ nodes: [WorkspacePage], telemetry });
-app.compile();
-app.start();
-app.mount(WorkspacePage, document.querySelector("#app")!);
-app.mount(UsersPage, document.querySelector("#users")!);
-app.mount(OrdersPage, document.querySelector("#orders")!);
+const app = startWeb(WorkspacePage, document.querySelector("#app")!, { telemetry });
+// Коли браузер залишає сторінку, звільняємо підписки, стилі та транспорт телеметрії.
 window.addEventListener(
   "pagehide",
   () => {

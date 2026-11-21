@@ -4,13 +4,13 @@ Event binding створює trace ID; action отримує його, remote п
 
 ```text
 trace abc
-browser tasks.add
-  remote tasks.create.remote
+browser tasks.create.submit
+  remote tasks.create.submit.remote
     server tasks.create → tasks.repository
   tasks.current.invalidate
     remote tasks.current.remote
       server tasks.list → tasks.repository
-  tasks.current.data → tasks.list.text binding
+  tasks.current.data → текстова прив’язка у TasksPage
 ```
 
 Передавайте ctx.trace явно через async boundaries; ctx.set переносить trace на local state. Browser не має прихованого AsyncLocalStorage. Незв’язані програмні writes без trace можуть почати окрему activity.

@@ -1,8 +1,10 @@
-# Документація ARC 0.3
+# Документація ARC
+
+[Журнал змін і версій](../CHANGELOG.md)
 
 ARC — application graph framework/compiler для server, browser та fullstack applications. Операція містить контракт і бізнес-логіку, ресурси надають їй залежності, а HTTP, RPC та черга викликають операцію через спільний executor.
 
-Цей посібник описує **поточну реалізацію** в `framework/` і застосунок ARC Workspace у `src/`. Початкове обговорення ідей збережене в [`doc.md`](../doc.md); воно містить також можливості, які ще не реалізовані.
+Цей посібник описує **поточну реалізацію** в `framework/` і застосунок ARC Workspace у `examples/workspace/`. Початкове обговорення ідей збережене в [`doc.md`](../doc.md); воно містить також можливості, які ще не реалізовані.
 
 | Розділ                                   | Що ви дізнаєтесь                                                           |
 | ---------------------------------------- | -------------------------------------------------------------------------- |
@@ -12,11 +14,11 @@ ARC — application graph framework/compiler для server, browser та fullsta
 | [Довідник API](api.md)                   | Параметри публічних функцій, HTTP, RPC, черга і scheduler                  |
 | [Тести та Stand](testing-and-stand.md)   | Підміна залежностей, HTTP-тести, traces, навантаження та failure injection |
 
-Для кореневого застосунку почніть із [ARC Workspace](workspace-app.md). Для frontend: [Web index](web/README.md) → [як писати frontend](web/writing-frontend.md) → [форми](web/forms-and-events.md) → [тести](web/testing.md). Для backend: початок роботи → як писати server код → тести. Архітектура пояснює внутрішню модель, довідник допомагає знайти точний виклик API.
+Для прикладу з користувачами та замовленнями почніть із [ARC Workspace](workspace-app.md). Для frontend: [Web index](web/README.md) → [як писати frontend](web/writing-frontend.md) → [форми](web/forms-and-events.md) → [тести](web/testing.md). Для backend: початок роботи → як писати server код → тести. Архітектура пояснює внутрішню модель, довідник допомагає знайти точний виклик API.
 
 ## Приклади, які можна запустити
 
-- [`src/app.ts`](../src/app.ts) — основний fullstack застосунок ARC Workspace: користувачі та замовлення.
+- [`examples/workspace/app.ts`](../examples/workspace/app.ts) — основний fullstack застосунок ARC Workspace: користувачі та замовлення.
 - [`examples/tasks.ts`](examples/tasks.ts) — самодостатній приклад feature-модуля завдань.
 - [`examples/tasks.test.ts`](examples/tasks.test.ts) — тести прикладу без підняття HTTP-сервера.
 
@@ -28,7 +30,7 @@ ARC_APP=docs/examples/tasks.ts npx arc stand
 node --conditions=arc-source --import tsx --test docs/examples/tasks.test.ts
 ```
 
-Усі приклади використовують ESM та імпорти з `@arc/framework`. У кореневому застосунку й навчальних прикладах відносні TypeScript-імпорти мають `.ts`; compiler переписує їх у JS build. Усередині `framework/src/` використовуються NodeNext-імпорти `.js`, які працюють і в source development, і в compiled package/declarations. Production import пакета веде на compiled ESM.
+Усі приклади використовують ESM та імпорти з `@arc/framework`. У прикладах відносні TypeScript-імпорти мають `.ts`; compiler переписує їх у JS build. Усередині `framework/src/` використовуються NodeNext-імпорти `.js`, які працюють і в source development, і в compiled package/declarations. Production import пакета веде на compiled ESM.
 
 [Звіт розширення ARC 0.3](audit/web-fullstack-report.md), [історичний аудит 0.2](audit/README.md), [IR v3 migration](migration-0.3.md).
 
@@ -45,6 +47,6 @@ node --conditions=arc-source --import tsx --test docs/examples/tasks.test.ts
 
 Server посібники зберігають приклади root imports; browser code використовує package subpaths.
 
-[ARC Workspace: як запустити та як влаштований кореневий проєкт](workspace-app.md).
+[ARC Workspace: як запустити та як влаштований fullstack-приклад](workspace-app.md).
 
 [Публічний сайт ARC: окремий проєкт website/, уроки та GitHub Pages](website.md).

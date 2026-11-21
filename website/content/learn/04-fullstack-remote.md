@@ -19,8 +19,7 @@ Server додає implementation:
 ```ts
 import { operation, ok } from "@arc/framework/server";
 import { Hello } from "./contract.ts";
-export const hello = operation({
-  ...Hello,
+export const hello = operation(Hello, {
   run: ({ input }) => ok(`Привіт, ${input.name}!`),
 });
 ```
@@ -28,15 +27,21 @@ export const hello = operation({
 Browser імпортує descriptor, не implementation:
 
 ```ts
-import { remoteClient } from "@arc/framework/fullstack";
-import { action } from "@arc/framework/web";
+import { remoteForm, textField } from "@arc/framework/fullstack";
 import { Hello } from "./contract.ts";
-const client = remoteClient(Hello, { id: "hello.remote" });
-export const greet = action({
-  id: "hello.action",
-  needs: { client },
-  run: (_, ctx) => client.call({ name: "ARC" }, ctx),
+
+export const { fields, submit: greet } = remoteForm(Hello, {
+  fields: { name: textField("ARC") },
 });
+```
+
+У TSX підключіть дію і поле безпосередньо до HTML:
+
+```tsx
+<form on:submit={greet}>
+  <input aria-label="Ім’я" bind:value={fields.name} required />
+  <button type="submit" bind:disabled={greet.running}>Привітатися</button>
+</form>
 ```
 
 Зареєструйте hello в server application.operations, а browser view/action — у web.nodes; web.entry задає browser bootstrap. CLI обслуговує internal transport та frontend з одного origin. Для читання server data використовуйте remote(Hello,{id,input}), який надає data/loading/error/stale.
@@ -47,11 +52,11 @@ expose.web має бути true на server operation. Browser descriptor не �
 
 ## Result, а не лише exception
 
-Remote result відрізняє success, business_error, fault та cancelled. Codes і optional details беруться з contract. Action може повертати цей Result та invalidates потрібні resources після success.
+Remote result відрізняє success, business_error, fault та cancelled. Codes і optional details беруться з contract. Форма надає відповідь через `greet.result`. Для перезавантаження пов’язаних списків після успіху задайте `refresh`.
 
 ```text
-hello.action [browser]
-  → hello.remote [browser]
+hello.submit [browser]
+  → hello.submit.remote [browser]
     REMOTE_CALLS → hello [server]
 ```
 
@@ -59,4 +64,4 @@ Shared schema не означає shared secrets або runtime values. Server r
 
 ## Результат уроку
 
-Ви зв’язали browser action із server operation без дублювання DTO/endpoint path. Повний код: examples/fullstack-tasks/; більший застосунок: src/.
+Ви зв’язали browser action із server operation без дублювання DTO/endpoint path. Повний код: examples/fullstack-tasks/; більший приклад: examples/workspace/.

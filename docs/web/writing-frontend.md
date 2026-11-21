@@ -1,110 +1,88 @@
 # Як писати frontend на ARC
 
-Цей посібник показує підхід кореневого [ARC Workspace](../workspace-app.md), а не новий паралельний frontend framework. Код application лежить у `src/`, framework implementation — у `framework/`.
+Цей посібник використовує [приклад ARC Workspace](../workspace-app.md) з `examples/workspace/`. Реалізація фреймворку лежить у `framework/`.
 
 ## 1. Оберіть власника даних
 
 | Потреба                                     | Primitive            | Приклад Workspace                                     |
 | ------------------------------------------- | -------------------- | ----------------------------------------------------- |
-| Поле форми, search, вибраний користувач     | state                | users.new-name, users.search, workspace.selected-user |
-| Фільтр, сума, знайдений активний користувач | derive               | users.filtered, orders.total, users.active            |
-| Дані із server/external API                 | remote / webResource | users.current, orders.current                         |
-| Mutation або user command                   | action               | users.add, orders.add                                 |
-| DOM та listeners                            | view / binding       | users.page, orders.table.rows                         |
+| Поле форми, search, вибраний користувач     | state                | users.create.submit.fields.name, users.search, workspace.selected-user |
+| Фільтр, видимі замовлення, активний користувач | derive               | users.filtered, orders.visible, users.active            |
+| Дані із server/external API                 | remote / webResource | users.current, orders.list.query                         |
+| Mutation або user command                   | action               | users.create.submit, orders.create.submit                                 |
+| DOM та listeners                            | view / binding       | users.page, `each(visibleOrders, …)`                         |
 
-Не зберігайте копію remote list у додатковому state без окремої потреби. Не запускайте fetch із derive.compute чи view.setup: load належить resource, mutation — action.
+Не зберігайте копію remote list у додатковому state без окремої потреби. Не запускайте fetch із `derive.compute` чи `view.template`: load належить resource, mutation — action.
 
 ## 2. Розміщуйте код за feature
 
 ```text
-src/
+examples/workspace/
+  user-selection.ts # вибраний користувач і віддалений список
   users/
     contracts.ts   # browser-safe schemas і operation descriptors
-    index.ts       # server repository, operation, module, REST
-    page.ts        # browser state, resource, action, view
+    server.ts       # server repository, operation, module, REST
+    page.tsx        # browser state, resource, action, view
   orders/
     contracts.ts
-    index.ts
-    page.ts
+    server.ts
+    page.tsx
+  auth.ts          # серверний користувач поточного запиту
   app.ts           # один logical application graph
   browser.ts       # browser runtime та mounts
-  page.ts          # Workspace shell
+  page.tsx          # Workspace shell
   styles.ts        # application CSS
-  ui.ts            # невеликі helpers для bindings/errors/escaping
+  ui.ts            # невеликі helpers для bindings і повідомлень про помилки
 ```
 
 Це структура прикладу, а не compiler convention. Runtime визначає node kind/metadata, не ім’я директорії. Shared contracts не повинні імпортувати server repositories чи secrets.
 
 ## 3. Використовуйте спільний contract
 
-[users/contracts.ts](../../src/users/contracts.ts) експортує User, ListUsers та CreateUser. Server [users/index.ts](../../src/users/index.ts) створює `operation({...CreateUser, needs, run})`; browser імпортує тільки descriptor. Не дублюйте URL, DTO чи business error enum.
+[users/contracts.ts](../../examples/workspace/users/contracts.ts) експортує User, ListUsers та CreateUser. Server [users/server.ts](../../examples/workspace/users/server.ts) створює `operation(CreateUser, { needs, run })`; browser імпортує тільки descriptor. Не дублюйте URL, DTO чи business error enum.
+
+Сервер відкриває браузерний виклик через `expose: { web: true }` у контракті. REST-маршрут можна оголосити окремо або створити разом з операцією через `http.post(path, contract, implementation)`, як у [замовленнях](../../examples/workspace/orders/server.ts).
+
+## 4. Опишіть форму та її результат
 
 ```ts
-import { remote, remoteClient } from "@arc/framework/fullstack";
-import { ListUsers, CreateUser } from "./contracts.ts";
+import { remoteForm, textField } from "@arc/framework/fullstack";
+import { CreateUser } from "./contracts.ts";
+import { selectedUser, usersData } from "../user-selection.ts";
 
-const usersData = remote(ListUsers, { id: "users.current" });
-const create = remoteClient(CreateUser, { id: "users.create.remote" });
-```
-
-Server descriptor має `expose: { web: true }`. Реєстрація browser remote сама не відкриває server operation. Публічний REST route для internal transport не потрібний.
-
-## 4. Оголошуйте state, derived values та action
-
-```ts
-import { state, derive, action } from "@arc/framework/web";
-
-const name = state({ id: "users.new-name", initial: "" });
-const email = state({ id: "users.new-email", initial: "" });
-const search = state({ id: "users.search", initial: "" });
-const filtered = derive({
-  id: "users.filtered",
-  from: [usersData.data, search],
-  compute: (users, query) =>
-    (users ?? []).filter((user) =>
-      `${user.name} ${user.email}`.toLowerCase().includes(query.toLowerCase()),
-    ),
-});
-const add = action({
-  id: "users.add",
-  needs: { name, email, create },
-  invalidates: [usersData],
-  async run(_, ctx) {
-    const result = await create.call(
-      {
-        name: name.get().trim(),
-        email: email.get().trim(),
-      },
-      ctx,
-    );
-    if (result.ok) {
-      ctx.set(name, "");
-      ctx.set(email, "");
-    }
-    return result;
+const { fields, submit: addUser } = remoteForm(CreateUser, {
+  fields: { name: textField(), email: textField() },
+  needs: [selectedUser],
+  refresh: [usersData],
+  onSuccess(user, ctx) {
+    ctx.set(selectedUser, user.id);
   },
 });
 ```
 
-Це скорочений варіант реального feature; у Workspace action також змінює selectedUser. `needs` описує graph dependencies: compiler не читає JS closures. `invalidates` додає graph relation і reload після success; business error не очищує поля й не запускає success invalidation. `ctx` передає signal та trace через remote boundary; `ctx.set` пов’язує state update із interaction trace.
+`remoteForm` створює стан полів, дію та endpoint у графі. `refresh` оновлює список після успіху. `onSuccess` отримує типізовану відповідь і змінює вибір користувача. `needs` показує цю залежність у Stand. Локальний пошук використовує окремий `state` і `derive` від завантажених користувачів.
 
-Для synchronous пов’язаних writes використовуйте batch. Після await кілька ctx.set можуть бути згруповані explicit batch, якщо потрібна одна transaction; глобальна transaction не тримається відкритою під час network.
+## 5. Оголосіть шаблон і прив’язки
 
-## 5. Створіть bindings і view
+```tsx
+<form on:submit={addUser}>
+  <label>Ім’я <input required bind:value={fields.name} /></label>
+  <label>Email <input required type="email" bind:value={fields.email} /></label>
+  <button type="submit" bind:disabled={addUser.running}>Додати користувача</button>
+</form>
+```
 
-[Views](views.md) описує всі binding types; [форми](forms-and-events.md) — двосторонні input та submit. View збирає DOM один раз, `bind(binding, element)` підключає reactive updates. Bindings повинні бути оголошені у view.bindings.
-
-Для application state не створюйте новий state на кожний callback/render. Один node object є одним instance. Для незалежних copies feature створюйте factory з унікальними IDs і явним ownership.
+ARC створює вузли директив ще до монтування. На сторінці замовлень `project` обчислює кількість і суму в JSX, а `visibleOrders` лишається спільним джерелом для підсумку й таблиці. [Посібник про шаблони](views.md)
 
 ## 6. Підключіть logical graph і browser runtime
 
-У [app.ts](../../src/app.ts) server composition містить:
+У [app.ts](../../examples/workspace/app.ts) server composition містить:
 
 ```ts
-web: { nodes: [WorkspacePage], entry: "src/browser.ts" }
+web: { nodes: [WorkspacePage], entry: "examples/workspace/browser.ts" }
 ```
 
-WorkspacePage.needs посилається на UsersPage та OrdersPage, тому compiler знаходить їх транзитивно. У [browser.ts](../../src/browser.ts):
+WorkspacePage.needs посилається на UsersPage та OrdersPage, тому compiler знаходить їх транзитивно. У [browser.ts](../../examples/workspace/browser.ts):
 
 ```ts
 const app = webApplication({ nodes: [WorkspacePage], telemetry });

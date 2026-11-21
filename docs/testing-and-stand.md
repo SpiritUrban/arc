@@ -1,4 +1,4 @@
-# Тести та ARC Stand 0.3
+# Тести та ARC Stand
 
 [← Зміст](README.md)
 
@@ -159,10 +159,10 @@ POST потребує application/json та same Origin, якщо Origin пер�
 
 Сторінка standalone API не виконує compile/start сама: перед `stand(app, options)` скомпілюйте й активуйте application. При програмному завершенні SSE можна зупинити `app.publish("application.stopping", "application")` перед очікуванням `closeServer`; CLI це вже робить.
 
-## ARC Web / Fullstack 0.3
+## ARC Web / Fullstack
 
 Цей розділ описує server API. Browser та fullstack: [Web guide](web/getting-started.md), [remote contracts](fullstack/remote-operations.md), [Stand graph і interaction traces](stand/README.md). Поточний unified IR має version 3; IR v2 приклади аудиту 0.2 є історичними.
 
-## Тести frontend кореневого проєкту
+## Тести frontend Workspace
 
 [Web testing guide](web/testing.md) розрізняє reactive unit, DOM/lifecycle та real-HTTP integration tests. npm test включає tests/workspace.test.ts; test:web і test:fullstack мають вужчі списки. Workspace test перевіряє browser bundle, create-user/order flow, duplicate email, identity isolation, escaping, trace та teardown. Він не є visual browser test.

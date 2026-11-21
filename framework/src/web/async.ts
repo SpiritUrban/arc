@@ -207,6 +207,7 @@ export interface Action<I, O> extends Readable<ActionSnapshot<O>> {
   error: Readable<unknown>;
   result: Readable<O | undefined>;
   execute(input: I, ctx?: { trace?: TraceToken }): Promise<O>;
+  submitForm?(form: HTMLFormElement, ctx: { trace: TraceToken }): Promise<O>;
   activate(telemetry?: WebTelemetry): void;
 }
 export interface ActionContext {

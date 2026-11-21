@@ -1,4 +1,4 @@
-# Початок роботи з ARC 0.3
+# Початок роботи з ARC
 
 [← Зміст](README.md) · [Міграція 0.1 → 0.2](migration-0.2.md)
 
@@ -12,7 +12,7 @@ npm run dev:workspace
 
 Application: http://localhost:3000; Stand: http://localhost:3100; OpenAPI: http://localhost:3000/openapi.json.
 
-`framework/` — окремий workspace @arc/framework; `src/` — кореневий application із users/orders. Код фреймворку не імпортує application. Навчальний feature приклад: `docs/examples/tasks.ts`.
+`framework/` — окремий workspace @arc/framework; `examples/workspace/` — fullstack-приклад із користувачами та замовленнями. Код фреймворку не імпортує application. Навчальний feature приклад: `docs/examples/tasks.ts`.
 
 ## Lifecycle та зміна з 0.1
 
@@ -47,12 +47,12 @@ CLI сам викликає compile і start для start/stand/run; graph/inspe
 Native JS production entrypoint:
 
 ```sh
-ARC_APP=dist/src/app.js node framework/arc.mjs start
+ARC_APP=dist/examples/workspace/app.js node framework/arc.mjs start
 ```
 
-Ця команда використовує compiled server ESM без tsx. Для Workspace CLI також збирає browser assets з налаштованого web.entry: потрібні esbuild та доступний src/browser.ts із його imports. Це поточний CLI flow, а не standalone deployment готових static assets без source. Development скрипти використовують condition `arc-source`, щоб приклад і тести імпортували саме source workspace. За замовчуванням package import веде на `framework/dist/index.js`, types — на `.d.ts`. Після зміни коду перед перевіркою compiled CLI повторіть build.
+Ця команда використовує compiled server ESM без tsx. Для Workspace CLI також збирає browser assets з налаштованого web.entry: потрібні esbuild та доступний examples/workspace/browser.ts із його imports. Це поточний CLI flow, а не standalone deployment готових static assets без source. Development скрипти використовують condition `arc-source`, щоб приклад і тести імпортували саме source workspace. За замовчуванням package import веде на `framework/dist/index.js`, types — на `.d.ts`. Після зміни коду перед перевіркою compiled CLI повторіть build.
 
-`ARC_APP` типовий src/app.ts (від cwd), PORT — 3000, STAND_PORT — 3100. Для TypeScript entrypoint Node 22.18+ підтримує erasable syntax; для іншого TS-синтаксису застосунку використовуйте dev script або compiled JS. CLI пакета не залежить від tsx.
+Скрипти репозиторію за замовчуванням використовують `examples/workspace/app.ts`. Для прямого запуску CLI `ARC_APP` за замовчуванням вказує на `src/app.ts` від поточної теки. Типові порти — 3000 для застосунку і 3100 для Stand. Для TypeScript entrypoint Node 22.18+ підтримує erasable syntax; для іншого TS-синтаксису застосунку використовуйте dev script або compiled JS. CLI пакета не залежить від tsx.
 
 ```sh
 PORT=4000 STAND_PORT=4100 npm run dev:workspace
@@ -92,10 +92,10 @@ import { application, operation, s, ok } from "@arc/framework";
 
 ## Три runtime режими
 
-`npm run dev:workspace` запускає кореневий fullstack ARC Workspace, `npm run dev:web-counter` — pure Web counter, `npm run dev:fullstack-tasks` — Tasks. Запускайте ці застосунки по одному, бо вони використовують спільний каталог збірки `.arc/web`; PORT змінює application port, STAND_PORT — Stand. Web та internal transport мають один origin.
+`npm run dev:workspace` запускає fullstack-приклад ARC Workspace, `npm run dev:web-counter` — pure Web counter, `npm run dev:fullstack-tasks` — Tasks. Для одночасного запуску задайте різні `PORT` і `STAND_PORT` для кожного застосунку. Web та internal transport мають один origin.
 
-`npm run build:app` збирає кореневий frontend; `npm run build:web` / `npm run build:fullstack` створюють browser assets навчальних прикладів у .arc/web. CLI `arc dev` compile/build/start/serve і відкриває Stand; це basic build на старті, без watch/HMR. [Web guide](web/getting-started.md), [Fullstack guide](fullstack/overview.md).
+`npm run build:app` збирає frontend Workspace; `npm run build:web` / `npm run build:fullstack` створюють browser assets навчальних прикладів у .arc/web. CLI `arc dev` compile/build/start/serve і відкриває Stand; це basic build на старті, без watch/HMR. [Web guide](web/getting-started.md), [Fullstack guide](fullstack/overview.md).
 
-Деталі кореневого UI та його graph: [ARC Workspace](workspace-app.md). Root `npm run build` включає browser build.
+Деталі UI Workspace та його graph: [ARC Workspace](workspace-app.md). Root `npm run build` включає browser build.
 
 Frontend розробка: [зміст](web/README.md), [feature guide](web/writing-frontend.md), [forms](web/forms-and-events.md), [lifecycle](web/lifecycle.md), [тести](web/testing.md).

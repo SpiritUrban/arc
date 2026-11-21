@@ -1,35 +1,121 @@
-# Views та bindings
+# TSX-шаблони та bindings
 
-MVP використовує imperative DOM builder, без JSX/template compiler та VDOM.
+Пишіть HTML у файлах `.tsx`. У `template` поверніть один кореневий HTML-елемент. У ньому позначте реактивні значення через `bind:…`, а дії через `on:…`.
 
-```ts
-import { state, binding, view, mount } from "@arc/framework/web";
+```tsx
+import { state, action, view } from "@arc/framework/web";
+
 const count = state({ id: "counter.value", initial: 0 });
-const text = binding({ id: "counter.text", type: "text", sources: [count] });
-const page = view({
-  id: "counter.page",
-  bindings: [text],
-  setup({ document, bind }) {
-    const span = document.createElement("span");
-    bind(text, span);
-    return span;
+const increment = action({
+  id: "counter.increment",
+  needs: { count },
+  run(_, ctx) {
+    ctx.set(count, count.get() + 1);
   },
 });
-const instance = mount(page, document.querySelector("#app")!);
-count.set(1); // тільки text binding
-instance.unmount();
+
+export const Counter = view({
+  id: "counter.page",
+  template: () => (
+    <section>
+      <p>Лічильник: <strong bind:text={count} /></p>
+      <button type="button" on:click={increment}>Додати</button>
+    </section>
+  ),
+});
 ```
 
-Binding types: text, property, attribute, event, visible. sources — явні readable dependencies; name задає property/attribute/event name, format перетворює source values. Для event задайте handler (action або callback(event,trace)) та необов’язкове input значення. Помилки event handler перехоплюються як binding.error telemetry.
+Коли викликається `view()`, ARC виконує функцію шаблону й створює вузли bindings. Вони доступні в графі та Stand ще до монтування. DOM створюється окремо для кожного mount. Шаблон має бути чистим. Дані, які змінюються, передавайте через bindings, бо вираз `{count.get()}` прочитає значення лише під час оголошення view.
 
-View setup виконується один раз на mount. IR містить binding nodes та BINDS source → binding; view залежить від bindings. `needs` додає явні graph dependencies, `owned` задає nodes, які треба активувати/звільнити разом із view. Instance scope знімає listeners/subscriptions і прибирає DOM на unmount; application dispose також unmount усі instances.
+## Налаштування TypeScript
 
-Приклад Tasks показує двосторонній input через окремі property та input-event bindings. Список MVP відображається text formatter; keyed list reconciliation не реалізований.
+У `tsconfig.json` задайте ARC як JSX runtime:
 
-## Workspace: composition і списки
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "@arc/framework/web"
+  }
+}
+```
 
-Кореневий [shell](../../src/page.ts) через needs оголошує UsersPage та OrdersPage. [Browser entry](../../src/browser.ts) спочатку mount shell, потім обидві feature views у створені targets; залежність view у graph сама не створює її DOM.
+ARC CLI використовує esbuild для браузерної збірки. Якщо graph entrypoint імпортує `.tsx`, використовуйте TSX-завантажувач під час розробки або скомпілюйте застосунок у JavaScript перед запуском Node.
 
-Workspace list/table bindings використовують property=innerHTML з application escapeHTML helper для кожного динамічного рядка. Це оновлення одного region, без keyed reconciliation. Для plain text використовуйте text binding; framework не санітизує довільний innerHTML. Деталі [forms/events та списків](forms-and-events.md).
+## Директиви
 
-[Ownership і cleanup](lifecycle.md), [DOM tests](testing.md), [frontend feature guide](writing-frontend.md).
+| Директива | Що приймає та робить |
+| --- | --- |
+| `bind:text` | Читає state або derive й оновлює текст |
+| `bind:value` | Синхронізує текстове значення поля з writable string state через два вузли, property та input event |
+| `bind:disabled` | Оновлює DOM-властивість `disabled` із реактивного boolean |
+| `bind:visible` | Керує видимістю через властивість `hidden` |
+| `bind:children` | Замінює вміст контейнера реактивними TSX-елементами або текстом |
+| `on:click`, `on:submit` та інші `on:…` | Підписуються на DOM-подію та викликають функцію або ARC action без аргументів |
+
+`on:submit` скасовує стандартну навігацію та ігнорує повторний submit, поки дія виконується. У Stand дія з’єднана з event-вузлом ребром `TRIGGERS`; залежності даних видно через `BINDS`.
+
+Директиви прикріплюйте до елементів основного шаблону. Для `bind:children` можна повертати фрагменти й масиви елементів; при оновленні ARC замінює вміст контейнера. Події зі змінних рядків можна делегувати через binding на цьому контейнері. [Форми й списки](forms-and-events.md)
+
+## Реактивний текст і обчислення
+
+```tsx
+import { project } from "@arc/framework/web";
+
+<p>Замовлень: {project(visibleOrders, (orders) => orders.length)}</p>
+```
+
+Передайте стан або похідне значення як дочірній вираз JSX, наприклад `<p>Кількість: {count}</p>`. ARC створить окремий текстовий вузол і оновлюватиме його значення. `project(source, format)` обчислює текст із явно вказаного джерела. Його також приймають `bind:text`, `bind:children`, `bind:disabled` та `bind:visible`. Stand показує ребро `BINDS` від джерела до елемента шаблону. Для спільного похідного значення використовуйте `derive`, а для двостороннього `bind:value` — writable string state.
+
+Для умов, списків і обчислень із кількох джерел використовуйте `render(() => …)`.
+
+```tsx
+{render(() => users.get().map((user) => (
+  <button type="button" on:click={(_, { set }) => set(selectedUser, user.id)}>
+    {user.name}
+  </button>
+)))}
+```
+
+ARC відстежує виклики `.get()` під час обчислення і замінює вміст ділянки при змінах. Обробники рядків очищаються разом із ділянкою. `set` із контексту події передає trace залежним оновленням. Stand показує ділянку як один вузол, а джерела, доступні лише через callback, можна підключити до статичного графа через `view.needs`.
+
+## Списки зі стабільними ключами
+
+`each(source, { key, render, empty })` зберігає DOM незмінених рядків. Джерелом може бути реактивне значення або функція, що читає кілька значень через `.get()`. `empty` задає необов’язковий елемент для порожнього списку.
+
+У рядку можна використовувати `on:click`, реактивний текст, `bind:class`, `bind:aria-…` та `bind:data-…`. ARC оновлює прив’язки на наявному елементі й прибирає підписки та обробники, коли рядок видаляється. Stand записує події рядків під вузлом списку. Джерела, які читає лише функція списку, можна включити до статичного графа через `view.needs`.
+
+## Локальний стан
+
+Задайте початкові значення через `state`, а поля використовуйте в шаблоні.
+
+```tsx
+const SearchPage = view({
+  id: "search.page",
+  state: () => ({ search: "" }),
+  template: ({ search }) => <input type="search" bind:value={search} />,
+});
+```
+
+ARC викликає ініціалізатор під час побудови графа й для кожного монтування, тож тримайте його без побічних ефектів. Кожен екземпляр отримує власні значення. Під час демонтажу ARC очищає їхні підписки, а Stand використовує стабільний ID `search.page.state.search`.
+
+## Вкладені view
+
+Вставте оголошений view як дочірній елемент статичного TSX-шаблону.
+
+```tsx
+const WorkspacePage = view({
+  id: "workspace.page",
+  template: () => <main>{UsersPage}{OrdersPage}</main>,
+});
+```
+
+ARC додає вкладені view до графа з шаблону, монтує їх разом із батьківським view і очищає їхні підписки під час демонтажу. У браузерній точці входу імпортуйте `startWeb` з `@arc/framework/web` і викличте `startWeb(WorkspacePage, target)`. Повернений застосунок має метод `dispose()`.
+
+## Явні bindings
+
+Для нестандартного DOM-обробника оголосіть `binding()` і передайте його через `bind={binding}` у шаблоні. ARC додасть його до графа разом із вузлами директив.
+
+Якщо view вже передає власний список `bindings`, він підтримує старий сценарій, у якому шаблон виконується на mount і використовує `bind={…}`. Для переходу на директиви приберіть цей список. Низькорівневий `setup({ document, scope, bind })` доступний для інтеграцій із прямим доступом до DOM.
+
+[Життєвий цикл](lifecycle.md) · [Повний приклад Counter](../../examples/web-counter/page.tsx)

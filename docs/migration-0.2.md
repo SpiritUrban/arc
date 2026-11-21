@@ -40,7 +40,7 @@ npm run dev
 За замовчуванням `@arc/framework` експортує compiled ESM `dist/index.js` та declarations. Production JS не потребує tsx:
 
 ```sh
-ARC_APP=dist/src/app.js node framework/arc.mjs start
+ARC_APP=dist/examples/workspace/app.js node framework/arc.mjs start
 ```
 
 Development-скрипти монорепозиторію використовують `--conditions=arc-source --import tsx`. Не змішуйте source та compiled copies фреймворку в одному bootstrap: CLI перевіряє Application через instanceof, а схемам також потрібна узгоджена копія класу Schema. Для власного app дотримуйтесь одного public import `@arc/framework` та одного режиму запуску.

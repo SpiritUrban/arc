@@ -5,6 +5,7 @@ import { createTasksApp, getTask, tasksRepository } from "./tasks.ts";
 
 const id = "00000000-0000-4000-8000-000000000001";
 
+// provide підставляє тестове сховище для однієї операції.
 test("operation: repository can be replaced without HTTP", async () => {
   const result = await testOperation(getTask)
     .provide(tasksRepository, {
@@ -16,6 +17,7 @@ test("operation: repository can be replaced without HTTP", async () => {
   assert.deepEqual(result, error("TASK_NOT_FOUND"));
 });
 
+// handler приймає стандартний Request, тому маршрути можна перевірити без відкриття порту.
 test("application: created task can be read over HTTP", async () => {
   const app = createTasksApp();
   await app.compile();

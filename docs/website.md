@@ -55,6 +55,6 @@ Google Sites — інший продукт і не є звичайним хос�
 
 Site tests перевіряють усі generated local routes/assets/anchors під repository prefix, documents search index, Get Started, code escaping і client interactions (tabs/search/theme/copy/mobile toggle). HTTP smoke перевіряє статичні відповіді. VM/Linkedom tests не підтверджують visual rendering у реальному браузері.
 
-Сайт має український текст і поточні ARC 0.3 API. SSR/SSG runtime targets ARC не стають реалізованими від появи цього сайту: website build — окремий static generator. Немає user accounts, CMS, server search, analytics, HMR чи ARC backend deployment.
+Сайт має український текст і поточний API ARC. SSR/SSG runtime targets ARC не стають реалізованими від появи цього сайту: website build — окремий static generator. Немає user accounts, CMS, server search, analytics, HMR чи ARC backend deployment.
 
 Підсвітка синтаксису генерується під час build через highlight.js: TypeScript/JavaScript, JSON, shell, HTML/XML, CSS та YAML. Для Markdown code blocks задавайте мову після opening fence (ts, js, json, sh тощо); text і невідомі мови лишаються escaped plain text. Source pages визначають мову за розширенням. У browser не завантажується highlighter або CDN; Copy повертає початковий текст, теми мають окремі token colors.

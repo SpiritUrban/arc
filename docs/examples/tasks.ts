@@ -4,6 +4,7 @@ import {
   http,
   module,
   operation,
+  operationContract,
   resource,
   s,
   ok,
@@ -16,8 +17,10 @@ export const Task = s.object({
   title: s.string({ min: 1, max: 200 }),
   done: s.boolean(),
 });
+// Тип TypeScript виводиться зі схеми Task, яка також використовується для перевірки даних.
 export type Task = Infer<typeof Task>;
 
+// open створює сховище у пам’яті. Операції отримують його через needs.
 export const tasksRepository = resource({
   id: "tasks.repository",
   scope: "application",
@@ -37,13 +40,19 @@ export const tasksRepository = resource({
   },
 });
 
-export const createTask = operation({
+const CreateTask = operationContract({
   id: "tasks.create",
   input: s.object({ title: s.string({ min: 1, max: 200 }) }),
   output: Task,
+});
+
+const createTaskRoute = http.post("/tasks", CreateTask, {
+  status: 201,
   needs: { tasks: tasksRepository },
   run: ({ input, tasks }) => ok(tasks.create(input.title)),
 });
+
+export const createTask = createTaskRoute.operation;
 
 export const getTask = operation({
   id: "tasks.get",
@@ -57,13 +66,11 @@ export const getTask = operation({
   },
 });
 
+// Модуль об’єднує операції та вказує, які HTTP-маршрути їх викликають.
 export const tasks = module({
   id: "tasks",
-  operations: [createTask, getTask],
-  routes: [
-    http.post("/tasks", createTask, { status: 201 }),
-    http.get("/tasks/:id", getTask),
-  ],
+  operations: [getTask],
+  routes: [createTaskRoute, http.get("/tasks/:id", getTask)],
 });
 
 export function createTasksApp() {

@@ -1,69 +1,28 @@
 # Input, events та форми
 
-ARC поки не має forms framework, JSX `bind:value` чи form() API. Workspace використовує звичайний HTML form, native constraints та явні ARC bindings. Server contract validation залишається остаточною перевіркою даних.
+Workspace використовує HTML-форми в TSX, вбудовані обмеження браузера та ARC bindings. Остаточну перевірку даних виконує серверний контракт.
 
-## Двосторонній input
+## Поля та submit
 
 ```ts
-import { state, binding } from "@arc/framework/web";
-
-const name = state({ id: "profile.name", initial: "" });
-const value = binding({
-  id: "profile.name.value",
-  type: "property",
-  name: "value",
-  sources: [name],
-});
-const edit = binding({
-  id: "profile.name.edit",
-  type: "event",
-  name: "input",
-  sources: [name],
-  handler(event, trace) {
-    name._trace = trace;
-    name.set((event.target as HTMLInputElement).value);
-  },
+const { fields, submit: addUser } = remoteForm(CreateUser, {
+  fields: { name: textField(), email: textField() },
+  refresh: [usersData],
 });
 ```
 
-У view.setup прив’яжіть обидва bindings до того самого input. Property binding переносить state у DOM; event callback переносить DOM value у state. `_trace` — низькорівневе поле поточного runtime для continuity, яке використовує [src/ui.ts](../../src/ui.ts); всередині action використовуйте ctx.set. String input зберігає також проміжні значення, наприклад порожню кількість, а action перетворює quantity у Number перед contract validation.
-
-## Submit та observable action state
-
-Для звичайного button click binding може напряму мати `handler: addUser`; тоді graph автоматично отримує action dependency і TRIGGERS. `input` — фіксоване значення для action.execute, не mapper.
-
-Для native form потрібно preventDefault. Callback приховує action від статичного closure analysis, тому Workspace явно додає graph relation:
-
-```ts
-const submit = binding({
-  id: "users.submit",
-  type: "event",
-  name: "submit",
-  sources: [],
-  handler(event, trace) {
-    event.preventDefault();
-    if (!addUser.running.get()) {
-      return addUser.execute(undefined, { trace });
-    }
-  },
-});
-submit.dependencies = [...(submit.dependencies ?? []), addUser];
-submit.relations = [
-  ...(submit.relations ?? []),
-  { to: addUser, kind: "TRIGGERS" },
-];
-
-const disabled = binding({
-  id: "users.submit.disabled",
-  type: "property",
-  name: "disabled",
-  sources: [addUser.running],
-});
+```tsx
+<form on:submit={addUser}>
+  <label>Ім’я <input required bind:value={fields.name} /></label>
+  <button type="submit" bind:disabled={addUser.running}>
+    Додати користувача
+  </button>
+</form>
 ```
 
-bind(submit, form), bind(disabled, submitButton). Return Promise з handler, щоб framework міг перехопити rejection як binding.error telemetry. Додаткова перевірка running у callback блокує повторний submit навіть до наступної DOM propagation.
+`bind:value={fields.name}` записує значення state у поле й оновлює state на події `input`. Значення DOM-поля є рядком. У формі замовлень `integerField(1)` перетворює рядок на число перед запитом. Ціле значення та межі перевіряє серверна схема.
 
-Input constraints у Workspace: required, minlength/maxlength, type=email, quantity min=1/max=100/step=1. Native validation не є authorization чи заміною server schema. Помилки load/mutation відображаються окремими text bindings у role=alert; loading — окремим status binding.
+`on:submit={addUser}` скасовує стандартну навігацію й одночасно допускає лише один submit цієї дії. `bind:disabled` показує цей стан у DOM. Подія, дія і серверний виклик зберігають спільний trace.
 
 ## Typed business error
 
@@ -82,10 +41,21 @@ if (result.ok) {
 }
 ```
 
-У Workspace action повертає цей Result; action.error і resource.error читає `failureMessage` helper. Raw server exceptions не показуються в UI. Errors з optional details schema також типізуються contract union.
+У Workspace `remoteForm` надає цей результат через `submit.result`, а `failureMessage` перетворює `submit.error` або помилку ресурсу на повідомлення. Raw server exceptions не показуються в UI. Errors з optional details schema також типізуються contract union.
 
-## Списки та безпечне відображення
+## Списки
 
-`type: "text"` пише textContent і підходить для довільного user text. Workspace list/table використовує property binding name=innerHTML: helper escapeHTML екранує кожне динамічне string значення до інтерполяції. ARC не санітизує довільний innerHTML автоматично. Статичні шаблони view.setup не містять user input.
+```tsx
+<tbody>
+  {each(visibleOrders, {
+    key: (order) => order.id,
+    render: (order) => <tr><td>{order.product}</td></tr>,
+  })}
+</tbody>
+```
 
-List region замінюється як одне binding, без повторного view setup; keyed row reconciliation немає. Event delegation на стабільному контейнері з closest('[data-user]') дає вибирати нові rows без ручного додавання listener до кожного елемента. Handler змінює selectedUser, а derived selection і orders resource реагують через graph.
+`each` з `@arc/framework/web` створює одну прив’язку до джерела списку. Кожен елемент має унікальний ключ і повертає один HTML-елемент. ARC зберігає DOM незмінних елементів, вставляє нові й замінює змінені. Для звичайних об’єктів порівнюються значення їхніх полів. Шаблон елемента читає дані зі свого аргументу, а події можна делегувати через контейнер.
+
+`bind:children={rows}` підходить для вмісту, який зручно замінити цілком. Рядкові значення в обох випадках стають текстовими вузлами.
+
+У [списку користувачів](../../examples/workspace/users/page.tsx) контейнер також має `bind={select}`. Цей явний binding знаходить натиснутий рядок через `closest("[data-user]")` і змінює `selectedUser`.

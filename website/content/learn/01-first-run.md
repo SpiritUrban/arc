@@ -26,7 +26,7 @@ Repositories тут in-memory: перезапуск server скине зміни
 ## Розберіться зі структурою
 
 - framework/ — бібліотека ARC, яку використовує application.
-- src/ — основний fullstack Workspace.
+- examples/workspace/ — fullstack-приклад Workspace із користувачами та замовленнями.
 - examples/fullstack-tasks/ — окремий малий Tasks application.
 - website/ — цей статичний сайт. Він не виконує ARC server operations.
 

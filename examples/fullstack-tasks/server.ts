@@ -1,10 +1,12 @@
 import { resource, operation, ok } from "@arc/framework/server";
-import { ListTasks, CreateTask, type Task } from "./contracts.ts";
+import { ListTasks, CreateTask, Task } from "./contracts.ts";
+// Сховище створюється в open і тримає задачі в пам’яті до зупинки застосунку.
+// instrument вказує ARC, виклики яких методів фіксувати в трасуванні.
 const tasksRepository = resource({
   id: "tasks.repository",
   instrument: ["list", "create"],
   open() {
-    const tasks: { id: string; title: string }[] = [];
+    const tasks: ReturnType<typeof Task.parse>[] = [];
     return {
       async list() {
         return [...tasks];
@@ -18,15 +20,15 @@ const tasksRepository = resource({
     };
   },
 });
-export const listTasks = operation({
-  ...ListTasks,
+// Сервер додає реалізацію run до спільного контракту. ARC передає ресурс tasks через needs.
+export const listTasks = operation(ListTasks, {
   needs: { tasks: tasksRepository },
   async run({ tasks }) {
     return ok(await tasks.list());
   },
 });
-export const createTask = operation({
-  ...CreateTask,
+// fail повертає очікувану бізнес-помилку, оголошену в контракті.
+export const createTask = operation(CreateTask, {
   needs: { tasks: tasksRepository },
   async run({ input, tasks, fail }) {
     const task = await tasks.create(input.title);

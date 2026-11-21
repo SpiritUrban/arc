@@ -51,3 +51,19 @@ export function webApplication(options: {
     },
   };
 }
+
+export function startWeb(
+  root: View,
+  target: Element,
+  options: { telemetry?: WebTelemetry } = {},
+) {
+  const app = webApplication({ nodes: [root], telemetry: options.telemetry });
+  try {
+    app.start();
+    app.mount(root, target);
+    return app;
+  } catch (error) {
+    app.dispose();
+    throw error;
+  }
+}

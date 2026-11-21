@@ -1,11 +1,13 @@
 # 03. State, derive і живий DOM
 
-ARC Web не потребує ARC Server. Оголосіть local state, derived value та binding; setup view виконається лише раз на mount.
+ARC Web не потребує ARC Server. Оголосіть local state, derived value та дію. ARC створить вузли DOM-прив’язок за директивами в TSX.
 
 ## Counter view
 
-```ts
-import { state, derive, action, binding, view } from "@arc/framework/web";
+Збережіть приклад у `counter.tsx`. Налаштування JSX runtime ARC наведено в [посібнику про шаблони](../../../docs/web/views.md).
+
+```tsx
+import { state, derive, action, project, view } from "@arc/framework/web";
 
 const count = state({ id: "lesson.count", initial: 0 });
 const doubled = derive({
@@ -20,27 +22,14 @@ const increment = action({
     ctx.set(count, count.get() + 1);
   },
 });
-const text = binding({
-  id: "lesson.text",
-  type: "text",
-  sources: [doubled],
-  format: (n) => `Подвоєне значення: ${n}`,
-});
-const click = binding({
-  id: "lesson.click",
-  type: "event",
-  sources: [],
-  handler: increment,
-});
 export const Counter = view({
   id: "lesson.counter",
-  bindings: [text, click],
-  setup({ document, bind }) {
-    const button = document.createElement("button");
-    bind(text, button);
-    bind(click, button);
-    return button;
-  },
+  template: () => (
+    <section>
+      <p>Подвоєне значення: <strong>{project(doubled, (value) => String(value))}</strong></p>
+      <button type="button" on:click={increment}>Додати</button>
+    </section>
+  ),
 });
 ```
 
@@ -50,7 +39,7 @@ export const Counter = view({
 
 ```ts
 import { webApplication } from "@arc/framework/web";
-import { Counter } from "./counter.ts";
+import { Counter } from "./counter.tsx";
 const app = webApplication({ nodes: [Counter] });
 app.compile();
 app.start();
@@ -66,7 +55,9 @@ window.addEventListener("pagehide", () => app.dispose(), { once: true });
 click → increment → count → doubled → text binding
 ```
 
-State writes групуються в microtask batch. Спочатку scheduler обчислює affected derived nodes, потім bindings. View setup не запускається заново. Для кількох synchronous writes можна використати batch; після await потрібен окремий batch.
+`project` форматує значення прямо в прив’язці. Джерело видно в графі. Окремий `derive` підходить для обчислення, яке можна використати в кількох місцях.
+
+State writes групуються в microtask batch. Спочатку scheduler обчислює affected derived nodes, потім bindings. TSX-шаблон повторно не виконується. Для кількох synchronous writes можна використати batch; після await потрібен окремий batch.
 
 ## Результат уроку
 

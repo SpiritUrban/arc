@@ -112,7 +112,7 @@ test("external web resource works with normal fetch without ARC backend", async 
   resource.dispose();
 });
 
-test("canonical compiled browser bundle clicks Add across actual HTTP and joins interaction telemetry", async () => {
+test("canonical compiled browser bundle submits Tasks across actual HTTP and joins interaction telemetry", async () => {
   const vm = await import("node:vm"),
     { parseHTML } = await import("linkedom");
   const { serve, closeServer } = await import("../framework/src/http.ts");
@@ -169,7 +169,9 @@ test("canonical compiled browser bundle clicks Add across actual HTTP and joins 
     const input = document.querySelector("input")!;
     input.value = "Network task";
     input.dispatchEvent(new window.Event("input"));
-    document.querySelector("button")!.dispatchEvent(new window.Event("click"));
+    document
+      .querySelector("form")!
+      .dispatchEvent(new window.Event("submit", { cancelable: true }));
     await waitFor(() =>
       document.querySelector("pre")!.textContent.includes("Network task"),
     );

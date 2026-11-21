@@ -14,10 +14,10 @@ Graph/inspect не відкривають application resources. В IR v3 є bro
 ## Виконайте interaction
 
 ```sh
-npm run dev
+npm run dev:workspace
 ```
 
-У Workspace створіть замовлення. Відкрийте Stand :3100, застосуйте Frontend/Backend/Boundaries filters та знайдіть interaction за trace ID. Browser action, remote call, server operation і binding updates можуть належати одному logical trace.
+У Workspace створіть замовлення. Відкрийте Stand :3100, виберіть вузол `orders.create.submit` і простежте стрілки. Для огляду скористайтеся кнопкою «Увесь граф», а щоб побачити лише віддалені виклики, виберіть Boundaries. Знайдіть виконання за trace ID. Browser action, remote call, server operation і binding updates можуть належати одному logical trace.
 
 Remote duration включає transport/server overhead; це не точне окреме вимірювання network latency. Browser telemetry призначене для development debugging, не production distributed tracing.
 
@@ -31,7 +31,7 @@ npm run build
 npm run test:distribution
 ```
 
-Root build компілює framework/server ESM і browser bundle Workspace. Для Tasks використовуйте npm run build:fullstack, для Counter — npm run build:web. Кожний browser build перезаписує .arc/web.
+Root build компілює framework/server ESM і browser bundle Workspace. Для Tasks використовуйте npm run build:fullstack, для Counter — npm run build:web. Окремі команди збірки записують файли в `.arc/web`. Запущені CLI застосунки використовують власні тимчасові збірки.
 
 ## Прочитайте integration test
 
@@ -39,6 +39,6 @@ tests/workspace.test.ts виконує зібраний frontend через real
 
 ## Куди рухатися далі
 
-Читайте документацію про actions/resources, lifecycle і runtime boundaries. SSR, SSG, router, forms framework, advanced cache та optimistic mutations поки не реалізовані; не будуйте приклад із припущенням, що вони вже є.
+Читайте про [форми та оновлення ресурсів](../../../docs/fullstack/remote-operations.md), [життєвий цикл](../../../docs/web/lifecycle.md) і [межі браузерної збірки](../../../docs/fullstack/runtime-boundaries.md).
 
 Ви завершили introductory course. Спробуйте додати нову feature до Workspace: почніть із contract та operation, потім resource/action, bindings і integration test.

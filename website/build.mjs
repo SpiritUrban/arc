@@ -4,6 +4,9 @@ import { resolve, relative, dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 export const siteDir = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(siteDir, "..");
+const { version } = JSON.parse(
+  await readFile(join(repo, "framework/package.json"), "utf8"),
+);
 export const escape = (value) =>
   String(value).replace(
     /[&<>"']/g,
@@ -35,6 +38,7 @@ const route = (file) => {
   if (path.endsWith(".md") && path.startsWith("docs/"))
     return path.replace(/README\.md$/, "index.html").replace(/\.md$/, ".html");
   if (path === "README.md") return "project.html";
+  if (path === "CHANGELOG.md") return "docs/changelog.html";
   return "source/" + path + ".html";
 };
 const navigation = [
@@ -94,13 +98,14 @@ const navigation = [
   [
     "ПРО ПРОЄКТ",
     [
+      ["docs/changelog.html", "Журнал змін"],
       ["docs/migration-0.3.html", "Міграція на IR v3"],
       ["docs/audit/web-fullstack-report.html", "Стан реалізації"],
     ],
   ],
 ];
 function header(root, current = "") {
-  return `<a class="skip-link" href="#content">До вмісту</a><header class="header"><div class="header-inner"><a class="logo" href="${root}index.html" aria-label="ARC головна"><span class="logo-mark">Λ</span>arc<span class="logo-period">.</span></a><span class="version">v0.3</span><nav aria-label="Головна навігація"><a ${current.startsWith("docs/") ? 'aria-current="page"' : ""} href="${root}docs/getting-started.html">Документація</a><a ${current.startsWith("learn/") ? 'aria-current="page"' : ""} href="${root}learn/index.html">Уроки</a><a href="${root}docs/workspace-app.html">Приклади</a></nav><div class="header-actions"><button class="search-open" data-search-open><span>⌕</span> Пошук <kbd>/</kbd></button><button class="theme-toggle" data-theme-toggle aria-label="Змінити колірну тему">◐</button><a class="small-cta" href="${root}docs/getting-started.html">Get Started <span>↗</span></a><button class="menu-toggle" data-menu-toggle aria-label="Відкрити навігацію" aria-expanded="false">☰</button></div></div></header>`;
+  return `<a class="skip-link" href="#content">До вмісту</a><header class="header"><div class="header-inner"><a class="logo" href="${root}index.html" aria-label="ARC головна"><span class="logo-mark">Λ</span>arc<span class="logo-period">.</span></a><span class="version">v${escape(version)}</span><nav aria-label="Головна навігація"><a ${current.startsWith("docs/") ? 'aria-current="page"' : ""} href="${root}docs/getting-started.html">Документація</a><a ${current.startsWith("learn/") ? 'aria-current="page"' : ""} href="${root}learn/index.html">Уроки</a><a href="${root}docs/workspace-app.html">Приклади</a></nav><div class="header-actions"><button class="search-open" data-search-open><span>⌕</span> Пошук <kbd>/</kbd></button><button class="theme-toggle" data-theme-toggle aria-label="Змінити колірну тему">◐</button><a class="small-cta" href="${root}docs/getting-started.html">Get Started <span>↗</span></a><button class="menu-toggle" data-menu-toggle aria-label="Відкрити навігацію" aria-expanded="false">☰</button></div></div></header>`;
 }
 function shell({
   title,
@@ -109,7 +114,7 @@ function shell({
   root = "./",
   description = "ARC — application graph framework/compiler для server, browser та fullstack applications.",
 }) {
-  return `<!doctype html><html lang="uk"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${escape(description)}"><meta name="theme-color" content="#10141c"><title>${escape(title)} · ARC</title><link rel="icon" href="${root}assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="${root}assets/style.css"><script src="${root}assets/site.js" defer data-root="${root}"></script></head><body>${header(root, current)}${body}<footer class="footer"><a class="logo" href="${root}index.html">arc<span class="logo-period">.</span></a><p>Application architecture. Made executable.</p><a href="${root}docs/audit/web-fullstack-report.html">MVP 0.3 · що вже працює ↗</a></footer><dialog class="search-dialog" aria-labelledby="search-title"><div class="search-top"><h2 id="search-title">Знайти в документації</h2><button data-search-close aria-label="Закрити пошук">×</button></div><input type="search" placeholder="State, operation, remote…" aria-label="Пошуковий запит" autocomplete="off"><div class="search-results" aria-live="polite"><p>Введіть назву або поняття.</p></div><span class="search-hint">Esc — закрити · усе працює без backend</span></dialog></body></html>`;
+  return `<!doctype html><html lang="uk"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${escape(description)}"><meta name="theme-color" content="#10141c"><title>${escape(title)} · ARC</title><link rel="icon" href="${root}assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="${root}assets/style.css"><script src="${root}assets/site.js" defer data-root="${root}"></script></head><body>${header(root, current)}${body}<footer class="footer"><a class="logo" href="${root}index.html">arc<span class="logo-period">.</span></a><p>Application architecture. Made executable.</p><a href="${root}docs/changelog.html">Журнал змін</a></footer><dialog class="search-dialog" aria-labelledby="search-title"><div class="search-top"><h2 id="search-title">Знайти в документації</h2><button data-search-close aria-label="Закрити пошук">×</button></div><input type="search" placeholder="State, operation, remote…" aria-label="Пошуковий запит" autocomplete="off"><div class="search-results" aria-live="polite"><p>Введіть назву або поняття.</p></div><span class="search-hint">Esc — закрити · усе працює без backend</span></dialog></body></html>`;
 }
 function sidebar(root, current) {
   return `<aside class="docs-sidebar" aria-label="Розділи документації">${navigation.map(([label, links]) => `<section><h2>${label}</h2>${links.map(([url, label]) => `<a href="${root}${url}" ${url === current ? 'aria-current="page"' : ""}>${label}</a>`).join("")}</section>`).join("")}</aside>`;
@@ -131,6 +136,7 @@ export async function buildSite(outDir = join(siteDir, "dist")) {
     ...(await walk(join(repo, "docs"))).filter((f) => f.endsWith(".md")),
     ...(await walk(join(siteDir, "content"))).filter((f) => f.endsWith(".md")),
     join(repo, "README.md"),
+    join(repo, "CHANGELOG.md"),
   ];
   const pages = new Map();
   const sources = new Map();
@@ -267,7 +273,7 @@ export async function buildSite(outDir = join(siteDir, "dist")) {
       const idx = lessons.findIndex(([url]) => url === page.url);
       pager = `<nav class="lesson-pager" aria-label="Порядок уроків">${idx > 0 ? `<a href="${root}${lessons[idx - 1][0]}">← ${lessons[idx - 1][1]}</a>` : "<span></span>"}${idx < lessons.length - 1 ? `<a href="${root}${lessons[idx + 1][0]}">${lessons[idx + 1][1]} →</a>` : `<a href="${root}docs/web/index.html">До документації →</a>`}</nav>`;
     }
-    const body = `<div class="docs-layout">${sidebar(root, page.url)}<main class="article" id="content"><div class="article-kicker">${lesson ? "ARC / ПОСЛІДОВНИЙ КУРС" : "ARC / ДОКУМЕНТАЦІЯ"}</div>${rendered.html}${pager}<div class="article-note">${lesson ? "Навчальний матеріал ARC 0.3" : "Побудовано з " + escape(relative(repo, file)) + " · source of truth — код і contracts"}</div></main><aside class="toc"><h2>НА ЦІЙ СТОРІНЦІ</h2>${rendered.toc.map((h) => `<a class="level-${h.level}" href="#${escape(h.id)}">${escape(h.text)}</a>`).join("")}</aside></div>`;
+    const body = `<div class="docs-layout">${sidebar(root, page.url)}<main class="article" id="content"><div class="article-kicker">${lesson ? "ARC / ПОСЛІДОВНИЙ КУРС" : "ARC / ДОКУМЕНТАЦІЯ"}</div>${rendered.html}${pager}<div class="article-note">${lesson ? "Навчальний матеріал ARC" : "Побудовано з " + escape(relative(repo, file)) + " · source of truth — код і contracts"}</div></main><aside class="toc"><h2>НА ЦІЙ СТОРІНЦІ</h2>${rendered.toc.map((h) => `<a class="level-${h.level}" href="#${escape(h.id)}">${escape(h.text)}</a>`).join("")}</aside></div>`;
     await mkdir(dirname(join(outDir, page.url)), { recursive: true });
     await writeFile(
       join(outDir, page.url),
@@ -299,19 +305,21 @@ export async function buildSite(outDir = join(siteDir, "dist")) {
     join(outDir, "index.html"),
     shell({
       title: "Один graph. Увесь застосунок.",
-      body: (await readFile(join(siteDir, "home.html"), "utf8")).replace(
-        /<pre><code>([\s\S]*?)<\/code><\/pre>/g,
-        (_, html) => {
-          const code = html
-            .replace(/<[^>]+>/g, "")
-            .replace(
-              /&(lt|gt|amp|quot|#39);/g,
-              (_, entity) =>
-                ({ lt: "<", gt: ">", amp: "&", quot: '"', "#39": "'" })[entity],
-            );
-          return `<pre>${highlightCode(code, "typescript")}</pre>`;
-        },
-      ),
+      body: (await readFile(join(siteDir, "home.html"), "utf8"))
+        .replaceAll("{{version}}", escape(version))
+        .replace(
+          /<pre><code>([\s\S]*?)<\/code><\/pre>/g,
+          (_, html) => {
+            const code = html
+              .replace(/<[^>]+>/g, "")
+              .replace(
+                /&(lt|gt|amp|quot|#39);/g,
+                (_, entity) =>
+                  ({ lt: "<", gt: ">", amp: "&", quot: '"', "#39": "'" })[entity],
+              );
+            return `<pre>${highlightCode(code, "typescript")}</pre>`;
+          },
+        ),
     }),
   );
   const cards = navigation.find(([x]) => x === "УРОКИ")[1];

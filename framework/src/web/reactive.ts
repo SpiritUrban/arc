@@ -13,6 +13,19 @@ export interface Writable<T> extends Readable<T> {
 }
 const dirty = new Set<Computed<any>>(),
   notifications = new Set<() => void>();
+let activeReads: Set<Readable<unknown>> | undefined;
+
+export function trackReads<T>(read: () => T) {
+  const previous = activeReads;
+  const sources = new Set<Readable<unknown>>();
+  activeReads = sources;
+  try {
+    return { value: read(), sources };
+  } finally {
+    activeReads = previous;
+  }
+}
+
 let scheduled = false,
   depth = 0,
   flushing = false;
@@ -87,7 +100,10 @@ export function state<T>(def: {
     metadata: { scope: def.scope ?? "application" },
     _children: new Set(),
     _listeners: new Set(),
-    get: () => value,
+    get() {
+      activeReads?.add(node);
+      return value;
+    },
     set(next) {
       if (disposed) throw new Error(`Disposed state: ${def.id}`);
       if (!Object.is(next, value)) {
@@ -156,7 +172,16 @@ export function derive<const D extends readonly Readable<any>[], T>(def: {
       }
     },
     get() {
-      if (node.dirty) node.recompute();
+      const previous = activeReads;
+      previous?.add(node);
+      if (node.dirty) {
+        activeReads = undefined;
+        try {
+          node.recompute();
+        } finally {
+          activeReads = previous;
+        }
+      }
       return value!;
     },
     subscribe(fn) {

@@ -6,6 +6,8 @@ export const Task = s.object({
 export const CreateTaskInput = s.object({
   title: s.string({ min: 1, max: 120 }),
 });
+// Контракти містять схеми входу, виходу та помилок. Їх імпортують браузер і сервер.
+// expose.web дозволяє браузеру викликати операцію через внутрішній транспорт ARC.
 export const ListTasks = operationContract({
   id: "tasks.list",
   expose: { web: true },
