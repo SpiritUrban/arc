@@ -1,13 +1,13 @@
 // @arc reactive-jsx
 // Браузерна частина замовлень. Зміна користувача оновлює список,
 // а надсилання форми викликає серверну операцію створення.
-import { derive, each, project, view } from "@arc/framework/web";
-import { integerField, remoteApi, textField } from "@arc/framework/fullstack";
+import { derive, each, project, view, type Signal } from "@arc/framework/web";
+import { remoteApi } from "@arc/framework/fullstack";
 import { ListOrders, CreateOrder } from "./contracts.ts";
 import { selectedUser, activeUser } from "../user-selection.ts";
 import { money, failureMessage } from "../ui.ts";
 
-function renderOrdersPage() {
+function renderOrdersPage(quantity: Signal<string>) {
   return (
     <section class="orders-panel">
       <div class="summary-grid">
@@ -47,7 +47,7 @@ function renderOrdersPage() {
               required
               maxlength="100"
               placeholder="Наприклад, блокнот ARC"
-              bind:value={createOrder.fields.product}
+              name="product"
             />
           </label>
           <div class="quantity-field">
@@ -61,7 +61,7 @@ function renderOrdersPage() {
                 min="1"
                 max="100"
                 step="1"
-                bind:value={createOrder.fields.quantity}
+                bind:value={quantity}
                 aria-invalid={createOrder.invalid("quantity")}
               />
             </label>
@@ -79,7 +79,7 @@ function renderOrdersPage() {
         <div class="form-footer">
           <span>
             Підсумок{" "}
-            <strong data-preview>{orderPreview}</strong>
+            <strong data-preview>{money((Number(quantity()) || 0) * 25)}</strong>
           </span>
           <span>Для вибраного користувача</span>
         </div>
@@ -154,10 +154,6 @@ export const ordersData = orderClient.query(ListOrders);
 
 // CreateOrder — спільний контракт. На сервері його реалізує маршрут createOrder у ./server.ts.
 export const createOrder = orderClient.mutation(CreateOrder, {
-  fields: {
-    product: textField(),
-    quantity: integerField(1),
-  },
   refresh: [ordersData],
 });
 
@@ -166,12 +162,6 @@ export const visibleOrders = derive({
   id: "orders.visible",
   from: [ordersData.data, selectedUser],
   compute: (orders, id) => (orders ?? []).filter((o) => o.userId === id),
-});
-
-const orderPreview = derive({
-  id: "orders.preview",
-  from: [createOrder.fields.quantity],
-  compute: (q) => money((Number(q) || 0) * 25),
 });
 
 const history = {
@@ -195,5 +185,6 @@ const history = {
 
 export const OrdersPage = view({
   id: "orders.page",
-  template: renderOrdersPage,
+  state: () => ({ quantity: "1" }),
+  template: ({ quantity }) => renderOrdersPage(quantity),
 });

@@ -3,6 +3,7 @@ import {
   type BusinessError,
 } from "../neutral/contracts.js";
 import { ValidationError, type Infer } from "../schema.js";
+import { formValue } from "../web/form-value.js";
 import {
   browserEvent,
   identity,
@@ -173,17 +174,24 @@ type RemoteForm<C extends OperationContract, Field extends string> = {
 };
 
 type NamedSubmission = {
-  values: Record<string, string>;
-  reset(): void;
+  values: Record<string, string | number>;
+  reset(ctx: ActionContext): void;
 };
 
-function readNamedSubmission(form: HTMLFormElement): NamedSubmission {
+function readNamedSubmission(
+  form: HTMLFormElement,
+  numericFields: ReadonlySet<string>,
+): NamedSubmission {
   const entries = new FormData(form);
-  const values = Object.create(null) as Record<string, string>;
+  const values = Object.create(null) as NamedSubmission["values"];
   for (const [name, value] of entries) {
     if (typeof value !== "string" || Object.hasOwn(values, name))
       throw new TypeError(`Expected one text value for form field ${name}`);
-    values[name] = value.trim();
+    const text = value.trim();
+    values[name] =
+      numericFields.has(name) && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)
+        ? Number(text)
+        : text;
   }
 
   const fields = Array.from(form.elements).filter(
@@ -191,16 +199,23 @@ function readNamedSubmission(form: HTMLFormElement): NamedSubmission {
       (element.localName === "input" || element.localName === "textarea") &&
       entries.has((element as HTMLInputElement).name),
   );
-  const snapshots = fields.map((field) => ({ field, value: field.value }));
+  const snapshots = fields.map((field) => {
+    const binding = formValue(field);
+    return { field, value: field.value, binding, stateValue: binding?.state.get() };
+  });
   return {
     values,
-    reset() {
-      for (const { field, value } of snapshots) {
-        if (
-          field.form === form &&
-          field.value === value &&
-          entries.get(field.name) === value
-        ) field.value = field.defaultValue;
+    reset(ctx) {
+      for (const { field, value, binding, stateValue } of snapshots) {
+        if (field.form !== form || field.value !== value ||
+            entries.get(field.name) !== value || formValue(field) !== binding) continue;
+        if (binding) {
+          if (binding.state.get() !== stateValue) continue;
+          ctx.set(binding.state, binding.initial);
+          field.value = binding.initial;
+        } else {
+          field.value = field.defaultValue;
+        }
       }
     },
   };
@@ -264,6 +279,12 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     onSuccess,
   } = options;
   const fieldOptions = options.fields;
+  const properties = callable && !fieldOptions ? contract.input.json.properties : undefined;
+  const numericFields = new Set(
+    Object.entries<{ type?: string }>(properties ?? {})
+      .filter(([, schema]) => schema.type === "number" || schema.type === "integer")
+      .map(([name]) => name),
+  );
   const names = Object.keys(fieldOptions ?? {}) as Field[];
   const definitions = names.map((name) => {
     const field = fieldOptions![name];
@@ -293,7 +314,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     ),
     invalidates: refresh,
     async run(form, ctx) {
-      const submission = form && readNamedSubmission(form);
+      const submission = form && readNamedSubmission(form, numericFields);
       const values = Object.fromEntries(
         names.map((name) => [name, fields[name].get()]),
       ) as Record<Field, string>;
@@ -317,7 +338,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
             if (fields[name].get() === values[name])
               ctx.set(fields[name], initial);
           }
-          submission?.reset();
+          submission?.reset(ctx);
           onSuccess?.(result.value, ctx);
         });
       }

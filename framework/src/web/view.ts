@@ -7,6 +7,7 @@ import {
   type WebTelemetry,
 } from "../neutral/protocol.js";
 import type { Action } from "./async.js";
+import { registerFormValue } from "./form-value.js";
 import {
   attributeReader,
   boundChild,
@@ -77,6 +78,7 @@ export interface Binding extends GraphDefinition {
   format?: (...values: any[]) => unknown;
   readAttribute?: () => unknown;
   submitRunning?: Readable<boolean>;
+  formValue?: Writable<string>;
   list?: KeyedList;
   block?: RenderBlock;
   handler?:
@@ -318,7 +320,7 @@ function directive(id: string, name: string, value: unknown): Binding[] {
       if (transform || typeof field.set !== "function")
         throw new TypeError("bind:value expects writable string state");
       return [
-        binding({ id, type: "property", name: "value", sources: [field] }),
+        binding({ id, type: "property", name: "value", sources: [field], formValue: field }),
         binding({
           id: `${id}.input`,
           type: "event",
@@ -710,6 +712,7 @@ export function mount(
       return;
     }
     if (b.type === "property" && b.name === "disabled") boundDisabled.add(element);
+    if (b.formValue) scope.add(registerFormValue(element, b.formValue));
     const update = () => {
       if (scope.disposed) return;
       const start = performance.now(),

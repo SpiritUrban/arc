@@ -129,15 +129,20 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       document.querySelector("[data-user]")!.textContent!,
       /Demo User/,
     );
-    const userForm = document.querySelector("#users form")!;
-    const userFields = Array.from(userForm.querySelectorAll<HTMLInputElement>("input[name]"));
-    Object.defineProperty(userForm, "elements", { value: userFields });
-    for (const field of userFields) {
-      Object.defineProperties(field, {
-        form: { value: userForm },
-        defaultValue: { value: "" },
-      });
+    function formFields(selector: string) {
+      const form = document.querySelector(selector)!;
+      const fields = Array.from(form.querySelectorAll<HTMLInputElement>("input[name]"));
+      Object.defineProperty(form, "elements", { value: fields });
+      for (const field of fields) {
+        Object.defineProperties(field, {
+          form: { value: form },
+          defaultValue: { value: "" },
+        });
+      }
+      return fields;
     }
+    const userFields = formFields("#users form");
+    formFields("#orders form");
     input("[data-name]", "x");
     input("[data-email]", "new@example.com");
     submit("#users form");
@@ -201,6 +206,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     );
     const quantity = document.querySelector<HTMLInputElement>("[data-quantity]")!;
     assert.equal(quantity.value, "1");
+    assert.match(document.querySelector("[data-preview]")!.textContent!, /25/);
     input("[data-product]", "Rejected product");
     input("[data-quantity]", "0");
     submit("#orders form");
