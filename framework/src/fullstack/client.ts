@@ -496,6 +496,12 @@ type SourceValues<Sources extends readonly Readable<unknown>[]> = {
     : never;
 };
 
+type ClientQueryOptions<C extends OperationContract, Sources extends readonly Readable<unknown>[]> = {
+  id?: string;
+  input?: (...values: SourceValues<Sources>) => Infer<C["input"]>;
+  key?: (...values: SourceValues<Sources>) => string | number;
+};
+
 /** Share request headers and their reactive dependencies between queries and forms. */
 export function remoteApi<
   const Sources extends readonly Readable<unknown>[],
@@ -522,23 +528,15 @@ export function remoteApi<
     query<C extends OperationContract>(
       contract: C,
       ...[query]: {} extends Infer<C["input"]>
-        ? [
-            options?: {
-              id?: string;
-              input?: (...values: SourceValues<Sources>) => Infer<C["input"]>;
-            },
-          ]
-        : [
-            options: {
-              id?: string;
-              input: (...values: SourceValues<Sources>) => Infer<C["input"]>;
-            },
-          ]
+        ? [options?: ClientQueryOptions<C, Sources>]
+        : [options: ClientQueryOptions<C, Sources> & Required<Pick<ClientQueryOptions<C, Sources>, "input">>]
     ): RemoteQuery<C> {
+      const key = query?.key;
       return createRemoteResource(contract, {
         id: query?.id ?? `${contract.id}.query`,
         from,
         input: query?.input,
+        key: key && (() => key(...from.map((source) => source.get()) as SourceValues<Sources>)),
         baseUrl,
         fetch: fetchWithHeaders,
       }, true);
@@ -560,6 +558,7 @@ type RemoteResourceOptions<C extends OperationContract> = {
   id: string;
   from?: readonly Readable<any>[];
   input?: (...values: any[]) => Infer<C["input"]>;
+  key?: () => string | number;
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
 };
@@ -624,7 +623,7 @@ function createRemoteResource<C extends OperationContract>(
   };
   const projection = derive({
     id: options.id + ".result",
-    from: [result],
+    from: options.key ? [result, ...(options.from ?? [])] : [result],
     compute: (snapshot) =>
       snapshot.outcome === "ok"
         ? ({

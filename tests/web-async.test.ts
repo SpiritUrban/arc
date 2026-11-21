@@ -76,6 +76,62 @@ test("web resource race guards stale completions even if underlying load ignores
   assert.equal(id._listeners.size, 0);
   id.dispose();
 });
+test("keyed resources immediately hide another key's snapshot and ignore late responses", async () => {
+  const owner = state({ id: "keyed.owner", initial: "a" });
+  const responses: ReturnType<typeof deferred<string | Error>>[] = [];
+  const resource = webResource({
+    id: "keyed.orders",
+    callable: true,
+    from: [owner],
+    key: () => owner.get(),
+    async load() {
+      const response = deferred<string | Error>();
+      responses.push(response);
+      const result = await response.promise;
+      if (result instanceof Error) throw result;
+      return result;
+    },
+  });
+  resource.activate();
+  responses[0].resolve("A");
+  await tick();
+  assert.equal(resource().data, "A");
+
+  const failed = resource.refresh();
+  responses[1].resolve(new Error("A failed"));
+  await failed;
+  assert.equal(resource().data, "A");
+  assert.ok(resource.error.get());
+
+  const stalled = resource.refresh();
+  owner.set("b");
+  assert.equal(resource().data, undefined);
+  assert.equal(resource.data.get(), undefined);
+  assert.equal(resource().error, undefined);
+  assert.equal(resource.loading.get(), true);
+  await tick();
+  responses[3].resolve("B");
+  await tick();
+  responses[2].resolve("late A");
+  await stalled;
+  assert.equal(resource().data, "B");
+  assert.equal(resource.data.get(), "B");
+
+  const failedAfterSwitch = resource.refresh();
+  responses[4].resolve(new Error("B failed"));
+  await failedAfterSwitch;
+  assert.ok(resource.error.get());
+  owner.set("a");
+  assert.equal(resource.error.get(), undefined);
+  assert.equal(resource().data, undefined);
+  await tick();
+  responses[5].resolve("fresh A");
+  await tick();
+  assert.equal(resource().data, "fresh A");
+  resource.dispose();
+  owner.dispose();
+});
+
 test("resource errors, invalidation after success, activation and dispose ownership", async () => {
   let loads = 0;
   const r = webResource({ id: "r", load: async () => ++loads });

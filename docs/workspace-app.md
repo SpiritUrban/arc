@@ -57,7 +57,7 @@ orders.create.submit.fields.product / orders.create.submit.fields.quantity
 orders.list.query → orders.visible → DOM bindings підсумку
 ```
 
-Remote order requests використовують request-scoped Authorization header з поточним selected user. При зміні identity resource abort попередній запит; framework generation guard відкидає старий результат. Додатковий derived filter не показує попереднього користувача під час reload.
+Запити замовлень використовують заголовок `Authorization` поточного користувача. `query` бере ID користувача як ключ. Після перемикання запит одразу приховує дані попереднього ключа й відкидає його запізнілі відповіді.
 
 ARC створює вузли прив’язок із TSX до монтування. `each` у таблиці замовлень і JSX-список із `map` та `key` на сторінці користувачів зберігають DOM незмінених рядків. Браузерні перевірки форми доповнює перевірка за контрактом операції.
 

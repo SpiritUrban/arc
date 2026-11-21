@@ -170,7 +170,9 @@ const orderClient = remoteApi({
   headers: (userId) => ({ authorization: `Bearer ${userId}` }),
 });
 
-export const ordersData = orderClient.query(ListOrders);
+export const ordersData = orderClient.query(ListOrders, {
+  key: () => selectedUser(),
+});
 
 // CreateOrder — спільний контракт. На сервері його реалізує маршрут createOrder у ./server.ts.
 export const createOrder = orderClient.mutation(CreateOrder, {
@@ -182,11 +184,10 @@ const cancelOrder = orderClient.mutation(CancelOrder, {
   refresh: [ordersData],
 });
 
-// Поки новий список завантажується, фільтр приховує кешовані замовлення попереднього користувача.
 export const visibleOrders = derive({
   id: "orders.visible",
-  from: [ordersData.data, selectedUser],
-  compute: (orders, id) => (orders ?? []).filter((o) => o.userId === id),
+  from: [ordersData.data],
+  compute: (orders) => orders ?? [],
 });
 
 const history = {

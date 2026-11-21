@@ -47,6 +47,7 @@ type WebResourceOptions<T, I> = {
   result?: boolean;
   scope?: "application" | "view";
   callable?: boolean;
+  key?: () => string | number;
 };
 
 export function webResource<T, I = unknown>(
@@ -55,16 +56,17 @@ export function webResource<T, I = unknown>(
 export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebResource<T, I>;
 export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebResource<T, I> {
   const createValue = def.callable ? signal : state;
+  const initial: ResourceSnapshot<T> = {
+    input: undefined,
+    data: undefined,
+    loading: false,
+    error: undefined,
+    stale: true,
+    outcome: "idle",
+  };
   const value = createValue<ResourceSnapshot<T>>({
     id: def.id,
-    initial: {
-      input: undefined,
-      data: undefined,
-      loading: false,
-      error: undefined,
-      stale: true,
-      outcome: "idle",
-    },
+    initial,
   });
   let generation = 0,
     controller: AbortController | undefined,
@@ -73,15 +75,28 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
     telemetry: WebTelemetry = silentTelemetry;
   const stops: (() => void)[] = [];
   const originalDispose = value.dispose.bind(value);
+  const readSnapshot = value.get.bind(value);
+  const key = def.key;
+  let snapshotKey: string | number | undefined;
+  if (key) {
+    const switching = { ...initial, loading: true };
+    value.get = () => {
+      const snapshot = readSnapshot();
+      if ((active || snapshotKey !== undefined) && !Object.is(snapshotKey, key()))
+        return active ? switching : initial;
+      return snapshot;
+    };
+  }
+  const projectionSources = key ? [value, ...(def.from ?? [])] as const : [value] as const;
   const projections = [
-    derive({ id: def.id + ".data", from: [value], compute: (s) => s.data }),
+    derive({ id: def.id + ".data", from: projectionSources, compute: (s) => s.data }),
     derive({
       id: def.id + ".loading",
-      from: [value],
+      from: projectionSources,
       compute: (s) => s.loading,
     }),
-    derive({ id: def.id + ".error", from: [value], compute: (s) => s.error }),
-    derive({ id: def.id + ".stale", from: [value], compute: (s) => s.stale }),
+    derive({ id: def.id + ".error", from: projectionSources, compute: (s) => s.error }),
+    derive({ id: def.id + ".stale", from: projectionSources, compute: (s) => s.stale }),
   ];
   const set = (next: ResourceSnapshot<T>, trace: TraceToken) => {
     value._trace = trace;
@@ -106,13 +121,18 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
         start = performance.now();
       const childTrace = { traceId: trace.traceId, parentId: spanId };
       let input: I;
-      set(
-        { ...value.get(), loading: true, error: undefined, stale: true },
-        trace,
-      );
       browserEvent(telemetry, def.id, "resource.started", trace, { spanId });
       let outcome: ResourceSnapshot<T>["outcome"] = "fault";
+      let requestKey: string | number | undefined;
+      let keyResolved = false;
+      const currentRequest = () => !signal.aborted && current === generation &&
+        !disposed && (!keyResolved || Object.is(requestKey, key?.()));
       try {
+        requestKey = key?.();
+        keyResolved = true;
+        const previous = Object.is(snapshotKey, requestKey) ? readSnapshot() : initial;
+        snapshotKey = requestKey;
+        set({ ...previous, loading: true, error: undefined, stale: true }, trace);
         input = def.input
           ? def.input(...(def.from ?? []).map((d) => d.get()))
           : ({} as I);
@@ -120,7 +140,7 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
           signal,
           trace: childTrace,
         });
-        if (signal.aborted || current !== generation || disposed) {
+        if (!currentRequest()) {
           outcome = "cancelled";
           return;
         }
@@ -133,7 +153,7 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
                 : "business_error";
           set(
             {
-              ...value.get(),
+              ...readSnapshot(),
               loading: false,
               error: loaded,
               stale: false,
@@ -156,11 +176,11 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
           );
         }
       } catch (error) {
-        outcome = signal.aborted ? "cancelled" : "fault";
-        if (current === generation && !disposed)
+        outcome = currentRequest() ? "fault" : "cancelled";
+        if (outcome === "fault")
           set(
             {
-              ...value.get(),
+              ...(keyResolved ? readSnapshot() : initial),
               loading: false,
               error: signal.aborted ? undefined : error,
               stale: true,
