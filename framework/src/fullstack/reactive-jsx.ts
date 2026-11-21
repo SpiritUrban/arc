@@ -7,8 +7,10 @@ const require = createRequire(import.meta.url);
 export function compileReactiveJsx(
   source: string,
   filename: string,
+  options: { loadTsx?: boolean; rewriteImports?: boolean } = {},
 ): string | undefined {
-  if (!/^\s*\/\/ @arc reactive-jsx\s*$/m.test(source)) return;
+  const reactive = /^\s*\/\/ @arc reactive-jsx\s*$/m.test(source);
+  if (!reactive && !options.loadTsx) return;
   const ts: typeof TS = require("typescript");
   return ts.transpileModule(source, {
     fileName: filename,
@@ -18,10 +20,11 @@ export function compileReactiveJsx(
       jsx: ts.JsxEmit.ReactJSX,
       jsxImportSource: "@arc/framework/web",
       verbatimModuleSyntax: true,
+      rewriteRelativeImportExtensions: options.rewriteImports,
       inlineSourceMap: true,
       inlineSources: true,
     },
-    transformers: {
+    transformers: reactive ? {
       before: [
         (context) => (file) => {
           const { factory } = context;
@@ -280,12 +283,15 @@ export function compileReactiveJsx(
           ]);
         },
       ],
-    },
+    } : undefined,
   }).outputText;
 }
 
 /** Load a source application with the same opt-in transform as the browser build. */
-export async function importApplication(url: URL | string) {
+export async function importApplication(
+  url: URL | string,
+  options: { loadTsx?: boolean } = {},
+) {
   const hook = registerHooks({
     load(moduleUrl, context, nextLoad) {
       if (
@@ -296,6 +302,7 @@ export async function importApplication(url: URL | string) {
         const compiled = compileReactiveJsx(
           readFileSync(file, "utf8"),
           file.pathname,
+          options,
         );
         if (compiled !== undefined)
           return { format: "module", source: compiled, shortCircuit: true };

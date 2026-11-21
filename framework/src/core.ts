@@ -1,6 +1,8 @@
 import { BrowserMetrics } from "./neutral/browser-metrics.js";
 import { randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 import {
   Schema,
   ValidationError,
@@ -265,6 +267,13 @@ export const traceContext = new AsyncLocalStorage<{
   traceId: string;
   operation: string;
 }>();
+type WebConfig = {
+  nodes: GraphDefinition[];
+  entry?: string;
+  serverModules?: string[];
+  bootstrap?: "page";
+};
+
 type AppOptions = {
   operations?: Operation[];
   resources?: Resource<any, any>[];
@@ -274,9 +283,11 @@ type AppOptions = {
   metricsWindowMs?: number;
   queues?: QueueDefinition[];
   schedules?: ScheduleDefinition[];
-  web?: { nodes: GraphDefinition[]; entry?: string; serverModules?: string[] };
+  web?: WebConfig | string;
 };
 export class Application {
+  private page?: WebConfig;
+  private loadingPage?: Promise<WebConfig>;
   operations: Operation[];
   resources: Resource<any, any>[];
   routes: Route[];
@@ -357,11 +368,40 @@ export class Application {
     ];
   }
   async compile(
-    options: { overrides?: Map<Resource<any, any>, unknown> } = {},
+    options: { overrides?: Map<Resource<any, any>, unknown>; entry?: URL } = {},
   ) {
     if (this.state === "closed" || this.state === "closing")
       throw new Error("Application is closed");
     if (this.state !== "new") return this;
+    if (typeof this.options.web === "string" && !this.page) {
+      if (!this.loadingPage) {
+        if (!options.entry)
+          throw new Error("Pass the application entry URL to compile({ entry }) when using a web page path");
+        const source = new URL(this.options.web, options.entry);
+        const url = options.entry.pathname.endsWith(".js") &&
+            source.pathname.endsWith(".tsx") && !existsSync(source)
+          ? new URL(source.href.replace(/\.tsx$/, ".js"))
+          : source;
+        const entry = fileURLToPath(url);
+        this.loadingPage = (async () => {
+          const { importApplication } = await import("./fullstack/reactive-jsx.js");
+          const { default: root } = await importApplication(url, { loadTsx: true });
+          if (root?.kind !== "view" || typeof root.setup !== "function")
+            throw new Error(`Default-export an ARC view from ${entry}`);
+          return { nodes: [root], entry, bootstrap: "page" };
+        })();
+      }
+      const loading = this.loadingPage;
+      try {
+        this.page = await loading;
+      } finally {
+        if (this.loadingPage === loading) this.loadingPage = undefined;
+      }
+      if (this.state !== "new") {
+        if (["closing", "closed"].includes(this.state)) throw new Error("Application is closed");
+        return this;
+      }
+    }
     const nodes = new Map<string, Operation | Resource<any, any>>();
     const visit = (
       node: Operation | Resource<any, any>,
@@ -1132,14 +1172,13 @@ export class Application {
   }
   webNodes(): GraphDefinition[] {
     return [
-      ...(this.options.web?.nodes ?? []),
+      ...((typeof this.options.web === "string" ? this.page : this.options.web)?.nodes ?? []),
       ...(this.options.modules ?? []).flatMap((m) => m.web?.nodes ?? []),
     ];
   }
   webConfig() {
-    return (
-      this.options.web ?? this.options.modules?.find((m) => m.web?.entry)?.web
-    );
+    if (typeof this.options.web === "string") return this.page;
+    return this.options.web ?? this.options.modules?.find((m) => m.web?.entry)?.web;
   }
   graph(): ArchitectureIR {
     const ir = compileArchitecture(this.webNodes(), this.makeGraph());

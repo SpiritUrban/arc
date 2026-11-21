@@ -48,4 +48,4 @@ Web resource передає AbortSignal у loader; новий input abort поп
 
 Передавайте ctx у remoteClient.call(input,ctx), а trace — у programmatic action.execute(input,{trace}). ctx.set пов’язує state updates із interaction. У browser немає прихованого request scope чи AsyncLocalStorage.
 
-[Bootstrap Workspace](../../examples/workspace/browser.ts) на pagehide викликає app.dispose, видаляє application style і викликає telemetry.dispose. Це поточний SPA teardown; BFCache restoration/resume окремо не реалізовано. [Lifecycle tests](../../tests/web-async.test.ts) перевіряють abort на unmount, [DOM tests](../../tests/web-dom.test.ts) — listener/subscription cleanup.
+Згенерований браузерний вхід Workspace на `pagehide` викликає `app.dispose()`, видаляє CSS сторінки та звільняє транспорт телеметрії. Це поточний SPA teardown; BFCache restoration/resume окремо не реалізовано. [Lifecycle tests](../../tests/web-async.test.ts) перевіряють abort на unmount, [DOM tests](../../tests/web-dom.test.ts) — listener/subscription cleanup.

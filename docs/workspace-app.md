@@ -41,7 +41,7 @@ npm test
 - `examples/workspace/users/page.tsx` — пошук, список користувачів і форма створення через `mutation`.
 - `examples/workspace/orders/page.tsx` — список замовлень через `query`, форма через `mutation` і підсумки для вибраного користувача.
 - `examples/workspace/page.tsx`, `examples/workspace/styles.ts` — responsive Workspace shell та стилі.
-- `examples/workspace/browser.ts` — browser composition, mount, telemetry та pagehide disposal.
+- `app.ts` підключає `web: "./page.tsx"`. ARC генерує браузерний запуск і телеметрію з кореневої сторінки.
 - `examples/workspace/ui.ts` — допоміжні функції для input bindings, форматування сум і повідомлень про помилки.
 
 ```text

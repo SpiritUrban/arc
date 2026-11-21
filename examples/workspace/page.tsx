@@ -70,3 +70,7 @@ export const WorkspacePage = view({
     </div>
   ),
 });
+
+export const title = "ARC Workspace — користувачі та замовлення";
+export { styles } from "./styles.ts";
+export default WorkspacePage;

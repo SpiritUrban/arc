@@ -76,16 +76,12 @@ ARC створює вузли директив ще до монтування. �
 У [app.ts](../../examples/workspace/app.ts) server composition містить:
 
 ```ts
-web: { nodes: [WorkspacePage], entry: "examples/workspace/browser.ts" }
+web: "./page.tsx"
 ```
 
-Шаблон `WorkspacePage` містить `{UsersPage}` і `{OrdersPage}`. ARC додає обидві сторінки до графа й монтує разом із кореневою.
+Файл `page.tsx` експортує кореневий `view` через `export default`. ARC додає сторінку до графа Stand і генерує браузерний запуск із телеметрією. Опційні експорти `title` і `styles` задають заголовок і CSS. На `pagehide` ARC звільняє застосунок, стилі й транспорт телеметрії. [Коренева сторінка](../../examples/workspace/page.tsx)
 
-```ts
-const app = startWeb(WorkspacePage, document.querySelector("#app")!, { telemetry });
-```
-
-У браузерній точці входу `pagehide` звільняє застосунок і транспорт телеметрії. [Браузерна точка входу](../../examples/workspace/browser.ts)
+CLI визначає шлях до сторінки відносно файла застосунку. Для програмної компіляції передайте URL цього файла через `app.compile({ entry })`. Завантаження сторінки з TSX потребує TypeScript.
 
 ## 7. Перевірте boundary та interaction
 

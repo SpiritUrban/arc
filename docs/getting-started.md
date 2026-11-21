@@ -50,7 +50,7 @@ Native JS production entrypoint:
 ARC_APP=dist/examples/workspace/app.js node framework/arc.mjs start
 ```
 
-Ця команда використовує compiled server ESM без tsx. Для Workspace CLI також збирає browser assets з налаштованого web.entry: потрібні esbuild та доступний examples/workspace/browser.ts із його imports. Це поточний CLI flow, а не standalone deployment готових static assets без source. Development скрипти використовують condition `arc-source`, щоб приклад і тести імпортували саме source workspace. За замовчуванням package import веде на `framework/dist/index.js`, types — на `.d.ts`. Після зміни коду перед перевіркою compiled CLI повторіть build.
+Ця команда використовує compiled server ESM без tsx. Для Workspace CLI генерує браузерний вхід зі зібраної кореневої сторінки. Потрібен `esbuild`. `npm run build` компілює реактивні JSX-вирази позначених сторінок прикладів. Development скрипти використовують condition `arc-source`, щоб приклад і тести імпортували саме source workspace. За замовчуванням package import веде на `framework/dist/index.js`, types — на `.d.ts`. Після зміни коду перед перевіркою compiled CLI повторіть build.
 
 Скрипти репозиторію за замовчуванням використовують `examples/workspace/app.ts`. Для прямого запуску CLI `ARC_APP` за замовчуванням вказує на `src/app.ts` від поточної теки. Типові порти — 3000 для застосунку і 3100 для Stand. Для TypeScript entrypoint Node 22.18+ підтримує erasable syntax; для іншого TS-синтаксису застосунку використовуйте dev script або compiled JS. CLI пакета не залежить від tsx.
 

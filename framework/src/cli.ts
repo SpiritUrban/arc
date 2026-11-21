@@ -15,12 +15,11 @@ if (
   throw new Error(
     "Usage: arc dev|build|graph|inspect <id>|run <id> <json>|start|stand",
   );
-const { default: logical } = await importApplication(
-  pathToFileURL(resolve(process.env.ARC_APP ?? "src/app.ts")).href
-);
+const entry = pathToFileURL(resolve(process.env.ARC_APP ?? "src/app.ts"));
+const { default: logical } = await importApplication(entry);
 if (!(logical instanceof Application) && logical?.kind !== "arc-graph")
   throw new Error("Default-export an ARC application graph");
-await logical.compile();
+await (logical instanceof Application ? logical.compile({ entry }) : logical.compile());
 const isServer = logical instanceof Application;
 // Browser-only development tooling has a server-side telemetry host, not another architecture graph.
 const host: Application = isServer ? logical : new Application({});

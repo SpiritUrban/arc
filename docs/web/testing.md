@@ -54,7 +54,7 @@ quantity.dispose();
 [tests/workspace.test.ts](../../tests/workspace.test.ts):
 
 1. Створює fresh server application, compile/start.
-2. Збирає examples/workspace/browser.ts через той самий buildWeb, що використовує CLI.
+2. Збирає `examples/workspace/page.tsx` і згенерований браузерний вхід через той самий `buildWeb`, що використовує CLI.
 3. Виконує bundle в isolated VM з Linkedom та real HTTP fetch.
 4. Створює користувача, вибирає його, створює замовлення і перевіряє суму.
 5. Перевіряє duplicate email, escaped user text, search і відсутність чужих orders після selection change.

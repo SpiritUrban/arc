@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 export interface BuildHost {
   graph(): ArchitectureIR;
   webConfig():
-    | { entry?: string; nodes: GraphDefinition[]; serverModules?: string[] }
+    | { entry?: string; nodes: GraphDefinition[]; serverModules?: string[]; bootstrap?: "page" }
     | undefined;
 }
 export async function buildWeb(
@@ -29,8 +29,25 @@ export async function buildWeb(
   const browserCore = fileURLToPath(
     new URL("../core-entry.js", import.meta.url),
   );
+  const input = config.bootstrap === "page"
+    ? {
+        stdin: {
+          contents: [
+            `import * as page from ${JSON.stringify(entry)};`,
+            `import { bootstrapPage } from ${JSON.stringify(fileURLToPath(new URL("./page-bootstrap.js", import.meta.url)))};`,
+            "bootstrapPage(page);",
+          ].join("\n"),
+          resolveDir: dirname(entry),
+          sourcefile: "arc-page-entry.js",
+        },
+      }
+    : { entryPoints: [entry] };
   const result = await build({
-    entryPoints: [entry],
+    ...input,
+    ...(config.bootstrap === "page" ? {
+      jsx: "automatic" as const,
+      jsxImportSource: "@arc/framework/web",
+    } : {}),
     outfile: join(outDir, "app.js"),
     bundle: true,
     platform: "browser",

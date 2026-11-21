@@ -11,9 +11,8 @@ import { internalTransport } from "../framework/src/fullstack/server.ts";
 import { serve, closeServer, handler } from "../framework/src/http.ts";
 
 test("Workspace browser creates users/orders, handles business errors and isolates selected user data", async () => {
-  const { createApp } = await importApplication(
-    new URL("../examples/workspace/app.ts", import.meta.url),
-  ) as typeof import("../examples/workspace/app.ts");
+  const entry = new URL("../examples/workspace/app.ts", import.meta.url);
+  const { createApp } = await importApplication(entry) as typeof import("../examples/workspace/app.ts");
   const app = createApp();
   const dir = await mkdtemp(join(tmpdir(), "arc-workspace-"));
   let server: Awaited<ReturnType<typeof serve>> | undefined;
@@ -22,7 +21,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
   const releaseCancellations = new Map<string, () => void>();
   let returningOrders: { owner: string; wait: Promise<void>; release(): void } | undefined;
   try {
-    await app.compile();
+    await app.compile({ entry });
     const { edges, nodes } = app.graph();
     assert.equal(
       nodes.filter(({ id }) => id.startsWith("users.page.dom.") && id.endsWith(".render")).length,
@@ -68,7 +67,8 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     }
     await app.start();
     const built = await buildWeb(app, { outDir: dir });
-    assert.ok(built.manifest.inputs.includes("examples/workspace/browser.ts"));
+    assert.ok(built.manifest.inputs.includes("examples/workspace/page.tsx"));
+    assert.ok(built.manifest.inputs.some((input) => input.endsWith("arc-page-entry.js")));
     assert.ok(!built.manifest.inputs.includes("examples/workspace/users/server.ts"));
     assert.ok(!built.manifest.inputs.includes("examples/workspace/orders/server.ts"));
     assert.ok(!built.manifest.inputs.includes("examples/workspace/auth.ts"));
@@ -133,6 +133,8 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     new vm.Script(
       await readFile(join(built.outDir, "app.js"), "utf8"),
     ).runInContext(context);
+    assert.match(document.title, /ARC Workspace/);
+    assert.ok(document.head.querySelector("style")?.textContent?.includes(".workspace"));
     cleanupBrowser = () => window.dispatchEvent(new window.Event("pagehide"));
     const waitFor = async (predicate: () => boolean) => {
       for (let i = 0; i < 200; i++) {
@@ -476,6 +478,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     cleanupBrowser();
     cleanupBrowser = undefined;
     assert.equal(document.querySelector("#app")!.children.length, 0);
+    assert.equal(document.head.querySelector("style"), null);
   } finally {
     cleanupBrowser?.();
     returningOrders?.release();

@@ -3,7 +3,6 @@
 import { application, operation, s, ok, http } from "@arc/framework";
 import { users } from "./users/server.ts";
 import { orders } from "./orders/server.ts";
-import { WorkspacePage } from "./page.tsx";
 // Окремий HTTP-маршрут /health дає змогу перевірити, що сервер відповідає.
 const health = operation({
   id: "system.health",
@@ -12,11 +11,11 @@ const health = operation({
   run: () => ok({ status: "ok" as const }),
 });
 // Серверні модулі реєструють операції та REST-маршрути.
-// web.nodes додає браузерну частину до спільного графа, а web.entry задає точку входу збірки.
+// ARC додає кореневу сторінку до графа та генерує браузерну точку входу.
 export const createApp = () =>
   application({
     modules: [users, orders],
-    web: { nodes: [WorkspacePage], entry: "examples/workspace/browser.ts" },
+    web: "./page.tsx",
     operations: [health],
     routes: [http.get("/health", health)],
   });
