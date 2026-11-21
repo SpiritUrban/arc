@@ -6,9 +6,8 @@
       >
       <h1>Один graph.<br />Увесь <span>застосунок.</span></h1>
       <p class="hero-description">
-        Від browser state до server operations.<br />Опишіть архітектуру явно —
-        нехай ARC<br class="desktop-break" />
-        зробить її виконуваною.
+        Від browser state до server operations. Опишіть архітектуру явно —
+        нехай ARC зробить її виконуваною.
       </p>
       <div class="hero-buttons">
         <a class="button primary" href="docs/getting-started.html"
@@ -18,13 +17,9 @@
         >
       </div>
       <div class="install-command">
-        <code>npm run dev</code
+        <code>npm run dev:workspace</code
         ><button data-copy aria-label="Копіювати команду">⧉</button
         ><span>у репозиторії ARC</span>
-      </div>
-      <div class="hero-tags">
-        <span>TypeScript</span><i></i><span>Explicit dependencies</span><i></i
-        ><span>Fine-grained Web</span>
       </div>
     </div>
     <div
@@ -37,27 +32,24 @@
         ><span class="window-live"><i></i> DECLARED</span>
       </div>
       <div class="graph-canvas">
-        <div class="graph-runtime">BROWSER <span>01</span></div>
+        <div class="graph-runtime">Browser</div>
         <div class="graph-row">
           <div class="graph-node state-node">
             <span class="node-icon">◈</span>
             <div><strong>title</strong><small>state</small></div>
-            <span class="node-domain">web</span>
           </div>
           <div class="graph-node">
             <span class="node-icon">↗</span>
             <div><strong>addTask</strong><small>action</small></div>
-            <span class="node-domain">web</span>
           </div>
         </div>
         <div class="graph-connector">
           <span>↓</span><small>REMOTE_CALLS</small>
         </div>
-        <div class="graph-runtime server-label">SERVER <span>02</span></div>
+        <div class="graph-runtime server-label">Server</div>
         <div class="graph-node server-node">
           <span class="node-icon">ƒ</span>
           <div><strong>tasks.create</strong><small>operation</small></div>
-          <span class="node-domain">server</span>
         </div>
         <div class="graph-connector short">
           <span>↓</span><small>DEPENDS_ON</small>
@@ -65,10 +57,6 @@
         <div class="graph-node resource-node">
           <span class="node-icon">▱</span>
           <div><strong>tasks.repository</strong><small>resource</small></div>
-          <span class="node-domain">server</span>
-        </div>
-        <div class="graph-bottom">
-          <span><i></i> explicit boundaries</span><span>IR v3 ↗</span>
         </div>
       </div>
     </div>
@@ -76,9 +64,7 @@
   <section class="principle-strip">
     <div class="wrap">
       <p>
-        Не структура папок.<br /><strong
-          >Архітектура, яку можна виконати.</strong
-        >
+        <strong>Архітектура, яку можна виконати.</strong>
       </p>
       <span>Один application graph</span><span>Кілька runtime targets</span
       ><span>Спільні contracts</span>

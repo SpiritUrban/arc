@@ -153,7 +153,7 @@ test("browser client tabs, navigation, search and copy operate without applicati
       .querySelector(".install-command [data-copy]")
       .dispatchEvent(new window.Event("click"));
     await new Promise((r) => setTimeout(r, 0));
-    assert.equal(copied, "npm run dev");
+    assert.equal(copied, "npm run dev:workspace");
     document
       .querySelector("[data-theme-toggle]")
       .dispatchEvent(new window.Event("click"));
