@@ -357,12 +357,28 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     await waitFor(() => secondButton.disabled && releaseCancellations.has(secondId));
     assert.equal(cancelOrderRequests, 2);
     const status = (id: string) => document.querySelector(`[data-order="${id}"] .order-status`)!.textContent;
+    const rowError = (id: string) =>
+      document.querySelector(`[data-order="${id}"] [data-cancel-error]`)!.textContent;
+    // Simulate a cancellation from another tab while both browser requests are held.
+    const external = await cancelOverRest(userId!);
+    assert.equal(external.status, 200);
     releaseCancellations.get(orderId)!();
-    await waitFor(() => status(orderId)?.includes("Скасовано") === true);
+    await waitFor(() => rowError(orderId)?.includes("вже скасовано") === true);
+    assert.equal(firstButton.disabled, false);
     assert.equal(secondButton.disabled, true);
     assert.match(secondButton.textContent!, /Скасовуємо/);
+    assert.equal(rowError(secondId), "");
+    click(firstButton);
+    await waitFor(() => firstButton.disabled && cancelOrderRequests === 3);
+    assert.equal(rowError(orderId), "");
+    assert.equal(secondButton.disabled, true);
+    releaseCancellations.get(orderId)!();
+    await waitFor(() => rowError(orderId)?.includes("вже скасовано") === true);
     releaseCancellations.get(secondId)!();
     await waitFor(() => status(secondId)?.includes("Скасовано") === true);
+    assert.match(status(orderId)!, /Скасовано/);
+    assert.match(rowError(orderId)!, /вже скасовано/);
+    assert.equal(rowError(secondId), "");
     assert.equal(document.querySelector("[data-cancel-order]"), null);
     await waitFor(() => app.browserEvents.some(
       (event) => event.node === "orders.cancel.submit" && event.type === "action.finished",

@@ -140,6 +140,13 @@ function renderOrdersPage(quantity: Signal<string>) {
                           {cancelOrder.pending(order.id) ? "Скасовуємо…" : "Скасувати"}
                         </button>
                       )}
+                      <p class="error" role="alert" data-cancel-error>
+                        {cancelOrder.failed("ORDER_ALREADY_CANCELLED", order.id)
+                          ? "Це замовлення вже скасовано."
+                          : cancelOrder.failed("ORDER_NOT_FOUND", order.id)
+                            ? "Замовлення не знайдено."
+                            : failureMessage(cancelOrder.outcome(order.id)?.error)}
+                      </p>
                     </td>
                   </tr>
                 ),
@@ -147,13 +154,6 @@ function renderOrdersPage(quantity: Signal<string>) {
             </tbody>
           </table>
         </div>
-        <p class="error" role="alert" data-cancel-error>
-          {cancelOrder.failed("ORDER_ALREADY_CANCELLED")
-            ? "Це замовлення вже скасовано."
-            : cancelOrder.failed("ORDER_NOT_FOUND")
-              ? "Замовлення не знайдено."
-              : failureMessage(cancelOrder().error)}
-        </p>
         <div class="empty order-empty" data-empty bind:visible={history.empty}>
           <span class="empty-symbol">▤</span>
           <strong>Тут з’являться замовлення</strong>
@@ -210,6 +210,7 @@ const history = {
 
 export const OrdersPage = view({
   id: "orders.page",
+  needs: { cancelOrder },
   state: () => ({ quantity: "1" }),
   template: ({ quantity }) => renderOrdersPage(quantity),
 });

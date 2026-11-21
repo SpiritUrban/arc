@@ -262,11 +262,17 @@ export type Mutation<
 > =
   CallableAction<void, RemoteResult<C>> & {
     fields: RemoteForm<C, Field>["fields"];
-    failed(code: keyof C["errors"] & string): boolean;
+    failed(code: keyof C["errors"] & string, key?: Key): boolean;
     invalid(field: InputField<C>): boolean;
     run(input: Infer<C["input"]>): Promise<RemoteResult<C>>;
     pending(key: Key): boolean;
+    outcome(key: Key): MutationOutcome<C> | undefined;
   };
+
+type MutationOutcome<C extends OperationContract> = {
+  readonly result: RemoteResult<C> | undefined;
+  readonly error: unknown;
+};
 
 const directInput = Symbol("ARC mutation input");
 type DirectSubmission<C extends OperationContract> = { [directInput]: Infer<C["input"]> };
@@ -408,6 +414,7 @@ function bindMutation(defaults: RemoteFormDefaults) {
     const { fields, submit } = buildRemoteForm(contract, options, defaults, true);
     const keyOf = options.key;
     const requests = new Map<Key, Promise<RemoteResult<C>>>();
+    const outcomes = new Map<Key, MutationOutcome<C>>();
     const revision = keyOf && state({ id: `${submit.id}.pending`, initial: 0 });
     let disposed = false;
     if (revision) {
@@ -416,6 +423,7 @@ function bindMutation(defaults: RemoteFormDefaults) {
       submit.dispose = () => {
         disposed = true;
         requests.clear();
+        outcomes.clear();
         revision.dispose();
         dispose();
       };
@@ -432,9 +440,19 @@ function bindMutation(defaults: RemoteFormDefaults) {
         let start!: () => void;
         const request = new Promise<RemoteResult<C>>((resolve) => {
           start = () => resolve(submit.execute({ [directInput]: payload }, { trace }));
-        }).finally(() => {
+        }).then(
+          (result) => {
+            if (!disposed) outcomes.set(key, { result, error: result.ok ? undefined : result });
+            return result;
+          },
+          (error: unknown) => {
+            if (!disposed) outcomes.set(key, { result: undefined, error });
+            throw error;
+          },
+        ).finally(() => {
           if (requests.delete(key)) revision.update((value) => value + 1);
         });
+        outcomes.delete(key);
         requests.set(key, request);
         revision.update((value) => value + 1);
         start();
@@ -444,10 +462,20 @@ function bindMutation(defaults: RemoteFormDefaults) {
         revision?.get();
         return requests.has(key);
       },
-      failed(code: keyof C["errors"] & string) {
-        const { status, result } = submit();
-        return status === "error" &&
-          result?.kind === "business_error" &&
+      outcome(key: Key) {
+        revision?.get();
+        return outcomes.get(key);
+      },
+      failed(code: keyof C["errors"] & string, key?: Key) {
+        let result: RemoteResult<C> | undefined;
+        if (key === undefined) {
+          const snapshot = submit();
+          result = snapshot.status === "error" ? snapshot.result : undefined;
+        } else {
+          revision?.get();
+          result = outcomes.get(key)?.result;
+        }
+        return result?.kind === "business_error" &&
           result.error === code;
       },
       invalid(field: InputField<C>) {

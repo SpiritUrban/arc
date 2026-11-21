@@ -162,7 +162,8 @@ export function compileReactiveJsx(
                   const method = callee.name.text;
                   if (
                     (method === "get" && child.arguments.length === 0) ||
-                    ((method === "failed" || method === "invalid" || method === "pending") &&
+                    (method === "failed" && (child.arguments.length === 1 || child.arguments.length === 2)) ||
+                    ((method === "invalid" || method === "pending" || method === "outcome") &&
                       child.arguments.length === 1)
                   ) {
                     reference = callee.expression;

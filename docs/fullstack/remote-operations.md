@@ -102,6 +102,8 @@ const cancelOrder = orderClient.mutation(CancelOrder, { refresh: [orders] });
 
 Для дій над рядками задайте ключ через `key: ({ id }) => id`. Тоді `cancelOrder.pending(order.id)` показує, чи триває виклик для цього рядка, включно з оновленням запитів із `refresh`. Повторний `run` із тим самим ключем повертає той самий Promise, а інші ключі можуть виконуватися паралельно.
 
+`cancelOrder.failed("ORDER_ALREADY_CANCELLED", order.id)` перевіряє бізнес-помилку конкретного рядка. `cancelOrder.outcome(order.id)` повертає його останній результат і помилку або `undefined` до завершення виклику. Новий запуск очищає попередній результат лише для свого ключа.
+
 ```tsx
 <button
   type="button"
