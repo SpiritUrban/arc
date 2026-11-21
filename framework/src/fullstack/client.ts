@@ -13,6 +13,7 @@ import {
 } from "../neutral/protocol.js";
 import {
   action,
+  captureResourceUpdate,
   webResource,
   type Action,
   type ActionContext,
@@ -166,6 +167,7 @@ type RemoteFormOptions<C extends OperationContract> = {
   invalidates?: readonly WebResource<any, any>[];
   /** Apply local state changes after a successful response, before refreshing resources. */
   onSuccess?: (value: Infer<C["output"]>, ctx: ActionContext) => void;
+  update?: QueryUpdate<Infer<C["output"]>>;
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
 };
@@ -300,6 +302,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     input,
     refresh = options.invalidates,
     onSuccess,
+    update,
   } = options;
   const fieldOptions = options.fields;
   const properties = callable && !fieldOptions ? contract.input.json.properties : undefined;
@@ -337,9 +340,13 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     ),
     invalidates: refresh,
     async run(request, ctx) {
+      const apply = update?.capture();
       if (request && directInput in request) {
         const result = await client.call(contract.input.parse(request[directInput]), ctx);
-        if (result.ok && !ctx.signal.aborted) batch(() => onSuccess?.(result.value, ctx));
+        if (result.ok && !ctx.signal.aborted) batch(() => {
+          apply?.(result.value, ctx.trace);
+          onSuccess?.(result.value, ctx);
+        });
         return result;
       }
       const submission = request && readNamedSubmission(request, numericFields);
@@ -367,6 +374,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
               ctx.set(fields[name], initial);
           }
           submission?.reset(ctx);
+          apply?.(result.value, ctx.trace);
           onSuccess?.(result.value, ctx);
         });
       }
@@ -374,6 +382,10 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     },
   };
   const submit = callable ? action({ ...definition, callable: true }) : action(definition);
+  if (update) submit.relations = [
+    ...(submit.relations ?? []),
+    { to: update.target, kind: "UPDATES" },
+  ];
   if (!fieldOptions) {
     submit.submitForm = (form, ctx) => submit.execute(form, ctx);
   }
@@ -553,8 +565,22 @@ export type RemoteResource<C extends OperationContract> = WebResource<
   Infer<C["input"]>
 > & { result: Readable<RemoteResult<C> | undefined> };
 
+type QueryItem<C extends OperationContract> =
+  Infer<C["output"]> extends readonly (infer Row)[] ? Row : never;
+
+type RowKey<Row> = [Row] extends [never] ? never : {
+  [Key in keyof Row]-?: Row[Key] extends string | number ? Key : never;
+}[keyof Row] & string;
+
+type QueryUpdate<Row> = {
+  readonly target: GraphDefinition;
+  capture(): (row: Row, trace: TraceToken) => void;
+};
+
 export type RemoteQuery<C extends OperationContract> =
-  RemoteResource<C> & (() => ResourceSnapshot<Infer<C["output"]>>);
+  RemoteResource<C> & (() => ResourceSnapshot<Infer<C["output"]>>) & {
+    replaceBy(field: RowKey<QueryItem<C>>): QueryUpdate<QueryItem<C>>;
+  };
 
 type RemoteResourceOptions<C extends OperationContract> = {
   id: string;
@@ -641,7 +667,25 @@ function createRemoteResource<C extends OperationContract>(
     projection.dispose();
     dispose();
   };
-  return Object.assign(result, { result: projection });
+  return Object.assign(result, {
+    result: projection,
+    replaceBy(field: RowKey<QueryItem<C>>): QueryUpdate<QueryItem<C>> {
+      return {
+        target: result,
+        capture() {
+          const apply = result[captureResourceUpdate]?.();
+          return (row, trace) => apply?.((data) => {
+            if (!Array.isArray(data)) return data;
+            const index = data.findIndex((item: QueryItem<C>) => Object.is(item[field], row[field]));
+            if (index < 0) return data;
+            const next = data.slice();
+            next[index] = row;
+            return next as Infer<C["output"]>;
+          }, trace);
+        },
+      };
+    },
+  });
 }
 export function telemetryTransport(
   options: { url?: string; fetch?: typeof globalThis.fetch } = {},

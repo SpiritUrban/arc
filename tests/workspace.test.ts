@@ -45,7 +45,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       e.from === "orders.create.submit" && e.to === "orders.list.query" && e.kind === "INVALIDATES",
     ));
     assert.ok(edges.some((e) =>
-      e.from === "orders.cancel.submit" && e.to === "orders.list.query" && e.kind === "INVALIDATES",
+      e.from === "orders.cancel.submit" && e.to === "orders.list.query" && e.kind === "UPDATES",
     ));
     assert.ok(edges.some((e) =>
       e.from === "users.create.submit" && e.to === "users.list.query" && e.kind === "INVALIDATES",
@@ -79,9 +79,11 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     );
     let createOrderRequests = 0;
     let cancelOrderRequests = 0;
+    let listOrderRequests = 0;
     const fetcher: typeof fetch = (input, init) => {
       const url = new URL(String(input), origin);
       if (url.pathname === "/_arc/call/orders.create") createOrderRequests++;
+      if (url.pathname === "/_arc/call/orders.list") listOrderRequests++;
       let ready = Promise.resolve();
       if (url.pathname === "/_arc/call/orders.list" &&
           returningOrders && new Headers(init?.headers).get("authorization") === `Bearer ${returningOrders.owner}`) {
@@ -399,12 +401,14 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     assert.equal(secondButton.disabled, true);
     releaseCancellations.get(orderId)!();
     await waitFor(() => rowError(orderId)?.includes("вже скасовано") === true);
+    const readsBeforeCancel = listOrderRequests;
     releaseCancellations.get(secondId)!();
     await waitFor(() => status(secondId)?.includes("Скасовано") === true);
-    assert.match(status(orderId)!, /Скасовано/);
+    assert.equal(listOrderRequests, readsBeforeCancel);
+    assert.match(status(orderId)!, /Створено/);
     assert.match(rowError(orderId)!, /вже скасовано/);
     assert.equal(rowError(secondId), "");
-    assert.equal(document.querySelector("[data-cancel-order]"), null);
+    assert.equal(document.querySelector(`[data-order="${secondId}"] [data-cancel-order]`), null);
     await waitFor(() => app.browserEvents.some(
       (event) => event.node === "orders.cancel.submit" && event.type === "action.finished",
     ));
@@ -418,6 +422,45 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     const duplicate = await cancelOverRest(userId!);
     assert.equal(duplicate.status, 409);
     assert.match(await duplicate.text(), /ORDER_ALREADY_CANCELLED/);
+
+    input("[data-product]", "Cancel while switching");
+    input("[data-quantity]", "1");
+    submit("#orders form");
+    const switchedOrder = () => [...document.querySelectorAll("[data-order]")].find(
+      (row) => row.querySelector("strong")?.textContent === "Cancel while switching",
+    );
+    await waitFor(() => Boolean(switchedOrder()));
+    const switchedId = switchedOrder()!.getAttribute("data-order")!;
+    click(switchedOrder()!.querySelector<HTMLButtonElement>("[data-cancel-order]")!);
+    await waitFor(() => releaseCancellations.has(switchedId));
+    input("[data-search]", "");
+    await waitFor(() => document.querySelectorAll("[data-user]").length === 2);
+    const demoId = "00000000-0000-4000-8000-000000000001";
+    document.querySelector(`[data-user="${demoId}"]`)!.dispatchEvent(new window.Event("click"));
+    await waitFor(() => document.querySelector("[data-rows]")!.textContent === "" &&
+      document.querySelector("[data-loading]")!.textContent === "");
+    const readsWhileAway = listOrderRequests;
+    const finishedCancellations = () => app.browserEvents.filter(
+      (event) => event.node === "orders.cancel.submit" && event.type === "action.finished",
+    ).length;
+    const finishedBeforeRelease = finishedCancellations();
+    releaseCancellations.get(switchedId)!();
+    await waitFor(() => finishedCancellations() > finishedBeforeRelease);
+    assert.equal(listOrderRequests, readsWhileAway);
+    assert.equal(document.querySelector("[data-rows]")!.textContent, "");
+
+    let releaseReturn!: () => void;
+    returningOrders = {
+      owner: userId!,
+      wait: new Promise<void>((resolve) => { releaseReturn = resolve; }),
+      release: releaseReturn,
+    };
+    document.querySelector(`[data-user="${userId}"]`)!.dispatchEvent(new window.Event("click"));
+    await waitFor(() => switchedOrder()?.textContent?.includes("Скасовано") === true);
+    assert.match(document.querySelector("[data-loading]")!.textContent!, /Завантажуємо/);
+    returningOrders.release();
+    returningOrders = undefined;
+    await waitFor(() => document.querySelector("[data-loading]")!.textContent === "");
     const createdOverRest = await handler(app)(
       new Request("http://localhost/orders", {
         method: "POST",

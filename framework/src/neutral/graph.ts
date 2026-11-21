@@ -26,7 +26,8 @@ export type EdgeKind =
   | "DERIVES"
   | "BINDS"
   | "REMOTE_CALLS"
-  | "INVALIDATES";
+  | "INVALIDATES"
+  | "UPDATES";
 export interface GraphNode {
   id: string;
   kind: NodeKind;

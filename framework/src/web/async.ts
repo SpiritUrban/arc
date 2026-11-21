@@ -23,6 +23,8 @@ export interface ResourceSnapshot<T> {
   stale: boolean;
   outcome: "idle" | "ok" | "business_error" | "fault" | "cancelled";
 }
+export const captureResourceUpdate = Symbol("ARC resource update");
+
 export interface WebResource<T, I = unknown> extends Readable<
   ResourceSnapshot<T>
 > {
@@ -35,6 +37,7 @@ export interface WebResource<T, I = unknown> extends Readable<
   activate(telemetry?: WebTelemetry): void;
   dispose(): void;
   relations?: GraphDefinition["relations"];
+  [captureResourceUpdate]?: () => (update: (data: T) => T, trace: TraceToken) => void;
 }
 type WebResourceOptions<T, I> = {
   id: string;
@@ -92,6 +95,7 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
     }
   }
   let snapshotKey: string | number | undefined;
+  let pendingRead: { key: typeof snapshotKey; updates: ((data: T) => T)[] } | undefined;
   if (key) {
     const switching = { ...initial, loading: true };
     value.get = () => {
@@ -128,6 +132,28 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
     loading: projections[1] as Readable<boolean>,
     error: projections[2],
     stale: projections[3] as Readable<boolean>,
+    [captureResourceUpdate]() {
+      const targetKey = key?.();
+      return (update: (data: T) => T, trace: TraceToken) => {
+        if (disposed) return;
+        if (pendingRead && Object.is(pendingRead.key, targetKey))
+          pendingRead.updates.push(update);
+        if (targetKey !== undefined) {
+          const cached = cache?.get(targetKey);
+          if (cached?.data !== undefined) {
+            const data = update(cached.data);
+            if (!Object.is(data, cached.data)) remember(targetKey, { ...cached, data });
+          }
+        }
+        if (Object.is(snapshotKey, targetKey)) {
+          const snapshot = readSnapshot();
+          if (snapshot.data !== undefined) {
+            const data = update(snapshot.data);
+            if (!Object.is(data, snapshot.data)) set({ ...snapshot, data }, trace);
+          }
+        }
+      };
+    },
     async refresh(trace: TraceToken = { traceId: identity() }) {
       if (disposed) return;
       const current = ++generation;
@@ -142,11 +168,13 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
       let outcome: ResourceSnapshot<T>["outcome"] = "fault";
       let requestKey: string | number | undefined;
       let keyResolved = false;
+      const updates: ((data: T) => T)[] = [];
       const currentRequest = () => !signal.aborted && current === generation &&
         !disposed && (!keyResolved || Object.is(requestKey, key?.()));
       try {
         requestKey = key?.();
         keyResolved = true;
+        pendingRead = { key: requestKey, updates };
         const cached = requestKey === undefined ? undefined : cache?.get(requestKey);
         if (cached && requestKey !== undefined) remember(requestKey, cached);
         const previous = Object.is(snapshotKey, requestKey) ? readSnapshot() : cached ?? initial;
@@ -184,7 +212,7 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
           outcome = "ok";
           const next = {
             input,
-            data: def.result ? loaded.value : loaded,
+            data: updates.reduce((data, update) => update(data), def.result ? loaded.value : loaded),
             loading: false,
             error: undefined,
             stale: false,
@@ -208,6 +236,7 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
             trace,
           );
       } finally {
+        if (pendingRead?.updates === updates) pendingRead = undefined;
         if (signal.aborted) outcome = "cancelled";
         browserEvent(telemetry, def.id, "resource.finished", trace, {
           spanId,
@@ -237,6 +266,7 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
       disposed = true;
       generation++;
       cache?.clear();
+      pendingRead = undefined;
       controller?.abort();
       for (const stop of stops) stop();
       for (const p of projections) p.dispose();

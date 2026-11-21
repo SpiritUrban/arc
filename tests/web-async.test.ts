@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   action,
+  captureResourceUpdate,
   state,
   derive,
   webResource,
@@ -130,6 +131,32 @@ test("keyed resources immediately hide another key's snapshot and ignore late re
   assert.equal(resource().data, "fresh A");
   resource.dispose();
   owner.dispose();
+});
+
+test("a confirmed resource update survives an older refresh", async () => {
+  const initial = [{ id: "first", cancelled: false }];
+  const delayed = deferred<typeof initial>();
+  let reads = 0;
+  const resource = webResource({
+    id: "confirmed.orders",
+    load: async () => reads++ ? delayed.promise : initial,
+  });
+  await resource.refresh();
+  const refresh = resource.refresh();
+  resource[captureResourceUpdate]!()(
+    (orders) => orders.map((order) =>
+      order.id === "first" ? { ...order, cancelled: true } : order,
+    ),
+    { traceId: "cancel-order" },
+  );
+  assert.equal(resource.data.get()?.[0].cancelled, true);
+  delayed.resolve([...initial, { id: "unrelated", cancelled: false }]);
+  await refresh;
+  assert.deepEqual(resource.data.get(), [
+    { id: "first", cancelled: true },
+    { id: "unrelated", cancelled: false },
+  ]);
+  resource.dispose();
 });
 
 test("resource errors, invalidation after success, activation and dispose ownership", async () => {

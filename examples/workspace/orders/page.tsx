@@ -182,7 +182,7 @@ export const createOrder = orderClient.mutation(CreateOrder, {
 
 const cancelOrder = orderClient.mutation(CancelOrder, {
   key: ({ id }) => id,
-  refresh: [ordersData],
+  update: ordersData.replaceBy("id"),
 });
 
 export const visibleOrders = derive({

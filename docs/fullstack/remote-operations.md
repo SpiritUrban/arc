@@ -119,6 +119,19 @@ const cancelOrder = orderClient.mutation(CancelOrder, { refresh: [orders] });
 </button>
 ```
 
+## Оновлення списку з відповіді
+
+```ts
+const cancelOrder = orderClient.mutation(CancelOrder, {
+  key: ({ id }) => id,
+  update: orders.replaceBy("id"),
+});
+```
+
+Після успіху ARC замінює наявний рядок даними з відповіді. Ключ запиту фіксується під час запуску мутації, тому навіть після перемикання користувача оновлюється його початковий список або кеш. Запит списку, який уже виконується, зберігає підтверджену зміну під час завершення. Stand показує зв’язок `UPDATES`.
+
+Використовуйте `refresh`, коли відповідь не містить оновленого рядка або операція змінює склад списку.
+
 ## HTTP-транспорт
 
 Server `internalTransport(app)` обслуговує POST /_arc/call/:operation. Операція повинна явно мати `expose:{web:true}` на server. Browser descriptor не надає дозволу. Input/output/error details перевіряються сервером; client також перевіряє output. Internal exception не передає stack чи raw message. AbortSignal передається fetch і request executor настільки, наскільки дозволяє HTTP disconnect.
