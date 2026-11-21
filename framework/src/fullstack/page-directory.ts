@@ -23,7 +23,7 @@ export async function discoverPageDirectory(url: URL) {
     const entries = await readdir(folder, { withFileTypes: true });
     entries.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
     for (const entry of entries) {
-      if (entry.name.startsWith(".")) continue;
+      if (entry.name.startsWith(".") || entry.name.startsWith("_")) continue;
       const filename = join(folder, entry.name);
       if (entry.isDirectory()) {
         await visit(filename, [...segments, routeSegment(entry.name)]);
