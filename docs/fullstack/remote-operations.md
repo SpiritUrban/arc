@@ -32,38 +32,40 @@ const status = () => (
 
 ## Форма, що викликає операцію
 
-Для форми з рядковими полями вкажіть у HTML ті самі імена, що й у контракті.
+Для форми з рядковими полями вкажіть у HTML ті самі імена, що й у контракті, та передайте `mutation` в `onSubmit`.
 
 ```tsx
-const { submit } = remoteForm(CreateTask, { refresh: [tasks] });
+import { mutation } from "@arc/framework/fullstack";
+
+const addTask = mutation(CreateTask, { refresh: [tasks] });
 
 const form = () => (
-  <form on:submit={submit}>
+  <form onSubmit={addTask}>
     <input name="title" aria-label="Назва задачі" required />
     <button type="submit">Додати</button>
   </form>
 );
 ```
 
-Під час submit ARC читає значення через `FormData`, обрізає зовнішні пробіли та перевіряє дані за схемою операції перед запитом. Для реактивних значень до submit або перетворення типів використовуйте `fields` і `bind:value`.
+Під час submit ARC читає значення через `FormData`, обрізає зовнішні пробіли та перевіряє дані за схемою операції перед запитом. `addTask()` повертає знімок дії з `running`, `result` і `error`. Для реактивних значень до submit або перетворення типів задайте `fields` і передайте потрібне поле в `bind:value`.
 
 ```tsx
-import { remoteForm, textField } from "@arc/framework/fullstack";
+import { mutation, textField } from "@arc/framework/fullstack";
 
-const { fields, submit } = remoteForm(CreateTask, {
+const addTask = mutation(CreateTask, {
   fields: { title: textField() },
   refresh: [tasks],
 });
 
 const form = () => (
-  <form on:submit={submit}>
-    <input aria-label="Назва задачі" bind:value={fields.title} required />
+  <form onSubmit={addTask}>
+    <input aria-label="Назва задачі" bind:value={addTask.fields.title} required />
     <button type="submit">Додати</button>
   </form>
 );
 ```
 
-`fields` задає початкові рядкові значення. Опис `{ initial, parse }` перетворює поле на тип, якого вимагає контракт. Для рядкового поля без перетворення достатньо вказати початковий рядок. Якщо перетворення залежить від кількох полів, задайте початкові рядки та один `input`. ID дії за замовчуванням має вигляд `<ID операції>.submit`. Для кількох форм з одним контрактом задайте кожній власний `id`. Після успіху форма повертає надіслані поля до початкових значень, якщо користувач не змінив їх під час запиту. Помилка доступна через `submit.error`, а залежності для додаткового стану можна оголосити в `needs`. Stand показує дію, мережевий виклик і зв’язки з ресурсами з `refresh`.
+`fields` задає початкові рядкові значення. Опис `{ initial, parse }` перетворює поле на тип, якого вимагає контракт. Для рядкового поля без перетворення достатньо вказати початковий рядок. Якщо перетворення залежить від кількох полів, задайте початкові рядки та один `input`. ID дії за замовчуванням має вигляд `<ID операції>.submit`. Для кількох форм з одним контрактом задайте кожній власний `id`. Після успіху форма повертає надіслані поля до початкових значень, якщо користувач не змінив їх під час запиту. Помилка доступна через `addTask().error`, а залежності для додаткового стану можна оголосити в `needs`. Stand показує дію, мережевий виклик і зв’язки з ресурсами з `refresh`.
 
 ## Спільний клієнт для читання та запису
 
@@ -73,7 +75,7 @@ const orderClient = remoteApi({
   headers: (userId) => ({ authorization: `Bearer ${userId}` }),
 });
 const orders = orderClient.query(ListOrders);
-const createOrder = orderClient.form(CreateOrder, {
+const createOrder = orderClient.mutation(CreateOrder, {
   fields: { product: textField(), quantity: integerField(1) },
   refresh: [orders],
 });

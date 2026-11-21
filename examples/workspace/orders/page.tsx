@@ -1,3 +1,4 @@
+// @arc reactive-jsx
 // Браузерна частина замовлень. Зміна користувача оновлює список,
 // а надсилання форми викликає серверну операцію створення.
 import { derive, each, project, view } from "@arc/framework/web";
@@ -38,7 +39,7 @@ function renderOrdersPage() {
           <span class="circle-icon">↗</span>
         </div>
         {/* ARC перехоплює submit, викликає createOrder і залишає користувача на цій сторінці. */}
-        <form class="order-form" data-form on:submit={createOrder}>
+        <form class="order-form" data-form onSubmit={createOrder}>
           <label class="product-field">
             Назва товару
             <input
@@ -46,7 +47,7 @@ function renderOrdersPage() {
               required
               maxlength="100"
               placeholder="Наприклад, блокнот ARC"
-              bind:value={orderFields.product}
+              bind:value={createOrder.fields.product}
             />
           </label>
           <label class="quantity-field">
@@ -58,13 +59,12 @@ function renderOrdersPage() {
               min="1"
               max="100"
               step="1"
-              bind:value={orderFields.quantity}
+              bind:value={createOrder.fields.quantity}
             />
           </label>
           <button
             class="button primary"
             type="submit"
-            bind:disabled={createOrder.running}
           >
             Створити <span>→</span>
           </button>
@@ -72,16 +72,13 @@ function renderOrdersPage() {
         <div class="form-footer">
           <span>
             Підсумок{" "}
-            <strong data-preview bind:text={formFeedback.preview}></strong>
+            <strong data-preview>{orderPreview}</strong>
           </span>
           <span>Для вибраного користувача</span>
         </div>
-        <p
-          class="error"
-          role="alert"
-          data-error
-          bind:text={formFeedback.error}
-        ></p>
+        <p class="error" role="alert" data-error>
+          {failureMessage(createOrder().error ?? ordersData().error)}
+        </p>
       </div>
       <div class="panel history">
         <div class="panel-heading">
@@ -145,17 +142,13 @@ const orderClient = remoteApi({
 export const ordersData = orderClient.query(ListOrders);
 
 // CreateOrder — спільний контракт. На сервері його реалізує маршрут createOrder у ./server.ts.
-const { fields: orderFields, submit: createOrder } = orderClient.form(
-  CreateOrder,
-  {
-    fields: {
-      product: textField(),
-      quantity: integerField(1),
-    },
-    refresh: [ordersData],
+export const createOrder = orderClient.mutation(CreateOrder, {
+  fields: {
+    product: textField(),
+    quantity: integerField(1),
   },
-);
-export { createOrder };
+  refresh: [ordersData],
+});
 
 // Поки новий список завантажується, фільтр приховує кешовані замовлення попереднього користувача.
 export const visibleOrders = derive({
@@ -164,19 +157,11 @@ export const visibleOrders = derive({
   compute: (orders, id) => (orders ?? []).filter((o) => o.userId === id),
 });
 
-const formFeedback = {
-  preview: derive({
-    id: "orders.preview",
-    from: [orderFields.quantity],
-    compute: (q) => money((Number(q) || 0) * 25),
-  }),
-  error: derive({
-    id: "orders.errors",
-    from: [createOrder.error, ordersData.error],
-    compute: (createError, loadError) =>
-      failureMessage(createError ?? loadError),
-  }),
-};
+const orderPreview = derive({
+  id: "orders.preview",
+  from: [createOrder.fields.quantity],
+  compute: (q) => money((Number(q) || 0) * 25),
+});
 
 const history = {
   title: derive({

@@ -145,8 +145,11 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     assert.equal(document.querySelectorAll("[data-user]").length, 1);
     input("[data-name]", "<New User>");
     input("[data-email]", "new@example.com");
+    const addButton = document.querySelector<HTMLButtonElement>("#users button[type=submit]")!;
     submit("#users form");
+    assert.equal(addButton.disabled, true);
     await waitFor(() => document.querySelectorAll("[data-user]").length === 2);
+    assert.equal(addButton.disabled, false);
     assert.match(document.querySelector("#users [data-status]")!.textContent!, /^2 /);
     assert.deepEqual(userFields.map((field) => field.value), ["", ""]);
     await waitFor(() =>
@@ -164,12 +167,16 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     );
     input("[data-product]", "  ARC Notebook  ");
     input("[data-quantity]", "3");
+    await waitFor(() => document.querySelector("[data-preview]")!.textContent!.includes("75"));
+    const orderButton = document.querySelector<HTMLButtonElement>("#orders button[type=submit]")!;
     submit("#orders form");
+    assert.equal(orderButton.disabled, true);
     await waitFor(() =>
       document
         .querySelector("[data-rows]")!
         .textContent!.includes("ARC Notebook"),
     );
+    assert.equal(orderButton.disabled, false);
     assert.match(document.querySelector("[data-amount]")!.textContent!, /75/);
     assert.equal(document.querySelector("[data-count]")!.textContent, "01");
     assert.equal(

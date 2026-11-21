@@ -15,6 +15,8 @@ import {
   webResource,
   type Action,
   type ActionContext,
+  type ActionOptions,
+  type CallableAction,
   type ResourceSnapshot,
   type WebResource,
 } from "../web/async.js";
@@ -204,117 +206,160 @@ function readNamedSubmission(form: HTMLFormElement): NamedSubmission {
   };
 }
 
-function bindRemoteForm(defaults: {
+type RemoteFormDefaults = {
   needs?: readonly GraphDefinition[];
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
-}) {
-  /** Submit named HTML controls without allocating reactive field state. */
-  function form<C extends OperationContract>(
-    contract: C,
-    options?: RemoteFormOptions<C> & { fields?: never; input?: never },
-  ): RemoteForm<C, never>;
-  /** Bind text fields to an operation and reset submitted values after success. */
-  function form<C extends OperationContract>(
-    contract: C,
-    options: RemoteFormOptions<C> & {
-      fields: Infer<C["input"]> extends Record<string, unknown>
-        ? FormFields<NoInfer<Infer<C["input"]>>>
-        : never;
-      input?: never;
+};
+
+type NamedFormOptions<C extends OperationContract> =
+  RemoteFormOptions<C> & { fields?: never; input?: never };
+
+type ReactiveFormOptions<C extends OperationContract> = RemoteFormOptions<C> & {
+  fields: Infer<C["input"]> extends Record<string, unknown>
+    ? FormFields<NoInfer<Infer<C["input"]>>>
+    : never;
+  input?: never;
+};
+
+type MappedFormOptions<C extends OperationContract, Field extends string> =
+  RemoteFormOptions<C> & {
+    fields: Readonly<Record<Field, string>>;
+    input: (values: Readonly<Record<Field, string>>) => Infer<C["input"]>;
+  };
+
+type FormOptions<C extends OperationContract, Field extends string> =
+  RemoteFormOptions<C> & {
+    fields?: Readonly<Record<Field, FormField<unknown>>>;
+    input?: (values: Readonly<Record<Field, string>>) => Infer<C["input"]>;
+  };
+
+export type Mutation<C extends OperationContract, Field extends string = never> =
+  CallableAction<void, RemoteResult<C>> & { fields: RemoteForm<C, Field>["fields"] };
+
+function buildRemoteForm<C extends OperationContract, Field extends string>(
+  contract: C, options: FormOptions<C, Field>, defaults: RemoteFormDefaults, callable: true,
+): RemoteForm<C, Field> & { submit: CallableAction<void, RemoteResult<C>> };
+function buildRemoteForm<C extends OperationContract, Field extends string>(
+  contract: C, options: FormOptions<C, Field>, defaults: RemoteFormDefaults,
+): RemoteForm<C, Field>;
+function buildRemoteForm<C extends OperationContract, Field extends string>(
+  contract: C, options: FormOptions<C, Field>, defaults: RemoteFormDefaults, callable = false,
+): RemoteForm<C, Field> {
+  const {
+    id = `${contract.id}.submit`,
+    baseUrl = defaults.baseUrl,
+    fetch = defaults.fetch,
+    input,
+    refresh = options.invalidates,
+    onSuccess,
+  } = options;
+  const fieldOptions = options.fields;
+  const names = Object.keys(fieldOptions ?? {}) as Field[];
+  const definitions = names.map((name) => {
+    const field = fieldOptions![name];
+    return typeof field === "string"
+      ? { name, initial: field }
+      : { name, initial: field.initial, parse: field.parse };
+  });
+  const fields = Object.fromEntries(
+    definitions.map(({ name, initial }) => [
+      name,
+      state({ id: `${id}.fields.${name}`, initial }),
+    ]),
+  ) as Record<Field, Writable<string>>;
+  const client = remoteClient(contract, {
+    id: `${id}.remote`,
+    baseUrl,
+    fetch,
+  });
+  const definition: ActionOptions<void | HTMLFormElement, RemoteResult<C>> = {
+    id,
+    needs: Object.fromEntries(
+      [
+        client,
+        ...names.map((name) => fields[name]),
+        ...new Set([...(defaults.needs ?? []), ...(options.needs ?? [])]),
+      ].map((node, index) => [index, node]),
+    ),
+    invalidates: refresh,
+    async run(form, ctx) {
+      const submission = form && readNamedSubmission(form);
+      const values = Object.fromEntries(
+        names.map((name) => [name, fields[name].get()]),
+      ) as Record<Field, string>;
+      if (!fieldOptions && !submission)
+        throw new TypeError("Named-field forms must be submitted from an HTML form");
+      const payload = submission
+        ? contract.input.parse(submission.values)
+        : input
+        ? input(values)
+        : (Object.fromEntries(
+            definitions.map(({ name, parse }) => [
+              name,
+              parse ? parse(values[name]) : values[name],
+            ]),
+          ) as Infer<C["input"]>);
+      const result = await client.call(payload, ctx);
+      if (result.ok && !ctx.signal.aborted) {
+        batch(() => {
+          for (const { name, initial } of definitions) {
+            if (fields[name].get() === values[name])
+              ctx.set(fields[name], initial);
+          }
+          submission?.reset();
+          onSuccess?.(result.value, ctx);
+        });
+      }
+      return result;
     },
+  };
+  const submit = callable ? action({ ...definition, callable: true }) : action(definition);
+  if (!fieldOptions) {
+    submit.submitForm = (form, ctx) => submit.execute(form, ctx);
+  }
+  return { fields, submit };
+}
+
+function bindRemoteForm(defaults: RemoteFormDefaults) {
+  function form<C extends OperationContract>(
+    contract: C, options?: NamedFormOptions<C>,
+  ): RemoteForm<C, never>;
+  function form<C extends OperationContract>(
+    contract: C, options: ReactiveFormOptions<C>,
   ): RemoteForm<C, Extract<keyof Infer<C["input"]>, string>>;
   function form<C extends OperationContract, Field extends string>(
-    contract: C,
-    options: RemoteFormOptions<C> & {
-      fields: Readonly<Record<Field, string>>;
-      input: (values: Readonly<Record<Field, string>>) => Infer<C["input"]>;
-    },
+    contract: C, options: MappedFormOptions<C, Field>,
   ): RemoteForm<C, Field>;
   function form<C extends OperationContract, Field extends string>(
-    contract: C,
-    options: RemoteFormOptions<C> & {
-      fields?: Readonly<Record<Field, FormField<unknown>>>;
-      input?: (values: Readonly<Record<Field, string>>) => Infer<C["input"]>;
-    } = {},
+    contract: C, options: FormOptions<C, Field> = {},
   ): RemoteForm<C, Field> {
-    const {
-      id = `${contract.id}.submit`,
-      baseUrl = defaults.baseUrl,
-      fetch = defaults.fetch,
-      input,
-      refresh = options.invalidates,
-      onSuccess,
-    } = options;
-    const fieldOptions = options.fields;
-    const names = Object.keys(fieldOptions ?? {}) as Field[];
-    const definitions = names.map((name) => {
-      const field = fieldOptions![name];
-      return typeof field === "string"
-        ? { name, initial: field }
-        : { name, initial: field.initial, parse: field.parse };
-    });
-    const fields = Object.fromEntries(
-      definitions.map(({ name, initial }) => [
-        name,
-        state({ id: `${id}.fields.${name}`, initial }),
-      ]),
-    ) as Record<Field, Writable<string>>;
-    const client = remoteClient(contract, {
-      id: `${id}.remote`,
-      baseUrl,
-      fetch,
-    });
-    const submit = action<void | HTMLFormElement, RemoteResult<C>>({
-      id,
-      needs: Object.fromEntries(
-        [
-          client,
-          ...names.map((name) => fields[name]),
-          ...new Set([...(defaults.needs ?? []), ...(options.needs ?? [])]),
-        ].map((node, index) => [index, node]),
-      ),
-      invalidates: refresh,
-      async run(form, ctx) {
-        const submission = form && readNamedSubmission(form);
-        const values = Object.fromEntries(
-          names.map((name) => [name, fields[name].get()]),
-        ) as Record<Field, string>;
-        if (!fieldOptions && !submission)
-          throw new TypeError("Named-field forms must be submitted from an HTML form");
-        const payload = submission
-          ? contract.input.parse(submission.values)
-          : input
-          ? input(values)
-          : (Object.fromEntries(
-              definitions.map(({ name, parse }) => [
-                name,
-                parse ? parse(values[name]) : values[name],
-              ]),
-            ) as Infer<C["input"]>);
-        const result = await client.call(payload, ctx);
-        if (result.ok && !ctx.signal.aborted) {
-          batch(() => {
-            for (const { name, initial } of definitions) {
-              if (fields[name].get() === values[name])
-                ctx.set(fields[name], initial);
-            }
-            submission?.reset();
-            onSuccess?.(result.value, ctx);
-          });
-        }
-        return result;
-      },
-    });
-    if (!fieldOptions) {
-      submit.submitForm = (form, ctx) => submit.execute(form, ctx);
-    }
-    return { fields, submit };
+    return buildRemoteForm(contract, options, defaults);
   }
   return form;
 }
 
+function bindMutation(defaults: RemoteFormDefaults) {
+  function mutate<C extends OperationContract>(
+    contract: C, options?: NamedFormOptions<C>,
+  ): Mutation<C>;
+  function mutate<C extends OperationContract>(
+    contract: C, options: ReactiveFormOptions<C>,
+  ): Mutation<C, Extract<keyof Infer<C["input"]>, string>>;
+  function mutate<C extends OperationContract, Field extends string>(
+    contract: C, options: MappedFormOptions<C, Field>,
+  ): Mutation<C, Field>;
+  function mutate<C extends OperationContract, Field extends string>(
+    contract: C, options: FormOptions<C, Field> = {},
+  ): Mutation<C, Field> {
+    const { fields, submit } = buildRemoteForm(contract, options, defaults, true);
+    return Object.assign(submit, { fields });
+  }
+  return mutate;
+}
+
 export const remoteForm = bindRemoteForm({});
+export const mutation = bindMutation({});
 
 type SourceValues<Sources extends readonly Readable<unknown>[]> = {
   [K in keyof Sources]: Sources[K] extends Readable<infer Value>
@@ -343,6 +388,7 @@ export function remoteApi<
       headers: merged,
     });
   };
+  const defaults = { needs: from, baseUrl, fetch: fetchWithHeaders };
   return {
     query<C extends OperationContract>(
       contract: C,
@@ -368,7 +414,8 @@ export function remoteApi<
         fetch: fetchWithHeaders,
       }, true);
     },
-    form: bindRemoteForm({ needs: from, baseUrl, fetch: fetchWithHeaders }),
+    form: bindRemoteForm(defaults),
+    mutation: bindMutation(defaults),
   };
 }
 

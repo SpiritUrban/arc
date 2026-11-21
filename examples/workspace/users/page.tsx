@@ -2,13 +2,13 @@
 // Браузерна частина користувачів. Мережевий ресурс завантажує записи,
 // локальний пошук фільтрує їх, а вибір рядка змінює список замовлень.
 import { view } from "@arc/framework/web";
-import { remoteForm } from "@arc/framework/fullstack";
+import { mutation } from "@arc/framework/fullstack";
 import { CreateUser } from "./contracts.ts";
 import { failureMessage } from "../ui.ts";
 import { selectedUser, users } from "../user-selection.ts";
 
 // CreateUser — спільний контракт. На сервері його виконує createUser у ./server.ts.
-const { submit: addUser } = remoteForm(CreateUser, {
+export const addUser = mutation(CreateUser, {
   needs: [selectedUser],
   refresh: [users],
   onSuccess(user, ctx) {
@@ -16,7 +16,6 @@ const { submit: addUser } = remoteForm(CreateUser, {
   },
 });
 
-export { addUser };
 
 export const UsersPage = view({
   id: "users.page",
@@ -79,7 +78,7 @@ export const UsersPage = view({
         </div>
         <div class="panel-divider"></div>
         <h3>Новий користувач</h3>
-        <form data-form on:submit={addUser}>
+        <form data-form onSubmit={addUser}>
           <label>
             Ім’я
             <input
@@ -108,7 +107,7 @@ export const UsersPage = view({
           </button>
         </form>
         <p class="error" role="alert" data-error>
-          {failureMessage(addUser.error.get() ?? users().error)}
+          {failureMessage(addUser().error ?? users().error)}
         </p>
       </section>
     );

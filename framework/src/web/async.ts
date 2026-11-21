@@ -219,19 +219,28 @@ export interface Action<I, O> extends Readable<ActionSnapshot<O>> {
   submitForm?(form: HTMLFormElement, ctx: { trace: TraceToken }): Promise<O>;
   activate(telemetry?: WebTelemetry): void;
 }
+export type CallableAction<I, O> = Action<I, O> & (() => ActionSnapshot<O>);
 export interface ActionContext {
   signal: AbortSignal;
   trace: TraceToken;
   set<T>(state: Writable<T>, value: T): void;
 }
-export function action<I = void, O = unknown>(def: {
+export type ActionOptions<I, O> = {
   id: string;
   input?: Schema<I>;
   needs?: Record<string, GraphDefinition>;
   invalidates?: readonly WebResource<any, any>[];
   run: (input: I, ctx: ActionContext) => O | Promise<O>;
-}): Action<I, O> {
-  const value = state<ActionSnapshot<O>>({
+  callable?: boolean;
+};
+
+export function action<I = void, O = unknown>(
+  def: ActionOptions<I, O> & { callable: true },
+): CallableAction<I, O>;
+export function action<I = void, O = unknown>(def: ActionOptions<I, O>): Action<I, O>;
+export function action<I = void, O = unknown>(def: ActionOptions<I, O>): Action<I, O> {
+  const createValue = def.callable ? signal : state;
+  const value = createValue<ActionSnapshot<O>>({
       id: def.id,
       initial: {
         status: "idle",

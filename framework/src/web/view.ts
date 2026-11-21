@@ -179,6 +179,14 @@ function compileTemplate(id: string, root: TemplateChild) {
     const { children, bind, ...attributes } = child.props;
     const attached = [...elementBindings(bind)];
     for (const [name, value] of Object.entries(attributes)) {
+      if (name === "onSubmit") {
+        delete attributes[name];
+        if (value == null) continue;
+        if (child.tag === Fragment)
+          throw new Error(`Attach onSubmit to an HTML element in ${id}`);
+        attached.push(...directive(`${id}.dom.${path}.on:submit`, "on:submit", value));
+        continue;
+      }
       if (name === "onClick") {
         delete attributes[name];
         if (value == null) continue;
@@ -229,7 +237,9 @@ function compileTemplate(id: string, root: TemplateChild) {
 function directive(id: string, name: string, value: unknown): Binding[] {
   if (name.startsWith("on:")) {
     const event = name.slice(3);
-    if (event && typeof value === "function") {
+    const action = value as Action<void, unknown> | undefined;
+    const isAction = action?.kind === "action" && typeof action.execute === "function";
+    if (event && typeof value === "function" && !isAction) {
       const handler = value as EventHandler;
       return [binding({
         id,
@@ -238,21 +248,16 @@ function directive(id: string, name: string, value: unknown): Binding[] {
         sources: [],
         handler(domEvent, trace) {
           if (event === "submit") domEvent.preventDefault();
-          return handler(domEvent, {
+          return withWriteTrace(trace, () => handler(domEvent, {
             set(state, next) {
               state._trace = trace;
               state.set(next);
             },
-          });
+          }));
         },
       })];
     }
-    const action = value as Action<void, unknown> | undefined;
-    if (
-      !event ||
-      action?.kind !== "action" ||
-      typeof action.execute !== "function"
-    )
+    if (!event || !isAction)
       throw new TypeError(`${name} expects an ARC action or event handler`);
     const node = binding({
       id,
@@ -683,10 +688,10 @@ export function mount(
         const trace = { traceId: identity() };
         browserEvent(telemetry, telemetryId, "binding.event", trace);
         try {
-          const result =
-            typeof b.handler === "function"
-              ? b.handler(event, trace)
-              : b.handler?.execute(b.input, { trace });
+          const handler = b.handler;
+          const result = handler && "execute" in handler
+            ? handler.execute(b.input, { trace })
+            : handler?.(event, trace);
           updateSubmitButtons?.();
           if (result && typeof (result as any).catch === "function")
             void (result as Promise<unknown>).catch((error) =>
