@@ -11,9 +11,11 @@ export const Fragment = Symbol("ARC template fragment");
 
 type TextValue = string | number | boolean | null | undefined;
 type RenderContent = TemplateElement | TextValue | readonly RenderContent[];
+export type ExpressionReferences = () => readonly unknown[];
 export interface RenderBlock {
   readonly [reactiveBlock]: true;
   readonly template: () => RenderContent;
+  readonly references?: ExpressionReferences;
 }
 interface ChildBinding {
   readonly [childBinding]: Binding;
@@ -23,6 +25,7 @@ export interface KeyedList {
   readonly source: Readable<readonly unknown[] | null | undefined>
     | (() => readonly unknown[] | null | undefined);
   readonly empty?: TemplateElement;
+  readonly references?: ExpressionReferences;
   key(item: unknown): string | number;
   render(item: unknown): TemplateElement;
 }
@@ -43,6 +46,7 @@ export function each<T>(
   source: Readable<readonly T[] | null | undefined> | (() => readonly T[] | null | undefined),
   options: {
     empty?: TemplateElement;
+    references?: ExpressionReferences;
     key: (item: T) => string | number;
     render: (item: T) => TemplateElement;
   },
@@ -51,6 +55,7 @@ export function each<T>(
     [keyedList]: true,
     source,
     empty: options.empty,
+    references: options.references,
     key: (item) => options.key(item as T),
     render: (item) => options.render(item as T),
   };
@@ -61,19 +66,22 @@ export function isKeyedList(child: TemplateChild): child is KeyedList {
 }
 
 /** Reevaluate a JSX region when the ARC values it reads change. */
-export function render(template: RenderBlock["template"]): RenderBlock {
-  return { [reactiveBlock]: true, template };
+export function render(
+  template: RenderBlock["template"],
+  references?: ExpressionReferences,
+): RenderBlock {
+  return { [reactiveBlock]: true, template, references };
 }
 
 export function isRenderBlock(child: TemplateChild): child is RenderBlock {
   return child != null && typeof child === "object" && reactiveBlock in child;
 }
 
-export function reactiveAttribute(read: () => unknown) {
-  return { [attributeExpression]: read };
+export function reactiveAttribute(read: () => unknown, references?: ExpressionReferences) {
+  return { [attributeExpression]: { read, references } };
 }
 
-export function attributeReader(value: unknown): (() => unknown) | undefined {
+export function attributeReader(value: unknown) {
   if (value && typeof value === "object" && attributeExpression in value)
     return (value as ReturnType<typeof reactiveAttribute>)[attributeExpression];
 }

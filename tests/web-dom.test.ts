@@ -15,7 +15,43 @@ import {
   view,
   mount,
   tick,
+  webResource,
 } from "../framework/src/web/index.ts";
+
+test("JSX references add resource dependencies without running the expression", async () => {
+  const { document } = parseHTML('<div id="app"></div>');
+  const target = document.querySelector("#app")!;
+  let loads = 0;
+  let reads = 0;
+  const resource = webResource({
+    id: "inferred-resource",
+    callable: true,
+    async load() {
+      loads++;
+      return "ready";
+    },
+  });
+  const page = view({
+    id: "inferred-page",
+    template: () => jsx("p", {
+      children: render(() => {
+        reads++;
+        return resource().data ?? "loading";
+      }, () => [resource]),
+    }),
+  });
+  const graph = compileArchitecture([page]);
+  assert.ok(graph.edges.some((edge) =>
+    edge.from === resource.id && edge.to.endsWith(".render") && edge.kind === "BINDS",
+  ));
+  assert.equal(reads, 0);
+  assert.equal(loads, 0);
+  const app = startWeb(page, target);
+  assert.equal(loads, 1);
+  await tick();
+  assert.equal(target.textContent, "ready");
+  app.dispose();
+});
 
 test("view-local state has a stable graph ID and a fresh value per mount", async () => {
   const { document, window } = parseHTML('<div id="app"></div>');

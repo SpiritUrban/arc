@@ -18,6 +18,7 @@ import {
   isRenderBlock,
   isTemplate,
   renderTemplate,
+  type ExpressionReferences,
   type KeyedList,
   type RenderBlock,
   type TemplateChild,
@@ -74,6 +75,7 @@ export interface Binding extends GraphDefinition {
     | "each"
     | "render";
   sources: readonly Readable<any>[];
+  references?: ExpressionReferences;
   name?: string;
   format?: (...values: any[]) => unknown;
   readAttribute?: () => unknown;
@@ -91,27 +93,37 @@ export interface Binding extends GraphDefinition {
 export function binding(
   def: Omit<Binding, "kind" | "runtime" | "dependencies" | "relations">,
 ): Binding {
-  return {
+  const handler = def.handler as unknown as GraphDefinition | undefined;
+  const action = handler?.id ? handler : undefined;
+  const dependencies = (sources: readonly Readable<unknown>[]) =>
+    action ? [...sources, action] : sources;
+  const relations = (sources: readonly Readable<unknown>[]) => {
+    const links = sources.map((to) => ({ to, kind: "BINDS" as const }));
+    return action ? [...links, { to: action, kind: "TRIGGERS" as const }] : links;
+  };
+  function graphSources() {
+    if (!def.references) return def.sources;
+    const inferred = def.references().filter((value): value is Readable<unknown> =>
+      isReadable(value) && typeof value.id === "string" && typeof value.kind === "string",
+    );
+    return [...new Set([...def.sources, ...inferred])];
+  }
+  const node: Binding = {
     ...def,
     kind: "binding",
     runtime: "browser",
-    dependencies: [
-      ...def.sources,
-      ...((def.handler as any)?.id
-        ? [def.handler as unknown as GraphDefinition]
-        : []),
-    ],
-    relations: [
-      ...def.sources.map((source) => ({ to: source, kind: "BINDS" as const })),
-      ...((def.handler as any)?.id
-        ? [
-            {
-              to: def.handler as unknown as GraphDefinition,
-              kind: "TRIGGERS" as const,
-            },
-          ]
-        : []),
-    ],
+    dependencies: dependencies(def.sources),
+    relations: relations(def.sources),
+  };
+  if (!def.references) return node;
+  return {
+    ...node,
+    get dependencies() {
+      return dependencies(graphSources());
+    },
+    get relations() {
+      return relations(graphSources());
+    },
   };
 }
 export interface View extends GraphDefinition {
@@ -156,6 +168,7 @@ function compileTemplate(id: string, root: TemplateChild) {
         id: `${id}.dom.${path}.render`,
         type: "render",
         sources: [],
+        references: child.references,
         block: child,
       });
       bindings.add(region);
@@ -166,6 +179,7 @@ function compileTemplate(id: string, root: TemplateChild) {
         id: `${id}.dom.${path}.each`,
         type: "each",
         sources: isReadable(child.source) ? [child.source] : [],
+        references: child.references,
         list: child,
       });
       bindings.add(list);
@@ -203,15 +217,16 @@ function compileTemplate(id: string, root: TemplateChild) {
         }));
         continue;
       }
-      const readAttribute = attributeReader(value);
-      if (readAttribute) {
+      const attribute = attributeReader(value);
+      if (attribute) {
         delete attributes[name];
         attached.push(binding({
           id: `${id}.dom.${path}.${name}`,
           type: "attribute",
           name: name === "className" ? "class" : name,
           sources: [],
-          readAttribute,
+          references: attribute.references,
+          readAttribute: attribute.read,
         }));
         continue;
       }

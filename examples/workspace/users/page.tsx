@@ -19,7 +19,6 @@ export const addUser = mutation(CreateUser, {
 
 export const UsersPage = view({
   id: "users.page",
-  needs: { users, selectedUser },
   state: () => ({ search: "" }),
   template: ({ search }) => {
     function visible() {

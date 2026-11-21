@@ -126,10 +126,14 @@ export function compileReactiveJsx(
                   attributes,
                 );
             usedEach = true;
+            const { references } = directReads(call.expression.expression);
             return factory.createCallExpression(each, undefined, [
               arrow(call.expression.expression),
               factory.createObjectLiteralExpression([
                 factory.createPropertyAssignment("key", arrow(value, [item])),
+                ...(references
+                  ? [factory.createPropertyAssignment("references", references)]
+                  : []),
                 factory.createPropertyAssignment(
                   "render",
                   arrow(rowWithoutKey, [item]),
@@ -138,30 +142,51 @@ export function compileReactiveJsx(
             ]);
           }
 
-          function readsState(node: TS.Node): boolean {
-            if (
-              ts.isFunctionLike(node) ||
-              ts.isJsxElement(node) ||
-              ts.isJsxSelfClosingElement(node) ||
-              ts.isJsxFragment(node)
-            )
-              return false;
-            if (
-              ts.isCallExpression(node) &&
-              ts.isPropertyAccessExpression(node.expression) &&
-              (node.expression.name.text === "failed" || node.expression.name.text === "invalid") &&
-              node.arguments.length === 1
-            )
-              return true;
-            if (
-              ts.isCallExpression(node) &&
-              (ts.isIdentifier(node.expression) ||
-                (ts.isPropertyAccessExpression(node.expression) &&
-                  node.expression.name.text === "get")) &&
-              node.arguments.length === 0
-            )
-              return true;
-            return ts.forEachChild(node, readsState) ?? false;
+          function directReads(node: TS.Node) {
+            const references = new Map<string, TS.Identifier>();
+            let reactive = false;
+            function scan(child: TS.Node) {
+              if (
+                ts.isFunctionLike(child) ||
+                ts.isJsxElement(child) ||
+                ts.isJsxSelfClosingElement(child) ||
+                ts.isJsxFragment(child)
+              )
+                return;
+              if (ts.isCallExpression(child)) {
+                const callee = child.expression;
+                let reference: TS.Expression | undefined;
+                if (ts.isIdentifier(callee) && child.arguments.length === 0) {
+                  reference = callee;
+                } else if (ts.isPropertyAccessExpression(callee)) {
+                  const method = callee.name.text;
+                  if (
+                    (method === "get" && child.arguments.length === 0) ||
+                    ((method === "failed" || method === "invalid") &&
+                      child.arguments.length === 1)
+                  ) {
+                    reference = callee.expression;
+                  }
+                }
+                if (reference) {
+                  reactive = true;
+                  if (ts.isIdentifier(reference))
+                    references.set(reference.text, reference);
+                }
+              }
+              ts.forEachChild(child, scan);
+            }
+            scan(node);
+            return {
+              reactive,
+              references: references.size
+                ? arrow(
+                    factory.createArrayLiteralExpression([
+                      ...references.values(),
+                    ]),
+                  )
+                : undefined,
+            };
           }
 
           const visit: TS.Visitor = (node) => {
@@ -178,7 +203,8 @@ export function compileReactiveJsx(
               const list = keyedMap(expression);
               if (list) return factory.updateJsxExpression(node, list);
             }
-            if (!readsState(node.expression)) return transformed;
+            const { reactive, references } = directReads(node.expression);
+            if (!reactive) return transformed;
 
             let helper: TS.Identifier;
             if (ts.isJsxAttribute(node.parent)) {
@@ -200,9 +226,13 @@ export function compileReactiveJsx(
             }
             return factory.updateJsxExpression(
               node,
-              factory.createCallExpression(helper, undefined, [
-                arrow(expression),
-              ]),
+              factory.createCallExpression(
+                helper,
+                undefined,
+                references
+                  ? [arrow(expression), references]
+                  : [arrow(expression)],
+              ),
             );
           };
 
