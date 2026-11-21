@@ -346,6 +346,9 @@ test("TSX directives declare graph nodes before mount and preserve form behavior
           jsx("input", { "bind:value": field }),
           jsx("p", { "bind:text": field }),
           jsx("button", { "bind:disabled": save.running }),
+          jsx("button", { id: "auto-submit" }),
+          jsx("button", { id: "locked-submit", type: "submit", disabled: true }),
+          jsx("button", { id: "regular-button", type: "button" }),
         ],
       }),
   });
@@ -374,7 +377,11 @@ test("TSX directives declare graph nodes before mount and preserve form behavior
 
   const submit = () =>
     form.dispatchEvent(new window.Event("submit", { cancelable: true }));
+  const auto = target.querySelector<HTMLButtonElement>("#auto-submit")!;
+  const locked = target.querySelector<HTMLButtonElement>("#locked-submit")!;
+  const regular = target.querySelector<HTMLButtonElement>("#regular-button")!;
   assert.equal(submit(), false);
+  assert.equal(auto.disabled, true);
   assert.equal(submit(), false);
   await tick();
   assert.equal(submissions, 1);
@@ -383,6 +390,9 @@ test("TSX directives declare graph nodes before mount and preserve form behavior
   await new Promise<void>((resolve) => setImmediate(resolve));
   await tick();
   assert.equal(target.querySelector("button")!.disabled, false);
+  assert.equal(auto.disabled, false);
+  assert.equal(locked.disabled, true);
+  assert.equal(regular.disabled, false);
   instance.unmount();
   assert.equal(field._listeners.size, 0);
   assert.equal(submit(), true);

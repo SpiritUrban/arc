@@ -27,8 +27,116 @@ export function compileReactiveJsx(
           const { factory } = context;
           const render = factory.createUniqueName("arcRender");
           const attribute = factory.createUniqueName("arcAttribute");
+          const each = factory.createUniqueName("arcEach");
           let usedRender = false;
           let usedAttribute = false;
+          let usedEach = false;
+
+          function arrow(
+            body: TS.Expression,
+            parameters: readonly TS.ParameterDeclaration[] = [],
+          ) {
+            return factory.createArrowFunction(
+              undefined,
+              undefined,
+              parameters,
+              undefined,
+              undefined,
+              factory.createParenthesizedExpression(body),
+            );
+          }
+
+          function unwrap(expression: TS.Expression): TS.Expression {
+            while (ts.isParenthesizedExpression(expression))
+              expression = expression.expression;
+            return expression;
+          }
+
+          function keyedMap(
+            expression: TS.Expression,
+          ): TS.Expression | undefined {
+            const call = unwrap(expression);
+            if (
+              !ts.isCallExpression(call) ||
+              call.questionDotToken ||
+              !ts.isPropertyAccessExpression(call.expression) ||
+              call.expression.questionDotToken ||
+              call.expression.name.text !== "map" ||
+              call.arguments.length !== 1
+            )
+              return;
+            const renderRow = unwrap(call.arguments[0]);
+            if (
+              !ts.isArrowFunction(renderRow) ||
+              ts.isBlock(renderRow.body) ||
+              renderRow.parameters.length !== 1 ||
+              renderRow.modifiers?.length
+            )
+              return;
+            const [item] = renderRow.parameters;
+            if (
+              !ts.isIdentifier(item.name) ||
+              item.initializer ||
+              item.dotDotDotToken
+            )
+              return;
+            const row = unwrap(renderRow.body);
+            const opening = ts.isJsxElement(row) ? row.openingElement : row;
+            if (
+              !ts.isJsxOpeningElement(opening) &&
+              !ts.isJsxSelfClosingElement(opening)
+            )
+              return;
+            const key = opening.attributes.properties.findLast(
+              (prop) =>
+                ts.isJsxAttribute(prop) &&
+                ts.isIdentifier(prop.name) &&
+                prop.name.text === "key",
+            );
+            if (!key || !ts.isJsxAttribute(key) || !key.initializer) return;
+            if (opening.attributes.properties.some(ts.isJsxSpreadAttribute))
+              return;
+            const value = ts.isJsxExpression(key.initializer)
+              ? key.initializer.expression
+              : ts.isStringLiteral(key.initializer)
+                ? key.initializer
+                : undefined;
+            if (!value) return;
+
+            const attributes = factory.updateJsxAttributes(
+              opening.attributes,
+              opening.attributes.properties.filter((prop) => prop !== key),
+            );
+            const rowWithoutKey = ts.isJsxElement(row)
+              ? factory.updateJsxElement(
+                  row,
+                  factory.updateJsxOpeningElement(
+                    row.openingElement,
+                    row.openingElement.tagName,
+                    row.openingElement.typeArguments,
+                    attributes,
+                  ),
+                  row.children,
+                  row.closingElement,
+                )
+              : factory.updateJsxSelfClosingElement(
+                  opening as TS.JsxSelfClosingElement,
+                  opening.tagName,
+                  opening.typeArguments,
+                  attributes,
+                );
+            usedEach = true;
+            return factory.createCallExpression(each, undefined, [
+              arrow(call.expression.expression),
+              factory.createObjectLiteralExpression([
+                factory.createPropertyAssignment("key", arrow(value, [item])),
+                factory.createPropertyAssignment(
+                  "render",
+                  arrow(rowWithoutKey, [item]),
+                ),
+              ]),
+            ]);
+          }
 
           function readsState(node: TS.Node): boolean {
             if (
@@ -54,10 +162,16 @@ export function compileReactiveJsx(
             if (
               !ts.isJsxExpression(node) ||
               !node.expression ||
-              node.dotDotDotToken ||
-              !readsState(node.expression)
+              node.dotDotDotToken
             )
               return transformed;
+
+            const expression = (transformed as TS.JsxExpression).expression!;
+            if (!ts.isJsxAttribute(node.parent)) {
+              const list = keyedMap(expression);
+              if (list) return factory.updateJsxExpression(node, list);
+            }
+            if (!readsState(node.expression)) return transformed;
 
             let helper: TS.Identifier;
             if (ts.isJsxAttribute(node.parent)) {
@@ -77,23 +191,24 @@ export function compileReactiveJsx(
               usedRender = true;
               helper = render;
             }
-            const expression = (transformed as TS.JsxExpression).expression!;
-            const thunk = factory.createArrowFunction(
-              undefined,
-              undefined,
-              [],
-              undefined,
-              undefined,
-              factory.createParenthesizedExpression(expression),
-            );
             return factory.updateJsxExpression(
               node,
-              factory.createCallExpression(helper, undefined, [thunk]),
+              factory.createCallExpression(helper, undefined, [
+                arrow(expression),
+              ]),
             );
           };
 
           const result = ts.visitEachChild(file, visit, context);
           const imports: TS.ImportSpecifier[] = [];
+          if (usedEach)
+            imports.push(
+              factory.createImportSpecifier(
+                false,
+                factory.createIdentifier("each"),
+                each,
+              ),
+            );
           if (usedRender)
             imports.push(
               factory.createImportSpecifier(

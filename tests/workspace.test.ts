@@ -24,8 +24,9 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     const { edges, nodes } = app.graph();
     assert.equal(
       nodes.filter(({ id }) => id.startsWith("users.page.dom.") && id.endsWith(".render")).length,
-      2,
+      3,
     );
+    assert.ok(nodes.some(({ id }) => id.startsWith("users.page.dom.") && id.endsWith(".each")));
     assert.equal(
       edges.filter((edge) =>
         edge.to.startsWith("orders.page.dom.") &&

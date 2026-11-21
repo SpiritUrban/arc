@@ -76,6 +76,7 @@ export interface Binding extends GraphDefinition {
   name?: string;
   format?: (...values: any[]) => unknown;
   readAttribute?: () => unknown;
+  submitRunning?: Readable<boolean>;
   list?: KeyedList;
   block?: RenderBlock;
   handler?:
@@ -261,6 +262,7 @@ function directive(id: string, name: string, value: unknown): Binding[] {
       handler: action,
     });
     if (event === "submit") {
+      node.submitRunning = action.running;
       node.handler = (event, trace) => {
         event.preventDefault();
         if (action.get().running) return;
@@ -549,6 +551,7 @@ export function mount(
   compileArchitecture([def]);
   const scope = new Scope(),
     telemetry = options.telemetry ?? silentTelemetry;
+  const boundDisabled = new WeakSet<Element>();
   let root: Node | undefined;
   const attach = (
     b: Binding,
@@ -641,6 +644,41 @@ export function mount(
       return;
     }
     if (b.type === "event") {
+      let updateSubmitButtons: (() => void) | undefined;
+      if (b.submitRunning && element.localName === "form") {
+        const running = b.submitRunning;
+        const form = element as HTMLFormElement;
+        const disabled = new Set<HTMLInputElement | HTMLButtonElement>();
+        function restore() {
+          for (const button of disabled) button.disabled = false;
+          disabled.clear();
+        }
+        updateSubmitButtons = () => {
+          if (!running.get()) {
+            restore();
+            return;
+          }
+          const buttons = new Set([
+            ...Array.from(form.elements ?? []),
+            ...form.querySelectorAll("button, input[type=submit], input[type=image]"),
+          ]);
+          for (const element of buttons) {
+            const button = element as HTMLInputElement | HTMLButtonElement;
+            const type = button.getAttribute("type")?.toLowerCase();
+            const submit = button.localName === "button"
+              ? type !== "button" && type !== "reset"
+              : button.localName === "input" && (type === "submit" || type === "image");
+            if (submit && !button.disabled && !boundDisabled.has(button) &&
+                (button.form === form || (!button.form && !button.hasAttribute("form")))) {
+              button.disabled = true;
+              disabled.add(button);
+            }
+          }
+        };
+        scope.add(restore);
+        scope.add(running.subscribe(updateSubmitButtons));
+        updateSubmitButtons();
+      }
       const listener = (event: Event) => {
         const trace = { traceId: identity() };
         browserEvent(telemetry, telemetryId, "binding.event", trace);
@@ -649,6 +687,7 @@ export function mount(
             typeof b.handler === "function"
               ? b.handler(event, trace)
               : b.handler?.execute(b.input, { trace });
+          updateSubmitButtons?.();
           if (result && typeof (result as any).catch === "function")
             void (result as Promise<unknown>).catch((error) =>
               browserEvent(telemetry, telemetryId, "binding.error", trace, {
@@ -665,6 +704,7 @@ export function mount(
       scope.add(() => element.removeEventListener(b.name ?? "click", listener));
       return;
     }
+    if (b.type === "property" && b.name === "disabled") boundDisabled.add(element);
     const update = () => {
       if (scope.disposed) return;
       const start = performance.now(),

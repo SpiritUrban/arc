@@ -25,7 +25,7 @@ const { submit } = remoteForm(CreateTask, { refresh: [tasks] });
 const form = () => (
   <form on:submit={submit}>
     <input name="title" aria-label="Назва задачі" required />
-    <button type="submit" bind:disabled={submit.running}>Додати</button>
+    <button type="submit">Додати</button>
   </form>
 );
 ```
@@ -43,7 +43,7 @@ const { fields, submit } = remoteForm(CreateTask, {
 const form = () => (
   <form on:submit={submit}>
     <input aria-label="Назва задачі" bind:value={fields.title} required />
-    <button type="submit" bind:disabled={submit.running}>Додати</button>
+    <button type="submit">Додати</button>
   </form>
 );
 ```
