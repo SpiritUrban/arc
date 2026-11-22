@@ -34,7 +34,7 @@ batch(() => {
   quantity.set(3);
 });
 flush();
-assert.equal(total.get(), 75);
+assert.equal(total(), 75);
 total.dispose();
 quantity.dispose();
 ```
