@@ -14,7 +14,7 @@ const contentTypes = {
 
 const server = createServer(async (request, response) => {
   const path = new URL(request.url, "http://localhost").pathname;
-  if (handleApi(request, response, path)) return;
+  if (await handleApi(request, response, path)) return;
   if (request.method !== "GET" && request.method !== "HEAD") {
     response.writeHead(405, { allow: "GET, HEAD" }).end();
     return;
@@ -22,18 +22,25 @@ const server = createServer(async (request, response) => {
   if (/^\/assets\/[a-zA-Z0-9._-]+$/.test(path)) {
     try {
       const content = await readFile(new URL(path.slice(1), dist));
-      response.writeHead(200, {
-        "content-type": contentTypes[extname(path)] ?? "application/octet-stream",
-      }).end(content);
+      response
+        .writeHead(200, {
+          "content-type":
+            contentTypes[extname(path)] ?? "application/octet-stream",
+        })
+        .end(content);
     } catch (error) {
       response.writeHead(error.code === "ENOENT" ? 404 : 500).end();
     }
     return;
   }
-  const found = Object.values(paths).some((pattern) => matchPath(pattern, path));
-  response.writeHead(found ? 200 : 404, {
-    "content-type": "text/html; charset=utf-8",
-  }).end(index);
+  const found = Object.values(paths).some((pattern) =>
+    matchPath(pattern, path),
+  );
+  response
+    .writeHead(found ? 200 : 404, {
+      "content-type": "text/html; charset=utf-8",
+    })
+    .end(index);
 });
 
 const port = await listen(server, Number(process.env.PORT ?? 4325));

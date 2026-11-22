@@ -12,11 +12,14 @@
     "start": "node server/start.mjs"
   },
   "dependencies": {
+    "@tanstack/react-query": "5.108.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-router": "7.18.6"
+    "react-router": "7.18.6",
+    "zod": "4.6.7"
   },
   "devDependencies": {
+    "@types/node": "24.19.2",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "@vitejs/plugin-react": "6.0.5",

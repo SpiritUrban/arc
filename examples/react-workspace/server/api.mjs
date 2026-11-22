@@ -1,11 +1,12 @@
 import { createServer } from "node:http";
+import { handleUsers } from "./users.ts";
 
-export function handleApi(request, response, path) {
+export async function handleApi(request, response, path) {
   if (path !== "/api" && !path.startsWith("/api/")) return false;
   response.setHeader("content-type", "application/json; charset=utf-8");
   if (path === "/api/health" && request.method === "GET") {
     response.end(JSON.stringify({ ok: true }));
-  } else {
+  } else if (!(await handleUsers(request, response, path))) {
     response.writeHead(404).end(JSON.stringify({ error: "NOT_FOUND" }));
   }
   return true;
@@ -22,8 +23,9 @@ export function listen(server, port) {
 }
 
 export function apiServer() {
-  return createServer((request, response) => {
+  return createServer(async (request, response) => {
     const path = new URL(request.url, "http://localhost").pathname;
-    if (!handleApi(request, response, path)) response.writeHead(404).end();
+    if (!(await handleApi(request, response, path)))
+      response.writeHead(404).end();
   });
 }
