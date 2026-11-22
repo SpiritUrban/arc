@@ -20,9 +20,10 @@ npm --prefix tests/workspace-parity test
 
 ```sh
 npm --prefix tests/workspace-parity run benchmark
+WORKSPACE_API_DELAY_MS=40 npm --prefix tests/workspace-parity run benchmark
 ```
 
-Прогін вимірює застосунки послідовно в одному Chromium worker і додатково відкриває ARC Stand на порту 4430. Сирі спостереження та діагностика друкуються в рядках `WORKSPACE_BENCH`. [Порівняння й результати](../../docs/workspace-comparison.md)
+Прогін вимірює застосунки послідовно в одному Chromium worker і додатково відкриває ARC Stand на порту 4430. Сирі спостереження кожної фази submit, обсяг JS і діагностика друкуються в рядках `WORKSPACE_BENCH`. Другий запуск затримує доставку кожної з двох відповідей після submit на 40 мс. [Порівняння й результати](../../docs/workspace-comparison.md)
 
 ## Експеримент із полем замовлення
 

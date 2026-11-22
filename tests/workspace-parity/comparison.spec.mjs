@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 
 const repetitions = 10;
 const warmups = 2;
+const delayMs = Number(process.env.WORKSPACE_API_DELAY_MS ?? 0);
+const standLive = "http://127.0.0.1:4430/api/live";
 function stats(values) {
   const sorted = [...values].sort((a, b) => a - b);
   const midpoint = sorted.length / 2;
@@ -10,6 +12,21 @@ function stats(values) {
     p90: sorted[Math.ceil(sorted.length * 0.9) - 1],
     values,
   };
+}
+
+async function standInteraction(request, traceId, eventType) {
+  expect(traceId).toBeTruthy();
+  let interaction;
+  await expect
+    .poll(async () => {
+      const live = await (await request.get(standLive)).json();
+      interaction = live.interactions.find(
+        (entry) => entry.traceId === traceId,
+      );
+      return interaction?.browser.some(({ type }) => type === eventType);
+    })
+    .toBe(true);
+  return interaction;
 }
 
 test("Workspace startup, submit and stale-order diagnosis", async ({
@@ -23,6 +40,7 @@ test("Workspace startup, submit and stale-order diagnosis", async ({
   const orders = react ? "/api/orders" : "/orders";
   const listUsers = react ? users : "/_arc/call/users.list";
   const listOrders = react ? orders : "/_arc/call/orders.list";
+  const createOrder = react ? orders : "/_arc/call/orders.create";
   const cancel = react ? orders + "/cancel" : "/_arc/call/orders.cancel";
   const samples = [];
   let diagnosis;
@@ -71,32 +89,112 @@ test("Workspace startup, submit and stale-order diagnosis", async ({
         };
       });
 
+      const selectedOrders = page.waitForResponse(
+        (res) =>
+          matches(res, listOrders, react ? "GET" : "POST") &&
+          res.request().headers().authorization === `Bearer ${owner}`,
+      );
       await page
         .getByRole("button", {
           name: new RegExp(`benchmark-${index}@example.com`),
         })
         .click();
+      expect((await selectedOrders).ok()).toBe(true);
       await expect(page.getByText("Тут з’являться замовлення")).toBeVisible();
       const form = page.locator("form.order-form");
       await form.locator('[name="product"]').fill(sampleProduct);
       await form.locator('[name="quantity"]').fill("2");
-      await page.evaluate(() => {
+      await page.evaluate((product) => {
         const form = document.querySelector("form.order-form");
         form.addEventListener(
           "submit",
-          () => performance.mark("workspace-submit"),
-          { once: true },
+          () => {
+            performance.mark("workspace-submit");
+            const rows = document.querySelector("table tbody");
+            const observer = new MutationObserver(() => {
+              if (
+                [...rows.rows].some((row) => row.textContent.includes(product))
+              ) {
+                performance.mark("workspace-order-row");
+                observer.disconnect();
+              }
+            });
+            observer.observe(rows, {
+              childList: true,
+              characterData: true,
+              subtree: true,
+            });
+          },
+            { capture: true, once: true },
         );
-      });
+      }, sampleProduct);
+      const orderTraffic = (url) =>
+        [createOrder, listOrders].includes(url.pathname);
+      const pauseResponse = async (route) => {
+        const response = await route.fetch();
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        await route.fulfill({ response });
+      };
+      if (delayMs > 0) await page.route(orderTraffic, pauseResponse);
+      const calls = [];
+      const track = (req) => {
+        if (orderTraffic(new URL(req.url()))) calls.push(req);
+      };
+      page.on("request", track);
       const row = page.getByRole("row").filter({ hasText: sampleProduct });
       await form.getByRole("button", { name: /Створити/ }).click();
       await expect(row).toBeVisible();
-      const submitMs = await page.evaluate(
-        () =>
-          performance.now() -
-          performance.getEntriesByName("workspace-submit")[0].startTime,
+      page.off("request", track);
+      expect(
+        calls.map((req) => [new URL(req.url()).pathname, req.method()]),
+      ).toEqual([
+        [createOrder, "POST"],
+        [listOrders, react ? "GET" : "POST"],
+      ]);
+      const responses = await Promise.all(calls.map((req) => req.response()));
+      expect(responses.every((res) => res?.ok())).toBe(true);
+      await Promise.all(responses.map((res) => res.finished()));
+      const [write, read] = calls.map((req) => req.timing());
+      expect(write.responseEnd).toBeGreaterThanOrEqual(0);
+      expect(read.responseEnd).toBeGreaterThanOrEqual(0);
+      const [submit, rowReady] = await page.evaluate(() =>
+        ["workspace-submit", "workspace-order-row"].map(
+          (name) =>
+            performance.timeOrigin +
+            performance.getEntriesByName(name)[0].startTime,
+        ),
       );
-      if (index >= warmups) samples.push({ ...startup, submitMs });
+      const profile = {
+        submitMs: rowReady - submit,
+        beforeWriteMs: write.startTime - submit,
+        writeMs: write.responseEnd,
+        beforeReadMs: read.startTime - (write.startTime + write.responseEnd),
+        readMs: read.responseEnd,
+        afterReadMs: rowReady - (read.startTime + read.responseEnd),
+      };
+      const response = responses[0];
+      const traced =
+        react || index < warmups
+          ? undefined
+          : await standInteraction(
+              request,
+              await response.headerValue("x-arc-trace-id"),
+              "action.finished",
+            );
+      if (index >= warmups)
+        samples.push({
+          ...startup,
+          ...profile,
+          ...(traced && {
+            createOperationMs: traced.server.find(
+              ({ operation }) => operation === "orders.create",
+            ).duration,
+            listOperationMs: traced.server.find(
+              ({ operation }) => operation === "orders.list",
+            ).duration,
+          }),
+        });
+      if (delayMs > 0) await page.unroute(orderTraffic, pauseResponse);
 
       if (index === warmups + repetitions - 1) {
         // Simulate the same stale list on both stacks by cancelling outside the page.
@@ -132,22 +230,11 @@ test("Workspace startup, submit and stale-order diagnosis", async ({
           staleRow: (await row.innerText()).includes("Створено"),
         };
         if (!react) {
-          const traceId = await response.headerValue("x-arc-trace-id");
-          expect(traceId).toBeTruthy();
-          const readTrace = async () => {
-            const live = await (
-              await request.get("http://127.0.0.1:4430/api/live")
-            ).json();
-            return live.interactions.find((entry) => entry.traceId === traceId);
-          };
-          await expect
-            .poll(async () =>
-              (await readTrace())?.browser.some(
-                ({ type }) => type === "action.finished",
-              ),
-            )
-            .toBe(true);
-          const trace = await readTrace();
+          const trace = await standInteraction(
+            request,
+            await response.headerValue("x-arc-trace-id"),
+            "action.finished",
+          );
           diagnosis.browserNodes = [
             ...new Set(
               trace.browser.map(({ type, node }) => `${type} ${node}`),
@@ -173,8 +260,19 @@ test("Workspace startup, submit and stale-order diagnosis", async ({
     chromium: browser.version(),
     repetitions,
     warmups,
+    delayMs,
     readyMs: stats(samples.map(({ readyMs }) => readyMs)),
     submitMs: stats(samples.map(({ submitMs }) => submitMs)),
+    submitPhases: Object.fromEntries(
+      [
+        "beforeWriteMs",
+        "writeMs",
+        "beforeReadMs",
+        "readMs",
+        "afterReadMs",
+        ...(!react ? ["createOperationMs", "listOperationMs"] : []),
+      ].map((key) => [key, stats(samples.map((sample) => sample[key]))]),
+    ),
     clientJs: samples.map(
       ({ decodedJsBytes, wireJsBytes, scriptRequests }) => ({
         decodedJsBytes,
