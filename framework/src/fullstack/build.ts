@@ -62,13 +62,13 @@ async function buildPage(
     return {
       stdin: {
         contents: [
-          ...routerRoutes.map((route, index) => `import * as page${index} from ${JSON.stringify(resolve(route.entry))};`),
+          ...routerRoutes.map((route, index) => `const loadPage${index}=()=>import(${JSON.stringify(resolve(route.entry))});`),
           ...[...layoutAliases].map(([path, alias]) => {
             const entry = routerRoutes.flatMap((route) => route.layouts ?? []).find((layout) => layout.path === path)!.entry;
             return `import * as ${alias} from ${JSON.stringify(resolve(entry))};`;
           }),
           `import { bootstrapPages } from ${JSON.stringify(fileURLToPath(new URL("./page-bootstrap.js", import.meta.url)))};`,
-          `bootstrapPages([${routerRoutes.map((route, index) => `{page:page${index},id:${JSON.stringify(route.id)},path:${JSON.stringify(route.path)},layouts:[${(route.layouts ?? []).map((layout) => `{path:${JSON.stringify(layout.path)},module:${layoutAliases.get(layout.path)}}`).join(",")}]}`).join(",")}]);`,
+          `bootstrapPages([${routerRoutes.map((route, index) => `{load:loadPage${index},id:${JSON.stringify(route.id)},path:${JSON.stringify(route.path)},layouts:[${(route.layouts ?? []).map((layout) => `{path:${JSON.stringify(layout.path)},module:${layoutAliases.get(layout.path)}}`).join(",")}]}`).join(",")}]);`,
         ].join("\n"),
         resolveDir: dirname(resolve(routerRoutes[0]!.entry)),
         sourcefile: "arc-router-entry.js",
@@ -95,7 +95,12 @@ async function buildPage(
       jsx: "automatic" as const,
       jsxImportSource: "@arc/framework/web",
     } : {}),
-    outfile,
+    ...(routerRoutes ? {
+      outdir: dirname(outfile),
+      entryNames: "app",
+      chunkNames: "chunks/[hash]",
+      splitting: true,
+    } : { outfile }),
     bundle: true,
     platform: "browser",
     conditions: ["arc-source", "browser"],
@@ -168,7 +173,12 @@ async function buildPage(
     throw new Error(
       `ARC201 server implementation reached browser bundle: ${forbidden.join(", ")}`,
     );
-  return { inputs, bytes: Object.values(result.metafile!.outputs)[0]?.bytes ?? 0 };
+  const outputs = Object.entries(result.metafile!.outputs);
+  return {
+    inputs,
+    bytes: outputs.reduce((sum, [, output]) => sum + output.bytes, 0),
+    entryBytes: outputs.find(([path]) => resolve(path) === resolve(outfile))?.[1].bytes ?? 0,
+  };
 }
 
 export async function buildWeb(app: BuildHost, options: { outDir?: string } = {}) {
@@ -222,6 +232,7 @@ export async function buildWeb(app: BuildHost, options: { outDir?: string } = {}
     inputs: [...new Set(builds.flatMap((result) => result.inputs))],
     serverModules: [...serverModules],
     browserBytes: builds.reduce((sum, result) => sum + result.bytes, 0),
+    browserEntryBytes: builds.reduce((sum, result) => sum + result.entryBytes, 0),
     ...(config.pages ? { pages } : {}),
   };
   await Promise.all([
@@ -265,13 +276,14 @@ export async function staticWeb(
   });
   const script = pages.find((page) => page.script === path);
   const page = findWebPage(pages, path);
-  const file = script ? script.script.slice(1) : page && (!page.api || acceptsHtml) ? page.html : undefined;
+  const chunk = /^\/chunks\/[\w.-]+\.js$/.test(path) ? path.slice(1) : undefined;
+  const file = script ? script.script.slice(1) : chunk ?? (page && (!page.api || acceptsHtml) ? page.html : undefined);
   if (!file) return;
 
   try {
     const contents = await readFile(join(outDir, file));
     return new Response(request.method === "HEAD" ? null : contents, {
-      headers: script
+      headers: script || chunk
         ? { "content-type": "text/javascript; charset=utf-8" }
         : { "content-type": "text/html; charset=utf-8", ...(page?.api ? { vary: "Accept" } : {}) },
     });

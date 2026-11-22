@@ -1,13 +1,14 @@
 import { startWeb } from "../web/runtime.js";
 import { layoutView, rootView } from "../neutral/page-root.js";
 import { comparePagePaths, matchPagePath, pageParamNames } from "../neutral/page-path.js";
-import { pageView, outlet, type View } from "../web/view.js";
+import { pageView, outlet, view as defineView, type View } from "../web/view.js";
+import { jsx } from "../web/jsx-runtime.js";
 import { signal, type Signal } from "../web/reactive.js";
 import { telemetryTransport } from "./client.js";
 
 type PageModule = { default: unknown; title?: string; styles?: string };
 type BrowserRoute = {
-  page: PageModule;
+  load(): Promise<PageModule>;
   id: string;
   path: string;
   layouts: readonly { path: string; module: PageModule }[];
@@ -22,7 +23,7 @@ type RouteNode = {
   view?: View;
 };
 
-export function bootstrapPages(routes: readonly BrowserRoute[]) {
+export async function bootstrapPages(routes: readonly BrowserRoute[]) {
   const target = document.getElementById("app");
   if (!target) throw new Error("ARC page requires an #app container");
   const initialPath = window.location.pathname;
@@ -32,6 +33,20 @@ export function bootstrapPages(routes: readonly BrowserRoute[]) {
     .sort((a, b) => comparePagePaths(a.route.path, b.route.path))[0];
   const active = match(initialPath);
   if (!active) throw new Error(`No ARC page matches ${initialPath}`);
+  const pageModules = new Map<BrowserRoute, PageModule>();
+  const pageLoads = new Map<BrowserRoute, Promise<PageModule>>();
+  const loadPage = (route: BrowserRoute) => {
+    let load = pageLoads.get(route);
+    if (!load) {
+      load = route.load().then((module) => {
+        pageModules.set(route, module);
+        return module;
+      });
+      pageLoads.set(route, load);
+    }
+    return load;
+  };
+  await loadPage(active.route);
   const root: RouteNode = { path: "", layouts: new Map(), pages: [] };
   const pageViews = new Map<string, View>();
   for (const route of routes) {
@@ -47,21 +62,30 @@ export function bootstrapPages(routes: readonly BrowserRoute[]) {
     parent.pages.push(route);
   }
 
-  const makePage = (route: BrowserRoute, pathname: string) => {
+  const makePage = (route: BrowserRoute, pathname: string, module: PageModule) => {
     const key = `${route.path}\n${pathname}`;
     const cached = pageViews.get(key);
     if (cached) return cached;
     const params = matchPagePath(route.path, pathname) ?? Object.fromEntries(
       pageParamNames(route.path).map((name) => [name, ""]),
     );
-    const page = rootView(route.page.default, route.id, pageView, params);
+    const page = rootView(module.default, route.id, pageView, params);
     pageViews.set(key, page);
     return page;
   };
+  const emptyView = defineView({
+    id: "router:empty",
+    template: () => jsx("div", { style: "display:contents" }),
+  });
   const makeNode = (node: RouteNode): View => {
     const choices = [
+      emptyView,
       ...[...node.layouts.values()].map(makeNode),
-      ...node.pages.map((route) => makePage(route, route === active.route ? initialPath : route.path.replace(/:([\w]+)/g, ""))),
+      ...node.pages.filter((route) => pageModules.has(route)).map((route) => makePage(
+        route,
+        route === active.route ? initialPath : route.path.replace(/:([\w]+)/g, ""),
+        pageModules.get(route)!,
+      )),
     ];
     const current = signal<View>({
       id: node.path ? `router:${node.path}` : "router:root",
@@ -92,7 +116,7 @@ export function bootstrapPages(routes: readonly BrowserRoute[]) {
     ));
     if (nextLayout) return node.layouts.get(nextLayout.path)?.view;
     if (!node.path || route.layouts.some(({ path }) => path === node.path))
-      return node.pages.find((page) => page === route) ? makePage(route, initialPath) : undefined;
+      return node.pages.includes(route) ? makePage(route, initialPath, pageModules.get(route)!) : undefined;
     return undefined;
   }
 
@@ -116,10 +140,14 @@ export function bootstrapPages(routes: readonly BrowserRoute[]) {
       else anchor.removeAttribute("aria-current");
     }
   };
-  const applyRoute = (pathname: string) => {
+  let navigation = 0;
+  const applyRoute = async (pathname: string) => {
     const found = match(pathname);
     if (!found) return false;
-    const pageViewForRoute = (route: BrowserRoute) => makePage(route, pathname);
+    const currentNavigation = ++navigation;
+    const page = await loadPage(found.route);
+    if (currentNavigation !== navigation || pathname !== window.location.pathname) return true;
+    const pageViewForRoute = (route: BrowserRoute) => makePage(route, pathname, page);
     let node = root;
     const chain = found.route.layouts;
     for (const layout of chain) {
@@ -130,9 +158,9 @@ export function bootstrapPages(routes: readonly BrowserRoute[]) {
     }
     node.current!.set(pageViewForRoute(found.route));
     const activeLayouts = chain.map(({ path }) => layoutModules.get(path)!).filter(Boolean);
-    const title = found.route.page.title ?? [...activeLayouts].reverse().find((layout) => layout.title)?.title;
+    const title = page.title ?? [...activeLayouts].reverse().find((layout) => layout.title)?.title;
     if (title) document.title = title;
-    const styles = [...activeLayouts.map((layout) => layout.styles), found.route.page.styles].filter(Boolean).join("\n");
+    const styles = [...activeLayouts.map((layout) => layout.styles), page.styles].filter(Boolean).join("\n");
     if (styles) {
       if (!style) {
         style = document.createElement("style");
@@ -146,7 +174,7 @@ export function bootstrapPages(routes: readonly BrowserRoute[]) {
     updateCurrentLinks(pathname);
     return true;
   };
-  applyRoute(initialPath);
+  await applyRoute(initialPath);
   const app = startWeb(root.view!, target, { telemetry });
   updateCurrentLinks(initialPath);
   const click = (event: MouseEvent) => {
@@ -160,7 +188,7 @@ export function bootstrapPages(routes: readonly BrowserRoute[]) {
     if (changedPath && !match(url.pathname)) return;
     event.preventDefault();
     window.history.pushState({}, "", url.href);
-    if (changedPath) applyRoute(url.pathname);
+    if (changedPath) void applyRoute(url.pathname).catch(() => window.location.assign(url.href));
     if (url.hash) {
       const id = decodeURIComponent(url.hash.slice(1));
       setTimeout(() => target.ownerDocument.getElementById(id)?.scrollIntoView?.(), 0);
@@ -169,10 +197,11 @@ export function bootstrapPages(routes: readonly BrowserRoute[]) {
     }
   };
   const popstate = () => {
-    if (applyRoute(window.location.pathname) && window.location.hash) {
+    void applyRoute(window.location.pathname).then((matched) => {
+      if (!matched || !window.location.hash) return;
       const id = decodeURIComponent(window.location.hash.slice(1));
       setTimeout(() => target.ownerDocument.getElementById(id)?.scrollIntoView?.(), 0);
-    }
+    }).catch(() => window.location.reload());
   };
   target.addEventListener("click", click);
   window.addEventListener("popstate", popstate);
