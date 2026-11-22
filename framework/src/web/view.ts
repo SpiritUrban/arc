@@ -11,6 +11,7 @@ import {
   registerFormChecked,
   registerFormRadio,
   registerFormValue,
+  registerFormValues,
 } from "./form-value.js";
 import {
   attributeReader,
@@ -100,6 +101,7 @@ export interface Binding extends GraphDefinition {
   formValue?: Writable<string>;
   formChecked?: Writable<boolean>;
   formRadio?: Writable<string>;
+  formValues?: Writable<string[]>;
   list?: KeyedList;
   block?: RenderBlock;
   handler?:
@@ -219,6 +221,9 @@ function compileTemplate(id: string, root: TemplateChild) {
     const radioValue = child.tag === "input" && attributes.type === "radio"
       ? attributes.value
       : undefined;
+    const multipleSelect = child.tag === "select" &&
+      (attributes.multiple === true || attributes.multiple === "" ||
+        attributes.multiple === "multiple");
     for (const [name, value] of Object.entries(attributes)) {
       if (name === "onSubmit") {
         delete attributes[name];
@@ -287,6 +292,7 @@ function compileTemplate(id: string, root: TemplateChild) {
       attached.push(
         ...directive(`${id}.dom.${path}.${name}`, name, value, {
           radio: child.tag === "input" && attributes.type === "radio",
+          multiple: multipleSelect,
           radioValue,
         }),
       );
@@ -310,7 +316,7 @@ function directive(
   id: string,
   name: string,
   value: unknown,
-  options: { radio?: boolean; radioValue?: unknown } = {},
+  options: { radio?: boolean; multiple?: boolean; radioValue?: unknown } = {},
 ): Binding[] {
   if (name.startsWith("on:")) {
     const event = name.slice(3);
@@ -415,9 +421,36 @@ function directive(
       ];
     }
     case "bind:value": {
-      const field = source as Writable<string>;
-      if (transform || typeof field.set !== "function")
+      if (transform || typeof (source as { set?: unknown }).set !== "function")
         throw new TypeError("bind:value expects writable string state");
+      if (options.multiple) {
+        const field = source as Writable<string[]>;
+        if (!Array.isArray(field.get()))
+          throw new TypeError("select[multiple] bind:value expects string array state");
+        return [
+          binding({
+            id,
+            type: "property",
+            name: "selectedValues",
+            sources: [field],
+            formValues: field,
+          }),
+          binding({
+            id: `${id}.change`,
+            type: "event",
+            name: "change",
+            sources: [field],
+            handler(event, trace) {
+              const select = event.currentTarget as HTMLSelectElement;
+              field._trace = trace;
+              field.set(Array.from(select.selectedOptions, (option) => option.value));
+            },
+          }),
+        ];
+      }
+      const field = source as Writable<string>;
+      if (typeof field.get() !== "string")
+        throw new TypeError("bind:value expects string state");
       if (options.radio) {
         if (typeof options.radioValue !== "string")
           throw new TypeError("Radio bind:value requires a static string value");
@@ -970,6 +1003,7 @@ export function mount(
     if (b.formValue) scope.add(registerFormValue(element, b.formValue));
     if (b.formChecked) scope.add(registerFormChecked(element, b.formChecked));
     if (b.formRadio) scope.add(registerFormRadio(element, b.formRadio));
+    if (b.formValues) scope.add(registerFormValues(element, b.formValues));
     const update = () => {
       if (scope.disposed) return;
       const start = performance.now(),
@@ -979,6 +1013,10 @@ export function mount(
       else if (b.type === "children") {
         const content = renderTemplate(value, element.ownerDocument);
         element.replaceChildren(content);
+      } else if (b.type === "property" && b.name === "selectedValues") {
+        const selected = new Set(value as readonly string[]);
+        for (const option of (element as HTMLSelectElement).options)
+          option.selected = selected.has(option.value);
       } else if (b.type === "property") (element as any)[b.name!] = value;
       else if (b.type === "attribute") {
         if (value === false || value == null) element.removeAttribute(b.name!);

@@ -103,7 +103,7 @@ interface TemplateProps {
   "bind:children"?: Readable<TemplateChild> | Projection<TemplateChild>;
   "bind:disabled"?: Readable<boolean> | Projection<boolean>;
   "bind:visible"?: Readable<boolean> | Projection<boolean>;
-  "bind:value"?: Writable<string>;
+  "bind:value"?: Writable<string> | Writable<string[]>;
   "bind:checked"?: Writable<boolean>;
   onClick?: Action<void, unknown> | ((event: MouseEvent) => unknown);
   onSubmit?: Action<void, unknown> | ((event: SubmitEvent) => unknown);

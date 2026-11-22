@@ -180,7 +180,7 @@ type RemoteForm<C extends OperationContract, Field extends string> = {
 };
 
 type NamedSubmission = {
-  values: Record<string, string | number | boolean>;
+  values: Record<string, string | number | boolean | readonly string[]>;
   reset(ctx: ActionContext): void;
 };
 
@@ -188,10 +188,19 @@ function readNamedSubmission(
   form: HTMLFormElement,
   numericFields: ReadonlySet<string>,
   booleanFields: ReadonlySet<string>,
+  arrayFields: ReadonlySet<string>,
 ): NamedSubmission {
   const entries = new FormData(form);
   const values = Object.create(null) as NamedSubmission["values"];
   for (const [name, value] of entries) {
+    if (arrayFields.has(name)) {
+      if (typeof value !== "string")
+        throw new TypeError(`Expected text values for form field ${name}`);
+      const valuesForField = (values[name] as string[] | undefined) ?? [];
+      valuesForField.push(value.trim());
+      values[name] = valuesForField;
+      continue;
+    }
     if (typeof value !== "string" || Object.hasOwn(values, name))
       throw new TypeError(`Expected one text value for form field ${name}`);
     const text = value.trim();
@@ -216,12 +225,27 @@ function readNamedSubmission(
     values[checkbox.name] = checkbox.checked;
   }
 
+  const multipleSelects = Array.from(form.elements).filter(
+    (element): element is HTMLSelectElement =>
+      element.localName === "select" &&
+      (element as HTMLSelectElement).multiple &&
+      arrayFields.has((element as HTMLSelectElement).name),
+  );
+  for (const select of multipleSelects) {
+    if (!Object.hasOwn(values, select.name))
+      values[select.name] = Array.from(select.selectedOptions, (option) => option.value.trim());
+  }
+
   const fields = Array.from(form.elements).filter(
-    (element): element is HTMLInputElement | HTMLTextAreaElement =>
-      (element.localName === "input" || element.localName === "textarea") &&
+    (element): element is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement =>
+      (element.localName === "input" || element.localName === "textarea" ||
+        element.localName === "select") &&
       (entries.has((element as HTMLInputElement).name) ||
         ((element as HTMLInputElement).type === "checkbox" &&
-          booleanFields.has((element as HTMLInputElement).name))),
+          booleanFields.has((element as HTMLInputElement).name)) ||
+        ((element as HTMLInputElement).localName === "select" &&
+          (element as HTMLSelectElement).multiple &&
+          arrayFields.has((element as HTMLSelectElement).name))),
   );
   const snapshots = fields.map((field) => {
     const binding = formValue(field);
@@ -232,6 +256,10 @@ function readNamedSubmission(
         field.localName === "input"
           ? (field as HTMLInputElement).checked
           : undefined,
+      selected:
+        field.localName === "select" && (field as HTMLSelectElement).multiple
+          ? Array.from((field as HTMLSelectElement).selectedOptions, (option) => option.value)
+          : undefined,
       binding,
       stateValue: binding?.state.get(),
     };
@@ -239,15 +267,21 @@ function readNamedSubmission(
   return {
     values,
     reset(ctx) {
-      for (const { field, value, checked, binding, stateValue } of snapshots) {
+      for (const { field, value, checked, selected, binding, stateValue } of snapshots) {
         const isCheckedControl =
           field.localName === "input" &&
           ["checkbox", "radio"].includes((field as HTMLInputElement).type);
+        const isMultipleSelect =
+          field.localName === "select" && (field as HTMLSelectElement).multiple;
+        const currentSelected = isMultipleSelect
+          ? Array.from((field as HTMLSelectElement).selectedOptions, (option) => option.value)
+          : undefined;
         if (
           field.form !== form ||
           field.value !== value ||
           (isCheckedControl && (field as HTMLInputElement).checked !== checked) ||
-          (!isCheckedControl && entries.get(field.name) !== value) ||
+          (isMultipleSelect && JSON.stringify(currentSelected) !== JSON.stringify(selected)) ||
+          (!isCheckedControl && !isMultipleSelect && entries.get(field.name) !== value) ||
           formValue(field) !== binding
         ) continue;
         if (binding) {
@@ -257,6 +291,8 @@ function readNamedSubmission(
             field.value = binding.initial;
           } else if (binding.kind === "radio") {
             ctx.set(binding.state, binding.initial);
+          } else if (binding.kind === "values") {
+            ctx.set(binding.state, binding.initial);
           } else {
             ctx.set(binding.state, binding.initial);
             (field as HTMLInputElement).checked = binding.initial;
@@ -265,7 +301,13 @@ function readNamedSubmission(
           if (isCheckedControl)
             (field as HTMLInputElement).checked =
               (field as HTMLInputElement).defaultChecked;
-          else field.value = field.defaultValue;
+          else if (field.localName === "select")
+            for (const option of (field as HTMLSelectElement).options)
+              option.selected = option.defaultSelected;
+          else {
+            const textField = field as HTMLInputElement | HTMLTextAreaElement;
+            textField.value = textField.defaultValue;
+          }
         }
       }
     },
@@ -369,6 +411,11 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
       .filter(([, schema]) => schema.type === "boolean")
       .map(([name]) => name),
   );
+  const arrayFields = new Set(
+    Object.entries<{ type?: string; items?: { type?: string } }>(properties ?? {})
+      .filter(([, schema]) => schema.type === "array" && schema.items?.type === "string")
+      .map(([name]) => name),
+  );
   const names = Object.keys(fieldOptions ?? {}) as Field[];
   const definitions = names.map((name) => {
     const field = fieldOptions![name];
@@ -408,7 +455,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
         return result;
       }
       const submission = request &&
-        readNamedSubmission(request, numericFields, booleanFields);
+        readNamedSubmission(request, numericFields, booleanFields, arrayFields);
       const values = Object.fromEntries(
         names.map((name) => [name, fields[name].get()]),
       ) as Record<Field, string>;
