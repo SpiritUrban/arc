@@ -189,8 +189,8 @@ Legacy `queue(app, op, options)` та `schedule(app, op, options)` лишают�
 
 | API                                                      | Поточна semantics                                                      |
 | -------------------------------------------------------- | ---------------------------------------------------------------------- |
-| state({id,initial,scope?})                               | get/set/update/subscribe/dispose; explicit identity                    |
-| derive({id,from,compute})                                | cached readable, explicit reactive dependencies                        |
+| state({id,initial,scope?})                               | callable read plus get/set/update/subscribe/dispose; explicit identity  |
+| derive({id,from,compute})                                | cached callable readable, explicit reactive dependencies              |
 | batch(fn), flush(), tick()                               | synchronous writes group, immediate flush, await scheduled propagation |
 | binding({id,type,sources,name?,format?,handler?,input?}) | text/property/attribute/event/visible; input для action — fixed value  |
 | view({id,bindings,needs?,owned?,setup})                  | setup({document,scope,bind}) повертає root Node                        |

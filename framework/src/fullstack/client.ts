@@ -323,7 +323,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
       name,
       state({ id: `${id}.fields.${name}`, initial }),
     ]),
-  ) as Record<Field, Writable<string>>;
+  ) as unknown as Record<Field, Writable<string>>;
   const client = remoteClient(contract, {
     id: `${id}.remote`,
     baseUrl,

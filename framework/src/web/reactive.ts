@@ -111,13 +111,14 @@ type StateOptions<T> = {
   scope?: "application" | "view";
 };
 
-export function state<T>(def: StateOptions<T>): Writable<T> {
-  return createState(def, {});
+export function state<T>(def: StateOptions<T>): Signal<T> {
+  let node!: Signal<T>;
+  node = createState(def, () => node.get());
+  return node;
 }
 
 export function signal<T>(def: StateOptions<T>): Signal<T> {
-  const node: Signal<T> = createState(def, () => node.get());
-  return node;
+  return state(def);
 }
 
 function createState<T, Target extends object>(def: StateOptions<T>, target: Target) {
