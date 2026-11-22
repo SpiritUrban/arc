@@ -259,8 +259,7 @@ export function compileReactiveJsx(
                 return transformed;
               const name = node.parent.name.getText(file);
               if (
-                name === "key" || name === "value" || name === "checked" ||
-                name === "selected" || name.toLowerCase() === "srcdoc" ||
+                name === "key" || name.toLowerCase() === "srcdoc" ||
                 name.startsWith("bind:") || /^on/i.test(name)
               )
                 return transformed;

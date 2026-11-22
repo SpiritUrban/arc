@@ -62,8 +62,7 @@ function isReadable(value: unknown): value is Readable<unknown> {
 
 function reactiveAttributeName(name: string): string | undefined {
   if (
-    name === "key" || name === "value" || name === "checked" ||
-    name === "selected" || name.toLowerCase() === "srcdoc" ||
+    name === "key" || name.toLowerCase() === "srcdoc" ||
     name.startsWith("bind:") || /^on/i.test(name)
   )
     return;
@@ -245,7 +244,9 @@ function compileTemplate(id: string, root: TemplateChild) {
         delete attributes[name];
         attached.push(binding({
           id: `${id}.dom.${path}.${name}`,
-          type: "attribute",
+          type: ["value", "checked", "selected", "disabled"].includes(name)
+            ? "property"
+            : "attribute",
           name:
             name === "className" ? "class" : name === "htmlFor" ? "for" : name,
           sources: [],
@@ -256,7 +257,7 @@ function compileTemplate(id: string, root: TemplateChild) {
       }
       const reactiveName = reactiveAttributeName(name);
       if (isReadable(value) && reactiveName) {
-        const property = name === "disabled";
+        const property = ["value", "checked", "selected", "disabled"].includes(name);
         attached.push(binding({
           id: `${id}.dom.${path}.${name}`,
           type: property ? "property" : "attribute",
