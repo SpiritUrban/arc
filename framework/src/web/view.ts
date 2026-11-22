@@ -142,9 +142,10 @@ export interface View extends GraphDefinition {
 }
 type ViewOptions = Omit<
   View,
-  "kind" | "runtime" | "dependencies" | "needs" | "setup" | "bindings"
+  "kind" | "runtime" | "dependencies" | "needs" | "owned" | "setup" | "bindings"
 > & {
   needs?: GraphNeeds;
+  owned?: OwnedNodes;
 } & (
     | { setup: View["setup"]; bindings: readonly Binding[]; template?: never }
     | {
@@ -426,6 +427,11 @@ export function outlet(id: string, current: Readable<View>, choices: readonly Vi
 }
 
 type OwnedNode = NonNullable<View["owned"]>[number];
+type OwnedNodes = OwnedNode | readonly OwnedNode[];
+function ownedNodes(owned?: OwnedNodes): OwnedNode[] {
+  if (owned === undefined) return [];
+  return Array.isArray(owned) ? owned : [owned as OwnedNode];
+}
 
 export interface PageContext<Param extends string = string> {
   params: Readonly<Record<Param, string>>;
@@ -471,7 +477,7 @@ function scopedView(
 ): View {
   function create(scope?: Scope) {
     const fields = new Map<string, GraphDefinition>();
-    const owned = [...(def.owned ?? [])];
+    const owned = ownedNodes(def.owned);
     let building = true;
     const local: LocalFactory = (initial, name = String(fields.size)) => {
       if (!building) throw new Error(`Declare local state while building ${def.id}`);
@@ -512,8 +518,10 @@ function buildView({
   setup,
   bindings: declared,
   needs,
+  owned: ownedOption,
   ...def
 }: ViewOptions): View {
+  const owned = ownedNodes(ownedOption);
   const compiled =
     template && !declared ? compileTemplate(def.id, template()) : undefined;
   if (compiled && (!isTemplate(compiled.root) || compiled.root.tag === Fragment))
@@ -521,6 +529,7 @@ function buildView({
   const bindings = compiled?.bindings ?? declared ?? [];
   return {
     ...def,
+    owned,
     bindings,
     setup:
       setup ??
@@ -542,7 +551,7 @@ function buildView({
       ...graphNeeds(needs),
       ...(compiled?.views ?? []),
       ...bindings,
-      ...((def.owned ?? []) as GraphDefinition[]),
+      ...owned,
     ],
   };
 }

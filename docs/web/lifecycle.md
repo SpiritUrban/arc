@@ -29,7 +29,7 @@ const detail = webResource({
 });
 const page = view({
   id: "detail.page",
-  owned: [detail],
+  owned: detail,
   template: () => <section />,
 });
 ```
