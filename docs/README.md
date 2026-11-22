@@ -43,6 +43,7 @@ node --conditions=arc-source --import tsx --test docs/examples/tasks.test.ts
 [Перехід з ARC 0.1 на 0.2](migration-0.2.md) містить зміни bootstrap, IR, calls, errors, transports і package imports. [Звіт аудиту](audit/README.md) є зафіксованим результатом перевірки, а не автоматично оновлюваним test dashboard. `doc.md` — історичний архів концепції; джерело актуального API — цей посібник і `framework/src/`.
 
 [План ARC 0.7](roadmap-0.7.md) фіксує роботу над frontend API. [План ARC 0.8](roadmap-0.8.md) визначає гарантії графа, композиції доменів і діагностики виконання.
+[План ARC 0.9](roadmap-0.9.md) визначає відтворення Workspace на React і порівняння обох реалізацій.
 
 ## Web і Fullstack
 
