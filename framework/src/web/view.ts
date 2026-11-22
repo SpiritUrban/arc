@@ -221,6 +221,9 @@ function compileTemplate(id: string, root: TemplateChild) {
     const radioValue = child.tag === "input" && attributes.type === "radio"
       ? attributes.value
       : undefined;
+    const checkboxValue = child.tag === "input" && attributes.type === "checkbox"
+      ? attributes.value
+      : undefined;
     const multipleSelect = child.tag === "select" &&
       (attributes.multiple === true || attributes.multiple === "" ||
         attributes.multiple === "multiple");
@@ -292,6 +295,8 @@ function compileTemplate(id: string, root: TemplateChild) {
       attached.push(
         ...directive(`${id}.dom.${path}.${name}`, name, value, {
           radio: child.tag === "input" && attributes.type === "radio",
+          checkbox: child.tag === "input" && attributes.type === "checkbox",
+          checkboxValue,
           multiple: multipleSelect,
           radioValue,
         }),
@@ -316,7 +321,13 @@ function directive(
   id: string,
   name: string,
   value: unknown,
-  options: { radio?: boolean; multiple?: boolean; radioValue?: unknown } = {},
+  options: {
+    radio?: boolean;
+    checkbox?: boolean;
+    multiple?: boolean;
+    radioValue?: unknown;
+    checkboxValue?: unknown;
+  } = {},
 ): Binding[] {
   if (name.startsWith("on:")) {
     const event = name.slice(3);
@@ -423,6 +434,38 @@ function directive(
     case "bind:value": {
       if (transform || typeof (source as { set?: unknown }).set !== "function")
         throw new TypeError("bind:value expects writable string state");
+      if (options.checkbox) {
+        const field = source as Writable<string[]>;
+        if (!Array.isArray(field.get()))
+          throw new TypeError("Checkbox group bind:value expects string array state");
+        if (typeof options.checkboxValue !== "string")
+          throw new TypeError("Checkbox group bind:value requires a static string value");
+        const checkboxValue = options.checkboxValue;
+        return [
+          binding({
+            id,
+            type: "property",
+            name: "checked",
+            sources: [field],
+            format: (current) => (current as readonly string[]).includes(checkboxValue),
+            formValues: field,
+          }),
+          binding({
+            id: `${id}.change`,
+            type: "event",
+            name: "change",
+            sources: [field],
+            handler(event, trace) {
+              const input = event.currentTarget as HTMLInputElement;
+              const selected = new Set(field.get());
+              if (input.checked) selected.add(checkboxValue);
+              else selected.delete(checkboxValue);
+              field._trace = trace;
+              field.set([...selected]);
+            },
+          }),
+        ];
+      }
       if (options.multiple) {
         const field = source as Writable<string[]>;
         if (!Array.isArray(field.get()))

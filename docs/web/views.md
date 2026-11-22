@@ -47,8 +47,8 @@ ARC CLI використовує esbuild для браузерної збірк�
 | Директива | Що приймає та робить |
 | --- | --- |
 | `bind:text` | Читає state або derive й оновлює текст |
-| `bind:value` | Синхронізує поле або звичайний select зі string state, radio-групу зі спільним string state, а `<select multiple>` — зі string array |
-| `bind:checked` | Синхронізує checkbox із writable boolean state через property та change event |
+| `bind:value` | Синхронізує поле/select зі string state; radio-групу, checkbox-групу або `<select multiple>` — із відповідним string/string-array state |
+| `bind:checked` | Синхронізує одиночний checkbox із writable boolean state через property та change event |
 | `bind:disabled` | Оновлює DOM-властивість `disabled` із реактивного boolean |
 | `bind:visible` | Керує видимістю через властивість `hidden` |
 | `bind:children` | Замінює вміст контейнера реактивними TSX-елементами або текстом |
