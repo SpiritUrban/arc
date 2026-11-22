@@ -1,5 +1,5 @@
 import type { PageContext } from "@arc/framework/web";
-import { GetOrder, UpdateOrder } from "../../orders/contracts.ts";
+import { CancelOrder, GetOrder, UpdateOrder } from "../../orders/contracts.ts";
 import { orderClient } from "../../orders/client.ts";
 import { ordersData } from "../../orders/page.tsx";
 import { UsersPage } from "../../users/page.tsx";
@@ -10,6 +10,10 @@ export const title = "Деталі замовлення — ARC Workspace";
 export default function OrderDetail({ query }: PageContext<"id">) {
   const order = query(orderClient, GetOrder);
   const updateOrder = orderClient.mutation(UpdateOrder, {
+    update: [order.replace(), ordersData.replaceBy("id")],
+  });
+  const cancelOrder = orderClient.mutation(CancelOrder, {
+    id: "orders.detail-cancel.submit",
     update: [order.replace(), ordersData.replaceBy("id")],
   });
 
@@ -28,8 +32,27 @@ export default function OrderDetail({ query }: PageContext<"id">) {
               <p>Кількість {order().data?.quantity}</p>
               <p>Сума {money(order().data?.total ?? 0)}</p>
               <p>{order().data?.cancelled ? "Скасовано" : "Створено"}</p>
+              {!order().data?.cancelled && (
+                <button
+                  class="button secondary"
+                  type="button"
+                  disabled={cancelOrder().running}
+                  onClick={() => cancelOrder.run({ id: order().data!.id })}
+                >
+                  {cancelOrder().running ? "Скасовуємо…" : "Скасувати замовлення"}
+                </button>
+              )}
             </div>
           )}
+          <p class="error" role="alert">
+            {cancelOrder.failed("ORDER_ALREADY_CANCELLED")
+              ? "Замовлення вже скасовано."
+              : cancelOrder.failed("ORDER_NOT_FOUND")
+                ? "Замовлення не знайдено."
+                : cancelOrder().error
+                  ? "Не вдалося скасувати замовлення."
+                  : ""}
+          </p>
           {order().data && !order().data.cancelled && (
             <form data-edit-order novalidate onSubmit={updateOrder}>
               <h2>Редагувати замовлення</h2>

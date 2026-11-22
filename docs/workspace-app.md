@@ -28,7 +28,7 @@ npm test
 4. Відредагувати ім’я чи email вибраного користувача. Зайнятий email повертає типізовану бізнес-помилку.
 5. Створити для нього замовлення з назвою товару й кількістю 1–100. Ціна демонстраційна: 25 ₴ за одиницю.
 6. Переглянути його історію, кількість замовлень і загальну суму. Перемикання користувача завантажує його замовлення; попередня projection приховується одразу.
-7. Скасувати своє замовлення кнопкою в історії. Сервер перевіряє власника й поточний статус, після успіху рядок лишається в історії зі статусом «Скасовано».
+7. Скасувати замовлення з історії або сторінки деталей. Сервер перевіряє власника й поточний статус; після успіху detail і список показують «Скасовано».
 8. Відкрити деталі замовлення, змінити товар або кількість і зберегти. Під час збереження кнопка показує стан дії; detail query одразу приймає відповідь `UpdateOrder`. Скасоване замовлення редагувати не можна.
 
 Початковий користувач — Demo User. Repositories in-memory: перезапуск server скидає зміни. Вибір користувача — демонстраційна авторизація Bearer UUID, яку вже використовував backend; login/password та production identity не реалізовані.
@@ -60,6 +60,8 @@ orders.create.submit.fields.product / orders.create.submit.fields.quantity
 users.update.submit → users.update.submit.remote → users.update [server]
   UPDATES → users.list.query
 page:orders/[id] → orders.update.submit → orders.update.submit.remote → orders.update [server]
+  UPDATES → orders.get.query + orders.list.query
+page:orders/[id] → orders.detail-cancel.submit → orders.detail-cancel.submit.remote → orders.cancel [server]
   UPDATES → orders.get.query + orders.list.query
 orders.list.query → orders.visible → DOM bindings підсумку
 ```
