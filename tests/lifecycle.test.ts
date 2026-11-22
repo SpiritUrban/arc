@@ -366,6 +366,7 @@ test("queue/worker/ingress/schedule are compiled IR nodes, application owns drai
 });
 
 test("HTTP producer returns while its queued worker runs and Stand records both operations", async () => {
+  const releaseBlocker = latch();
   const workerStarted = latch();
   const releaseWorker = latch();
   const worker = operation({
@@ -373,6 +374,10 @@ test("HTTP producer returns while its queued worker runs and Stand records both 
     input: s.object({ report: s.string() }),
     output: s.string(),
     async run({ input }) {
+      if (input.report === "blocker") {
+        await releaseBlocker.promise;
+        return ok(input.report);
+      }
       workerStarted.release();
       await releaseWorker.promise;
       return ok(input.report);
@@ -413,6 +418,8 @@ test("HTTP producer returns while its queued worker runs and Stand records both 
     assert.ok(impact.includes(reports.id));
     assert.ok(impact.includes("worker:reports"));
     await app.start();
+    const runtime = app.queues.get(reports.id)!;
+    const blocker = runtime.enqueue({ report: "blocker" });
 
     const response = await handler(app)(new Request("http://localhost/reports", {
       method: "POST",
@@ -420,18 +427,30 @@ test("HTTP producer returns while its queued worker runs and Stand records both 
       body: JSON.stringify({ report: "weekly" }),
     }));
     assert.equal(response.status, 202);
+    assert.equal(runtime.metrics().pending, 1);
+    releaseBlocker.release();
+    assert.deepEqual(await blocker, ok("blocker"));
     await workerStarted.promise;
-    assert.equal(app.queues.get(reports.id)!.metrics().running, 1);
+    assert.equal(runtime.metrics().running, 1);
 
     const closing = app.close();
     releaseWorker.release();
     await closing;
     assert.deepEqual(await job, ok("weekly"));
     const live = await (await stand(app)(new Request("http://localhost/api/live"))).json();
-    const recorded = live.interactions.flatMap((interaction: { server: typeof app.traces }) =>
-      interaction.server.map((trace) => trace.operation));
-    assert.deepEqual(recorded.sort(), [worker.id, submit.id].sort());
+    const interactions: { traceId: string; server: typeof app.traces }[] = live.interactions;
+    const linked = interactions.find(({ server }) => server.some((trace) => trace.operation === submit.id));
+    assert.ok(linked);
+    assert.deepEqual(linked.server.map((trace) => trace.operation), [submit.id, worker.id]);
+    const [producerTrace, workerTrace] = linked.server;
+    const producerSpan = producerTrace.spans.find(({ node }) => node === submit.id);
+    assert.ok(producerSpan);
+    assert.equal(workerTrace.spans.find(({ node }) => node === worker.id)?.parentId, producerSpan.id);
+    const standalone = interactions.filter(({ traceId }) => traceId !== linked.traceId);
+    assert.deepEqual(standalone.flatMap(({ server }) => server.map(({ operation }) => operation)), [worker.id]);
+    assert.equal(standalone[0].server[0].spans.find(({ node }) => node === worker.id)?.parentId, undefined);
   } finally {
+    releaseBlocker.release();
     releaseWorker.release();
     await app.close();
   }

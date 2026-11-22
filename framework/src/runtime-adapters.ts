@@ -1,18 +1,23 @@
 import type {
   Application,
+  ExecutionOptions,
   QueueDefinition,
   ScheduleDefinition,
   Result,
 } from "./core.js";
+type QueueTrace = Pick<ExecutionOptions, "traceId" | "parentSpanId">;
+
 export function createQueueRuntime(
   app: Application,
   definition: QueueDefinition,
-  execute = (input: unknown) => app.execute(definition.operation.id, input),
+  execute: (input: unknown, trace?: QueueTrace) => Promise<Result>,
+  captureTrace: () => QueueTrace | undefined,
 ) {
   const concurrency = definition.concurrency ?? 4,
     capacity = definition.capacity ?? 1000;
   const pending: {
     input: unknown;
+    trace?: QueueTrace;
     resolve: (result: Result) => void;
     reject: (error: unknown) => void;
   }[] = [];
@@ -39,7 +44,7 @@ export function createQueueRuntime(
       const job = pending.shift()!;
       running++;
       state();
-      void execute(job.input)
+      void execute(job.input, job.trace)
         .then(
           (result) => {
             completed++;
@@ -66,7 +71,7 @@ export function createQueueRuntime(
       if (pending.length >= capacity)
         return Promise.reject(new Error("Queue capacity exceeded"));
       return new Promise((resolve, reject) => {
-        pending.push({ input, resolve, reject });
+        pending.push({ input, trace: captureTrace(), resolve, reject });
         state();
         pump();
       });

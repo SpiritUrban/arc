@@ -605,9 +605,7 @@ export class Application {
         for (const q of this.queueDefinitions)
           this.queues.set(
             q.id,
-            createQueueRuntime(this, q, (input) =>
-              this.runAccepted(q.operation.id, input),
-            ),
+            this.createQueue(q),
           );
         for (const schedule of this.scheduleDefinitions)
           this.scheduleRuntimes.set(
@@ -679,12 +677,23 @@ export class Application {
     )
       throw new Error("Invalid queue options");
     this.queueDefinitions.push(def);
-    const runtime = createQueueRuntime(this, def, (input) =>
-      this.runAccepted(def.operation.id, input),
-    );
+    const runtime = this.createQueue(def);
     this.queues.set(def.id, runtime);
     this.publish("graph.updated", def.id);
     return runtime;
+  }
+  private createQueue(definition: QueueDefinition) {
+    return createQueueRuntime(
+      this,
+      definition,
+      (input, trace) => this.runAccepted(definition.operation.id, input, trace),
+      () => {
+        const context = this.effectContext.getStore();
+        if (context && !context.scope.ended) {
+          return { traceId: context.scope.trace.id, parentSpanId: context.parentId };
+        }
+      },
+    );
   }
   attachSchedule(def: ScheduleDefinition) {
     this.validateTransport(def.id, def.operation);
