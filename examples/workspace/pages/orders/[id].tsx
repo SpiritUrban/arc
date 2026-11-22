@@ -7,15 +7,15 @@ import { money } from "../../ui.ts";
 
 export const title = "Деталі замовлення — ARC Workspace";
 
-export default function OrderDetail({ query }: PageContext<"id">) {
+export default function OrderDetail({ own, query }: PageContext<"id">) {
   const order = query(orderClient, GetOrder);
-  const updateOrder = orderClient.mutation(UpdateOrder, {
+  const updateOrder = own(orderClient.mutation(UpdateOrder, {
     update: [order.replace(), ordersData.replaceBy("id")],
-  });
-  const cancelOrder = orderClient.mutation(CancelOrder, {
+  }));
+  const cancelOrder = own(orderClient.mutation(CancelOrder, {
     id: "orders.detail-cancel.submit",
     update: [order.replace(), ordersData.replaceBy("id")],
-  });
+  }));
 
   return (
     <section>

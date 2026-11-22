@@ -82,10 +82,27 @@ test("Workspace order edit carries the submit trace to the server operation in S
     await waitFor(() => document.querySelector("[data-order-detail] h2")?.textContent === "Revised notebook",
       "detail updated from the mutation response");
     assert.ok(editTrace);
+    const mutationEvents = [
+      ["binding.event", "page:pages/orders/[id].dom."],
+      ["action.started", "orders.update.submit"],
+      ["remote.started", "orders.update.submit.remote"],
+      ["remote.finished", "orders.update.submit.remote"],
+      ["action.finished", "orders.update.submit"],
+    ] as const;
+    await waitFor(() => mutationEvents.every(([type, node]) => app.browserEvents.some((event) =>
+      event.traceId === editTrace && event.type === type &&
+      (type === "binding.event" ? event.node.startsWith(node) : event.node === node))),
+    "form, mutation and remote events share the server trace");
     const live = await (await stand(app)(new Request("http://localhost/api/live"))).json();
     const interaction = live.interactions.find(({ traceId }: { traceId: string }) => traceId === editTrace);
     assert.ok(interaction);
     assert.deepEqual(interaction.server.map(({ operation }: { operation: string }) => operation), ["orders.update"]);
+    const started = interaction.browser.find((event: (typeof app.browserEvents)[number]) =>
+      event.type === "action.started" && event.node === "orders.update.submit");
+    const remote = interaction.browser.find((event: (typeof app.browserEvents)[number]) =>
+      event.type === "remote.started" && event.node === "orders.update.submit.remote");
+    assert.ok(started?.spanId);
+    assert.equal(remote?.parentId, started.spanId);
     const outletIds = ["router-outlet:root", "router-outlet:/", "router-outlet:/orders"];
     for (const id of outletIds) {
       assert.ok(bundle.manifest.partitions?.browser.includes(id));

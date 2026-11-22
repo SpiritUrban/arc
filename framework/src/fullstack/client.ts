@@ -505,6 +505,11 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     },
   };
   const submit = callable ? action({ ...definition, callable: true }) : action(definition);
+  const activate = submit.activate;
+  submit.activate = (telemetry) => {
+    client.activate(telemetry ?? silentTelemetry);
+    activate(telemetry);
+  };
   if (updates.length) submit.relations = [
     ...(submit.relations ?? []),
     ...updates.map((update) => ({ to: update.target, kind: "UPDATES" as const })),
