@@ -135,7 +135,7 @@ interface EventContext {
 
 export interface TemplateElement {
   readonly [templateNode]: true;
-  readonly tag: string | typeof Fragment;
+  readonly tag: string | typeof Fragment | View;
   readonly props: TemplateProps;
 }
 
@@ -155,14 +155,16 @@ export function jsx<Props extends object>(
   props: Props | null,
   _key?: unknown,
 ): TemplateElement {
+  if (isNestedView(tag))
+    return { [templateNode]: true, tag, props: props ?? {} };
   if (typeof tag === "function") return tag((props ?? {}) as Props);
   return { [templateNode]: true, tag, props: props ?? {} };
 }
 
 export { jsx as jsxs };
 
-export function isNestedView(child: TemplateChild): child is View {
-  return child != null && typeof child === "object" && "kind" in child && child.kind === "view" && "setup" in child;
+export function isNestedView(child: unknown): child is View {
+  return child != null && (typeof child === "object" || typeof child === "function") && "kind" in child && child.kind === "view" && "setup" in child;
 }
 
 export function isTemplate(child: TemplateChild): child is TemplateElement {
@@ -224,6 +226,8 @@ export function renderTemplate(
     props: { children, bind: bindings, ...attributes },
   } = child;
   if (tag === Fragment) return renderTemplate(children, document, bind, mountView);
+  if (typeof tag !== "string")
+    throw new TypeError("Nested views must be declared in a static view template");
   const element = document.createElement(tag);
   for (const [name, value] of Object.entries(attributes)) {
     if (name.startsWith("bind:") || name.startsWith("on:"))

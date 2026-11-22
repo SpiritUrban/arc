@@ -14,7 +14,7 @@ export default function OrderDetail({ query }: PageContext<"id">) {
       <a href="/orders">← Усі замовлення</a>
       <h1>Деталі замовлення</h1>
       <div class="content-grid">
-        <div id="users">{UsersPage}</div>
+        <div id="users"><UsersPage /></div>
         <section class="panel" aria-label="Замовлення">
           {order().loading && <p role="status">Завантажуємо замовлення…</p>}
           {order().error ? <p class="error" role="alert">Замовлення не знайдено або недоступне.</p> : null}

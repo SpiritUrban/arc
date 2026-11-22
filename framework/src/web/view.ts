@@ -148,6 +148,7 @@ export function binding(
   };
 }
 export interface View extends GraphDefinition {
+  (): TemplateElement;
   kind: "view";
   [instantiateView]?(scope: Scope): View;
   bindings: readonly Binding[];
@@ -181,11 +182,15 @@ function compileTemplate(id: string, root: TemplateChild) {
   function visit(child: TemplateChild, path: string): TemplateChild {
     if (Array.isArray(child))
       return child.map((item, index) => visit(item, `${path}.${index}`));
-    if (typeof child === "function" && !isReadable(child))
-      child = render(child);
     if (isNestedView(child)) {
       views.add(child);
       return child;
+    }
+    if (typeof child === "function" && !isReadable(child))
+      child = render(child);
+    if (isTemplate(child) && isNestedView(child.tag)) {
+      views.add(child.tag);
+      return child.tag;
     }
     if (isRenderBlock(child)) {
       const region = binding({
@@ -724,7 +729,7 @@ function buildView({
   if (compiled && (!isTemplate(compiled.root) || compiled.root.tag === Fragment))
     throw new Error("A view template must have one root HTML element");
   const bindings = compiled?.bindings ?? declared ?? [];
-  return {
+  return asView({
     ...def,
     owned,
     bindings,
@@ -750,7 +755,13 @@ function buildView({
       ...bindings,
       ...owned,
     ],
-  };
+  });
+}
+
+function asView(definition: Omit<View, "call">): View {
+  const node = (() => jsx(node, {})) as View;
+  Object.assign(node, definition);
+  return node;
 }
 
 function sameItem(previous: unknown, current: unknown): boolean {

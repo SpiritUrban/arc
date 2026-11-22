@@ -174,11 +174,11 @@ ARC створює новий сигнал під час кожного монт
 ```tsx
 const WorkspacePage = view({
   id: "workspace.page",
-  template: <main><>{UsersPage}{OrdersPage}</></main>,
+  template: <main><><UsersPage /><OrdersPage /></></main>,
 });
 ```
 
-ARC додає вкладені view до графа з шаблону, монтує їх разом із батьківським view і очищає їхні підписки під час демонтажу. У браузерній точці входу імпортуйте `startWeb` з `@arc/framework/web` і викличте `startWeb(WorkspacePage, target)`. Повернений застосунок має метод `dispose()`.
+Оголошений `view` можна використовувати як JSX-тег, як звичайний компонент. Він лишається окремим вузлом графа зі своїм mount і lifecycle; звичайні функції-компоненти, що повертають TSX, залишаються легкими шаблонними компонентами. ARC додає вкладені view до графа, монтує їх разом із батьківським і очищає їхні підписки під час демонтажу. У браузерній точці входу імпортуйте `startWeb` з `@arc/framework/web` і викличте `startWeb(WorkspacePage, target)`. Повернений застосунок має метод `dispose()`.
 
 ## Явні bindings
 
