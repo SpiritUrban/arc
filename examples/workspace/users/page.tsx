@@ -2,9 +2,9 @@
 // локальний пошук фільтрує їх, а вибір рядка змінює список замовлень.
 import { view } from "@arc/framework/web";
 import { mutation } from "@arc/framework/fullstack";
-import { CreateUser } from "./contracts.ts";
+import { CreateUser, UpdateUser } from "./contracts.ts";
 import { failureMessage } from "../ui.ts";
-import { selectedUser, users } from "../user-selection.ts";
+import { activeUser, selectedUser, users } from "../user-selection.ts";
 
 // CreateUser — спільний контракт. На сервері його виконує createUser у ./server.ts.
 export const addUser = mutation(CreateUser, {
@@ -13,6 +13,9 @@ export const addUser = mutation(CreateUser, {
   onSuccess(user, ctx) {
     ctx.set(selectedUser, user.id);
   },
+});
+const updateUser = mutation(UpdateUser, {
+  update: users.replaceBy("id"),
 });
 
 
@@ -117,6 +120,54 @@ export const UsersPage = view({
               users().error,
           )}
         </p>
+        {activeUser() && (
+          <>
+            <div class="panel-divider"></div>
+            <h3>Редагувати вибраного користувача</h3>
+            <form data-edit-user onSubmit={updateUser}>
+              <input type="hidden" name="id" value={activeUser()!.id} />
+              <label>
+                Ім’я
+                <input
+                  name="name"
+                  required
+                  minlength="2"
+                  maxlength="100"
+                  value={activeUser()!.name}
+                  aria-invalid={updateUser.invalid("name")}
+                />
+              </label>
+              <p class="error" role="alert">
+                {updateUser.invalid("name") && "Перевірте ім’я користувача."}
+              </p>
+              <label>
+                Email
+                <input
+                  name="email"
+                  required
+                  type="email"
+                  value={activeUser()!.email}
+                  aria-invalid={updateUser.invalid("email") || updateUser.failed("EMAIL_EXISTS")}
+                />
+              </label>
+              <p class="error" role="alert">
+                {updateUser.failed("EMAIL_EXISTS")
+                  ? "Користувач із такою поштою вже існує."
+                  : updateUser.invalid("email") && "Перевірте адресу email."}
+              </p>
+              <button class="button secondary" type="submit" disabled={updateUser().running}>
+                {updateUser().running ? "Зберігаємо…" : "Зберегти користувача"}
+              </button>
+              <p class="error" role="alert">
+                {updateUser.failed("USER_NOT_FOUND")
+                  ? "Користувача не знайдено."
+                  : updateUser().error && !updateUser.invalid() && !updateUser.failed("EMAIL_EXISTS")
+                    ? failureMessage(updateUser().error)
+                    : ""}
+              </p>
+            </form>
+          </>
+        )}
       </section>
     );
   },

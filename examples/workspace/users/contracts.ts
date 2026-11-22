@@ -21,3 +21,15 @@ export const CreateUser = operationContract({
   errors: { EMAIL_EXISTS: 409 },
   expose: { web: true },
 });
+
+export const UpdateUser = operationContract({
+  id: "users.update",
+  input: s.object({
+    id: s.uuid(),
+    name: s.string({ min: 2, max: 100 }),
+    email: s.email(),
+  }),
+  output: User,
+  errors: { USER_NOT_FOUND: 404, EMAIL_EXISTS: 409 },
+  expose: { web: true },
+});

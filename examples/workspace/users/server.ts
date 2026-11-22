@@ -10,14 +10,14 @@ import {
   ok,
   error,
 } from "@arc/framework";
-import { User, ListUsers, CreateUser } from "./contracts.ts";
+import { User, ListUsers, CreateUser, UpdateUser } from "./contracts.ts";
 export { User } from "./contracts.ts";
 type User = ReturnType<typeof User.parse>;
 // Сховище живе в пам’яті одного запуску. Початковий запис дає Workspace демо-користувача.
 export const usersRepository = resource({
   id: "users.repository",
   // instrument додає виклики методів до трас. effects описує читання й запис у графі.
-  instrument: ["find", "list", "create"],
+  instrument: ["find", "list", "create", "update"],
   effects: ["memory.read", "memory.write"],
   open: () => {
     const users = new Map<string, User>([
@@ -39,6 +39,15 @@ export const usersRepository = resource({
           return undefined;
         const user = { id: randomUUID(), name, email };
         users.set(user.id, user);
+        return user;
+      },
+      update: async (id: string, name: string, email: string) => {
+        const current = users.get(id);
+        if (!current) return "USER_NOT_FOUND" as const;
+        if ([...users.values()].some((user) => user.id !== id && user.email === email))
+          return "EMAIL_EXISTS" as const;
+        const user = { id, name, email };
+        users.set(id, user);
         return user;
       },
     };
@@ -67,6 +76,14 @@ export const createUser = operation(CreateUser, {
   },
 });
 
+export const updateUser = operation(UpdateUser, {
+  needs: { users: usersRepository },
+  run: async ({ input, users }) => {
+    const result = await users.update(input.id, input.name, input.email);
+    return typeof result === "string" ? error(result) : ok(result);
+  },
+});
+
 // Список використовують і REST-маршрут GET /users, і браузерний remote(ListUsers).
 export const listUsers = operation(ListUsers, {
   needs: { users: usersRepository },
@@ -75,10 +92,11 @@ export const listUsers = operation(ListUsers, {
 // Модуль реєструє операції та прив’язує частину з них до звичайних HTTP-маршрутів.
 export const users = module({
   id: "users",
-  operations: [getUser, createUser, listUsers],
+  operations: [getUser, createUser, updateUser, listUsers],
   routes: [
     http.get("/users", listUsers),
     http.get("/users/:id", getUser),
     http.post("/users", createUser, { status: 201 }),
+    http.put("/users/:id", updateUser),
   ],
 });
