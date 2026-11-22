@@ -29,7 +29,7 @@ import {
   state,
   type Computed,
   type Readable,
-  type Writable,
+  type Signal,
 } from "../web/reactive.js";
 import type { GraphDefinition } from "../neutral/graph.js";
 export type RemoteResult<C extends OperationContract> =
@@ -173,7 +173,7 @@ type RemoteFormOptions<C extends OperationContract> = {
   fetch?: typeof globalThis.fetch;
 };
 type RemoteForm<C extends OperationContract, Field extends string> = {
-  fields: Record<Field, Writable<string>>;
+  fields: Record<Field, Signal<string>>;
   submit: Action<void, RemoteResult<C>>;
 };
 
@@ -324,7 +324,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
       name,
       state({ id: `${id}.fields.${name}`, initial }),
     ]),
-  ) as unknown as Record<Field, Writable<string>>;
+  ) as unknown as Record<Field, Signal<string>>;
   const client = remoteClient(contract, {
     id: `${id}.remote`,
     baseUrl,
