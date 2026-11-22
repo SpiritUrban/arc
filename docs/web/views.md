@@ -44,15 +44,17 @@ ARC CLI використовує esbuild для браузерної збірк�
 
 ## Директиви
 
-| Директива | Що приймає та робить |
+Для read-only значень не потрібен префікс `bind:`: вставляйте readable як `{count}`, а властивості задавайте напряму — `disabled={busy}`, `class={style}`, `aria-pressed={selected}`. Так само можна передати `href`, `title`, `value`, `checked` та `data-*`.
+
+Двосторонній зв’язок із формами задавайте явно:
+
+| Директива | Що робить |
 | --- | --- |
-| `bind:text` | Читає state або derive й оновлює текст |
 | `bind:value` | Синхронізує поле/select зі string state; radio-групу, checkbox-групу або `<select multiple>` — із відповідним string/string-array state |
-| `bind:checked` | Синхронізує одиночний checkbox із writable boolean state через property та change event |
-| `bind:disabled` | Оновлює DOM-властивість `disabled` із реактивного boolean |
+| `bind:checked` | Синхронізує одиночний checkbox із writable boolean state |
 | `bind:visible` | Керує видимістю через властивість `hidden` |
-| `bind:children` | Замінює вміст контейнера реактивними TSX-елементами або текстом |
-| `on:click`, `on:submit` та інші `on:…` | Підписуються на DOM-подію та викликають функцію або ARC action без аргументів |
+
+Події задавайте через `onClick`, `onSubmit` або `on:…` для інших DOM-подій. Вони приймають обробник або ARC action.
 
 Radio-кнопки однієї групи використовують спільний string state:
 
@@ -63,7 +65,7 @@ Radio-кнопки однієї групи використовують спіл
 
 `on:submit` скасовує стандартну навігацію та ігнорує повторний submit, поки дія виконується. ARC на цей час блокує кнопки надсилання без явного `bind:disabled`. У Stand дія з’єднана з event-вузлом ребром `TRIGGERS`; залежності даних видно через `BINDS`.
 
-Read-only значення можна передавати в атрибути напряму: `href={url}`, `title={label}`, `class={style}`, `disabled={busy}`, `value={text}`, `checked={checked}`, `aria-pressed={selected}` або `data-state={status}`. Це оновлює DOM-властивість чи атрибут. `bind:value` окремо синхронізує поле зі станом у дві сторони; `bind:visible` керує видимістю.
+Read-only значення оновлюють DOM-властивість чи атрибут. `bind:value` окремо синхронізує поле зі станом у дві сторони; `bind:visible` керує видимістю.
 
 Директиви прикріплюйте до елементів основного шаблону. Для `bind:children` можна повертати фрагменти й масиви елементів; при оновленні ARC замінює вміст контейнера. Події зі змінних рядків можна делегувати через binding на цьому контейнері. [Форми й списки](forms-and-events.md)
 
