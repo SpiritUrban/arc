@@ -166,7 +166,7 @@ type RemoteFormOptions<C extends OperationContract> = {
   needs?: GraphNeeds;
   /** Reload these resources after a successful submission. */
   refresh?: WebResource<any, any> | readonly WebResource<any, any>[];
-  /** An alias for refresh. When both are present, refresh takes precedence. */
+  /** @deprecated Use `refresh`. When both are present, `refresh` takes precedence. */
   invalidates?: WebResource<any, any> | readonly WebResource<any, any>[];
   /** Apply local state changes after a successful response, before refreshing resources. */
   onSuccess?: (value: Infer<C["output"]>, ctx: ActionContext) => void;
