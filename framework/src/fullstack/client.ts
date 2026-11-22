@@ -180,7 +180,7 @@ type RemoteForm<C extends OperationContract, Field extends string> = {
 };
 
 type NamedSubmission = {
-  values: Record<string, string | number | boolean | readonly string[]>;
+  values: Record<string, string | number | boolean | readonly (string | number)[]>;
   reset(ctx: ActionContext): void;
 };
 
@@ -188,16 +188,24 @@ function readNamedSubmission(
   form: HTMLFormElement,
   numericFields: ReadonlySet<string>,
   booleanFields: ReadonlySet<string>,
-  arrayFields: ReadonlySet<string>,
+  arrayFields: ReadonlyMap<string, string>,
 ): NamedSubmission {
   const entries = new FormData(form);
   const values = Object.create(null) as NamedSubmission["values"];
   for (const [name, value] of entries) {
-    if (arrayFields.has(name)) {
+    const arrayItemType = arrayFields.get(name);
+    if (arrayItemType) {
       if (typeof value !== "string")
         throw new TypeError(`Expected text values for form field ${name}`);
-      const valuesForField = (values[name] as string[] | undefined) ?? [];
-      valuesForField.push(value.trim());
+      const valuesForField =
+        (values[name] as (string | number)[] | undefined) ?? [];
+      const text = value.trim();
+      valuesForField.push(
+        (arrayItemType === "number" || arrayItemType === "integer") &&
+            /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)
+          ? Number(text)
+          : text,
+      );
       values[name] = valuesForField;
       continue;
     }
@@ -412,10 +420,13 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
       .filter(([, schema]) => schema.type === "boolean")
       .map(([name]) => name),
   );
-  const arrayFields = new Set(
+  const arrayFields = new Map(
     Object.entries<{ type?: string; items?: { type?: string } }>(properties ?? {})
-      .filter(([, schema]) => schema.type === "array" && schema.items?.type === "string")
-      .map(([name]) => name),
+      .filter(([, schema]) =>
+        schema.type === "array" &&
+        ["string", "number", "integer"].includes(schema.items?.type ?? ""),
+      )
+      .map(([name, schema]) => [name, schema.items!.type!]),
   );
   const names = Object.keys(fieldOptions ?? {}) as Field[];
   const definitions = names.map((name) => {
