@@ -10,7 +10,7 @@ const attributeExpression = Symbol("ARC reactive JSX attribute");
 export const Fragment = Symbol("ARC template fragment");
 
 type TextValue = string | number | boolean | null | undefined;
-type RenderContent = TemplateElement | TextValue | readonly RenderContent[];
+type RenderContent = TemplateElement | TextValue | View | readonly RenderContent[];
 export type ExpressionReferences = () => readonly unknown[];
 export interface RenderBlock {
   readonly [reactiveBlock]: true;

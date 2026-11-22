@@ -8,7 +8,8 @@ import { wireContract } from "../neutral/descriptor.js";
 import { comparePagePaths, matchPagePath } from "../neutral/page-path.js";
 import type { ArchitectureIR, GraphDefinition } from "../neutral/graph.js";
 import { fileURLToPath } from "node:url";
-type BuildPage = { path: string; entry: string; id?: string; layouts?: readonly string[] };
+type BuildLayout = { path: string; entry: string };
+type BuildPage = { path: string; entry: string; id?: string; layouts?: readonly BuildLayout[] };
 export type PageAssets = { path: string; html: string; script: string; api?: boolean };
 
 export interface BuildHost {
@@ -47,18 +48,39 @@ async function buildPage(
   ir: ArchitectureIR,
   serverModules: Set<string>,
   reactiveEntries: ReadonlySet<string>,
-  layouts: readonly string[] = [],
+  layouts: readonly BuildLayout[] = [],
+  routerRoutes?: readonly BuildPage[],
 ) {
   const entry = resolve(source);
   const browserCore = fileURLToPath(
     new URL("../core-entry.js", import.meta.url),
   );
-  const input = id
+  const routerInput = routerRoutes ? (() => {
+    const layoutAliases = new Map<string, string>();
+    for (const route of routerRoutes) for (const layout of route.layouts ?? [])
+      if (!layoutAliases.has(layout.path)) layoutAliases.set(layout.path, `layout${layoutAliases.size}`);
+    return {
+      stdin: {
+        contents: [
+          ...routerRoutes.map((route, index) => `import * as page${index} from ${JSON.stringify(resolve(route.entry))};`),
+          ...[...layoutAliases].map(([path, alias]) => {
+            const entry = routerRoutes.flatMap((route) => route.layouts ?? []).find((layout) => layout.path === path)!.entry;
+            return `import * as ${alias} from ${JSON.stringify(resolve(entry))};`;
+          }),
+          `import { bootstrapPages } from ${JSON.stringify(fileURLToPath(new URL("./page-bootstrap.js", import.meta.url)))};`,
+          `bootstrapPages([${routerRoutes.map((route, index) => `{page:page${index},id:${JSON.stringify(route.id)},path:${JSON.stringify(route.path)},layouts:[${(route.layouts ?? []).map((layout) => `{path:${JSON.stringify(layout.path)},module:${layoutAliases.get(layout.path)}}`).join(",")}]}`).join(",")}]);`,
+        ].join("\n"),
+        resolveDir: dirname(resolve(routerRoutes[0]!.entry)),
+        sourcefile: "arc-router-entry.js",
+      },
+    };
+  })() : undefined;
+  const input = routerInput ?? (id
     ? {
         stdin: {
           contents: [
             `import * as page from ${JSON.stringify(entry)};`,
-            ...layouts.map((layout, index) => `import * as layout${index} from ${JSON.stringify(layout)};`),
+            ...layouts.map((layout, index) => `import * as layout${index} from ${JSON.stringify(resolve(layout.entry))};`),
             `import { bootstrapPage } from ${JSON.stringify(fileURLToPath(new URL("./page-bootstrap.js", import.meta.url)))};`,
             `bootstrapPage(page, ${JSON.stringify(id)}, ${JSON.stringify(path)}${layouts.length ? `, [${layouts.map((_, index) => `layout${index}`).join(", ")}]` : ""});`,
           ].join("\n"),
@@ -66,10 +88,10 @@ async function buildPage(
           sourcefile: "arc-page-entry.js",
         },
       }
-    : { entryPoints: [entry] };
+      : { entryPoints: [entry] });
   const result = await build({
     ...input,
-    ...(id ? {
+    ...(id || routerRoutes ? {
       jsx: "automatic" as const,
       jsxImportSource: "@arc/framework/web",
     } : {}),
@@ -159,6 +181,7 @@ export async function buildWeb(app: BuildHost, options: { outDir?: string } = {}
   const declaredRoutes = config.pages ?? [{ path: "/", entry: config.entry, id: config.bootstrap?.id }];
   const pages = declaredRoutes.map(({ path }) => ({
     ...pageAssets(path),
+    ...(config.pages ? { script: "/app.js" } : {}),
     api: Boolean(config.pages) && hasReadRoute(path, ir),
   }));
   const serverModules = new Set((config.serverModules ?? []).map((file) => resolve(file)));
@@ -168,18 +191,29 @@ export async function buildWeb(app: BuildHost, options: { outDir?: string } = {}
   for (const [path, file] of Object.entries(config.layouts ?? {})) layouts.set(path, file);
   const routes = declaredRoutes.map((route) => {
     const applicable = [...layouts].filter(([base]) => base === "/" || route.path === base || route.path.startsWith(`${base}/`))
-      .sort(([a], [b]) => a.length - b.length).map(([, file]) => resolve(file));
+      .sort(([a], [b]) => a.length - b.length).map(([path, file]) => ({ path, entry: resolve(file) }));
     return { ...route, layouts: applicable };
   });
   for (const layout of layouts.values()) reactiveEntries.add(resolve(layout));
-  const builds = await Promise.all(routes.map(async (route, index) => {
-    const { html, script } = pages[index];
-    const result = await buildPage(route, join(outDir, script.slice(1)), ir, serverModules, reactiveEntries, route.layouts);
+  const writeHtml = async (page: PageAssets) => {
+    const { html, script } = page;
     await writeFile(join(outDir, html),
       `<!doctype html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ARC Application</title></head><body><div id="app"></div><script type="module" src="${script}"></script></body></html>`,
     );
-    return result;
-  }));
+  };
+  let builds;
+  if (config.pages) {
+    const result = await buildPage(routes[0]!, join(outDir, "app.js"), ir, serverModules, reactiveEntries, [], routes);
+    builds = [result];
+    await Promise.all(pages.map(writeHtml));
+  } else {
+    builds = await Promise.all(routes.map(async (route, index) => {
+      const page = pages[index]!;
+      const result = await buildPage(route, join(outDir, page.script.slice(1)), ir, serverModules, reactiveEntries, route.layouts);
+      await writeHtml(page);
+      return result;
+    }));
+  }
   const manifest = {
     version: 3,
     entry: config.entry,

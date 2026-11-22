@@ -74,7 +74,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     }
     assert.ok(built.manifest.inputs.includes("examples/workspace/pages/index.tsx"));
     assert.ok(built.manifest.inputs.includes("examples/workspace/pages/layout.tsx"));
-    assert.ok(built.manifest.inputs.some((input) => input.endsWith("arc-page-entry.js")));
+    assert.ok(built.manifest.inputs.some((input) => input.endsWith("arc-router-entry.js")));
     assert.ok(!built.manifest.inputs.includes("examples/workspace/users/server.ts"));
     assert.ok(!built.manifest.inputs.includes("examples/workspace/orders/server.ts"));
     assert.ok(!built.manifest.inputs.includes("examples/workspace/auth.ts"));
@@ -89,8 +89,9 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     assert.equal(ordersPage.status, 200);
     assert.match(ordersPage.headers.get("content-type")!, /text\/html/);
     const { document: ordersDocument, window: ordersWindow } = parseHTML(await ordersPage.text());
+    ordersWindow.location.href = `${origin}/orders`;
     const ordersScript = ordersDocument.querySelector("script")!.getAttribute("src")!;
-    assert.notEqual(ordersScript, "/app.js");
+    assert.equal(ordersScript, "/app.js");
     const asset = await fetch(`${origin}${ordersScript}`);
     assert.equal(asset.status, 200);
     const ordersCode = await asset.text();
@@ -103,6 +104,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     const { window, document } = parseHTML(
       '<html><head></head><body><div id="app"></div></body></html>',
     );
+    window.location.href = `${origin}/`;
     let createOrderRequests = 0;
     let cancelOrderRequests = 0;
     let listOrderRequests = 0;
@@ -147,6 +149,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       Response,
       Headers,
       FormData: BrowserFormData,
+      URL,
       AbortController,
       performance,
       queueMicrotask,
@@ -537,6 +540,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       window: {
         location: new URL(`${origin}${detailPath}`),
         addEventListener: detailWindow.addEventListener.bind(detailWindow),
+        removeEventListener: detailWindow.removeEventListener.bind(detailWindow),
       },
     }));
     try {

@@ -1238,8 +1238,8 @@ export class Application {
       if (!applicable.length) return nodes.get(entry)!;
       const createLayout = pageView;
       return applicable.map(([base, layout], index) => ({ base, layout, index })).reduceRight((child, { base, layout, index }) => layoutView(
-        layout.default, child, path, createLayout!,
-        Object.fromEntries(pageParamNames(path).map((name) => [name, ""])),
+        layout.default, child, base, createLayout!,
+        Object.fromEntries(pageParamNames(base).map((name) => [name, ""])),
         index === 0 ? `layout:${path}` : `layout:${path}:${base}`,
       ), nodes.get(entry)!);
     });

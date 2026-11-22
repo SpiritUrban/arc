@@ -17,6 +17,8 @@ import {
   isNestedView,
   isRenderBlock,
   isTemplate,
+  jsx,
+  render,
   renderTemplate,
   type ExpressionReferences,
   type KeyedList,
@@ -399,6 +401,18 @@ export function view<Initial extends Record<string, unknown>>(
   });
 }
 
+/** Switch between declared child views while keeping their parent view mounted. */
+export function outlet(id: string, current: Readable<View>, choices: readonly View[]): View {
+  return view({
+    id,
+    needs: Object.fromEntries(choices.map((child, index) => [`child${index}`, child])),
+    template: () => jsx("div", {
+      style: "display:contents",
+      children: render(() => current.get(), () => [current]),
+    }),
+  });
+}
+
 type OwnedNode = NonNullable<View["owned"]>[number];
 
 export interface PageContext<Param extends string = string> {
@@ -648,6 +662,7 @@ export function mount(
         const compiled = compileTemplate(b.id, value);
         return renderTemplate(compiled.root, document, (binding, child) =>
           attach(binding, child, contentScope, telemetryId),
+          (view, fragment) => contentScope.own(mount(view, fragment, { telemetry })),
         );
       };
       const updated = (sources: ReadonlySet<Readable<unknown>>, start: number) =>

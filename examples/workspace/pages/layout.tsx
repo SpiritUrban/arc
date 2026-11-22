@@ -3,14 +3,7 @@ import type { PageLayoutContext } from "@arc/framework/web";
 export { styles } from "../styles.ts";
 export const title = "ARC Workspace — користувачі та замовлення";
 
-export default function Layout({ children, route }: PageLayoutContext) {
-  const overview = route === "/";
-  const heading = overview
-    ? "Огляд"
-    : route === "/orders"
-      ? "Замовлення"
-      : "Деталі замовлення";
-
+export default function Layout({ children }: PageLayoutContext) {
   return (
     <div class="workspace">
       <aside class="sidebar">
@@ -19,21 +12,13 @@ export default function Layout({ children, route }: PageLayoutContext) {
         </a>
         <nav aria-label="Робочий простір">
           <div class="workspace-label">РОБОЧИЙ ПРОСТІР</div>
-          <a
-            class={overview ? "nav-item active" : "nav-item"}
-            href="/"
-            aria-current={overview ? "page" : undefined}
-          >
+          <a class="nav-item" href="/">
             <span>▦</span> Огляд
           </a>
           <a class="nav-item" href="/#users">
             <span>◎</span> Користувачі
           </a>
-          <a
-            class={!overview ? "nav-item active" : "nav-item"}
-            href="/orders"
-            aria-current={route === "/orders" ? "page" : undefined}
-          >
+          <a class="nav-item" href="/orders">
             <span>▤</span> Замовлення
           </a>
         </nav>
@@ -49,7 +34,7 @@ export default function Layout({ children, route }: PageLayoutContext) {
         <header class="topbar">
           <span>
             Workspace <span class="breadcrumb">/</span>{" "}
-            <strong>{heading}</strong>
+            <strong>ARC Workspace</strong>
           </span>
           <span class="environment">
             <span class="connection-dot"></span> Development
