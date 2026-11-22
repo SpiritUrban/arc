@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { handleOrders } from "./orders.ts";
 import { handleUsers } from "./users.ts";
 
 export async function handleApi(request, response, path) {
@@ -6,7 +7,10 @@ export async function handleApi(request, response, path) {
   response.setHeader("content-type", "application/json; charset=utf-8");
   if (path === "/api/health" && request.method === "GET") {
     response.end(JSON.stringify({ ok: true }));
-  } else if (!(await handleUsers(request, response, path))) {
+  } else if (
+    !(await handleUsers(request, response, path)) &&
+    !(await handleOrders(request, response, path))
+  ) {
     response.writeHead(404).end(JSON.stringify({ error: "NOT_FOUND" }));
   }
   return true;

@@ -6,12 +6,18 @@ import {
   type User,
 } from "../src/users/contracts.ts";
 
+import { readJson, sendJson } from "./json.ts";
+
 const users = new Map<string, User>([
   [
     demoUserId,
     { id: demoUserId, name: "Demo User", email: "demo@example.com" },
   ],
 ]);
+
+export function findUser(id: string) {
+  return users.get(id);
+}
 
 export async function handleUsers(
   request: IncomingMessage,
@@ -26,7 +32,7 @@ export async function handleUsers(
     if (!id) {
       response.end(JSON.stringify([...users.values()]));
     } else {
-      const user = users.get(id);
+      const user = findUser(id);
       if (user) response.end(JSON.stringify(user));
       else
         response
@@ -40,33 +46,8 @@ export async function handleUsers(
   const editing = request.method === "PUT" && !!id;
   if (!creating && !editing) return false;
 
-  if (!request.headers["content-type"]?.includes("application/json")) {
-    response
-      .writeHead(415)
-      .end(JSON.stringify({ error: "UNSUPPORTED_MEDIA_TYPE" }));
-    return true;
-  }
-  let body: unknown;
-  try {
-    const chunks: Buffer[] = [];
-    for await (const chunk of request) chunks.push(chunk);
-    body = JSON.parse(Buffer.concat(chunks).toString());
-  } catch {
-    response.writeHead(400).end(JSON.stringify({ error: "INVALID_JSON" }));
-    return true;
-  }
-  const profile = profileSchema.safeParse(body);
-  if (!profile.success) {
-    const fields = [
-      ...new Set(
-        profile.error.issues.map(({ path }) => path[0]).filter(Boolean),
-      ),
-    ];
-    response
-      .writeHead(400)
-      .end(JSON.stringify({ error: "VALIDATION_ERROR", fields }));
-    return true;
-  }
+  const profile = await readJson(request, response, profileSchema);
+  if (!profile) return true;
   if (id && !users.has(id)) {
     response.writeHead(404).end(JSON.stringify({ error: "USER_NOT_FOUND" }));
     return true;
@@ -81,6 +62,6 @@ export async function handleUsers(
   }
   const user = { id: id ?? randomUUID(), ...profile.data };
   users.set(user.id, user);
-  response.writeHead(creating ? 201 : 200).end(JSON.stringify(user));
+  sendJson(response, creating ? 201 : 200, user);
   return true;
 }

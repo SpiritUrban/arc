@@ -11,6 +11,7 @@ import {
   useParams,
 } from "react-router";
 import { styles } from "../../workspace/styles.ts";
+import { OrdersPanel } from "./orders/panel.tsx";
 import { paths } from "./paths.ts";
 import { UserSelection, UsersPanel } from "./users/panel.tsx";
 
@@ -77,6 +78,7 @@ createRoot(document.getElementById("root")!).render(
                     <h1>Огляд</h1>
                     <div className="content-grid">
                       <UsersPanel />
+                      <OrdersPanel />
                     </div>
                   </>
                 }
@@ -88,6 +90,7 @@ createRoot(document.getElementById("root")!).render(
                     <h1>Замовлення</h1>
                     <div className="content-grid">
                       <UsersPanel />
+                      <OrdersPanel />
                     </div>
                   </>
                 }

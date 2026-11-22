@@ -1,19 +1,5 @@
+import { readResponse } from "../http.ts";
 import { userSchema, usersSchema, type Profile } from "./contracts.ts";
-
-export class ProfileError extends Error {
-  constructor(
-    code: string,
-    readonly fields: string[] = [],
-  ) {
-    super(code);
-  }
-}
-
-async function readResponse(response: Response) {
-  const body = await response.json();
-  if (!response.ok) throw new ProfileError(body.error, body.fields);
-  return body;
-}
 
 export async function listUsers(signal: AbortSignal) {
   return usersSchema.parse(

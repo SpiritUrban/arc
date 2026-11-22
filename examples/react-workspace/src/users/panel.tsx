@@ -6,7 +6,8 @@ import {
   type ReactNode,
 } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { listUsers, ProfileError, saveUser } from "./api.ts";
+import { ApiError } from "../http.ts";
+import { listUsers, saveUser } from "./api.ts";
 import {
   demoUserId,
   profileSchema,
@@ -26,6 +27,10 @@ export function UserSelection({ children }: { children: ReactNode }) {
   return (
     <Selection.Provider value={{ id, select }}>{children}</Selection.Provider>
   );
+}
+
+export function useSelectedUser() {
+  return useContext(Selection).id;
 }
 
 function ProfileForm({ user }: { user?: User }) {
@@ -73,7 +78,7 @@ function ProfileForm({ user }: { user?: User }) {
   }
 
   const error = mutation.error;
-  const failure = error instanceof ProfileError ? error : undefined;
+  const failure = error instanceof ApiError ? error : undefined;
   const nameInvalid =
     validation.includes("name") || failure?.fields.includes("name");
   const duplicate = failure?.message === "EMAIL_EXISTS";
@@ -156,13 +161,17 @@ function ProfileForm({ user }: { user?: User }) {
   );
 }
 
-export function UsersPanel() {
-  const { id, select } = useContext(Selection);
-  const [search, setSearch] = useState("");
-  const users = useQuery({
+export function useUsers() {
+  return useQuery({
     queryKey: usersKey,
     queryFn: ({ signal }) => listUsers(signal),
   });
+}
+
+export function UsersPanel() {
+  const { id, select } = useContext(Selection);
+  const [search, setSearch] = useState("");
+  const users = useUsers();
   const current = users.data?.find((user) => user.id === id);
   const visible =
     users.data?.filter((user) =>
