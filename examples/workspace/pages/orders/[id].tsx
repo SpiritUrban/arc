@@ -1,6 +1,6 @@
 import type { PageContext } from "@arc/framework/web";
 import { CancelOrder, GetOrder, UpdateOrder } from "../../orders/contracts.ts";
-import { orderClient } from "../../orders/client.ts";
+import { cancelAndReconcile, orderClient } from "../../orders/client.ts";
 import { ordersData } from "../../orders/page.tsx";
 import { UsersPage } from "../../users/page.tsx";
 import { money } from "../../ui.ts";
@@ -12,9 +12,10 @@ export default function OrderDetail({ own, query }: PageContext<"id">) {
   const updateOrder = own(orderClient.mutation(UpdateOrder, {
     update: [order.replace(), ordersData.replaceBy("id")],
   }));
+  const cancelUpdates = [order.replace(), ordersData.replaceBy("id")];
   const cancelOrder = own(orderClient.mutation(CancelOrder, {
     id: "orders.detail-cancel.submit",
-    update: [order.replace(), ordersData.replaceBy("id")],
+    update: cancelUpdates,
   }));
 
   return (
@@ -37,7 +38,10 @@ export default function OrderDetail({ own, query }: PageContext<"id">) {
                   class="button secondary"
                   type="button"
                   disabled={cancelOrder().running}
-                  onClick={() => cancelOrder.run({ id: order().data!.id })}
+                  onClick={() => {
+                    if (!cancelOrder().running)
+                      return cancelAndReconcile(cancelOrder, order().data!.id, cancelUpdates);
+                  }}
                 >
                   {cancelOrder().running ? "Скасовуємо…" : "Скасувати замовлення"}
                 </button>

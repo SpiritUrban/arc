@@ -64,7 +64,9 @@ async function hold(page, pathname, matches, { delayResponse = false } = {}) {
       const response = delayResponse ? await route.fetch() : undefined;
       arrived(route.request());
       await released;
-      const delivery = response ? route.fulfill({ response }) : route.continue();
+      const delivery = response
+        ? route.fulfill({ response })
+        : route.continue();
       await delivery.catch(() => {});
     };
     const pending = complete();
@@ -361,12 +363,10 @@ test("ORD-04–06 · ownership, detail update and independent cancellation", asy
     await listRefresh.release();
   }
   await expect(page.getByText("Завантажуємо замовлення…")).toHaveCount(0);
-  await test
-    .info()
-    .attach("order-reads", {
-      body: JSON.stringify(reads),
-      contentType: "application/json",
-    });
+  await test.info().attach("order-reads", {
+    body: JSON.stringify(reads),
+    contentType: "application/json",
+  });
   console.log(`${info.project.name} order reads: ${JSON.stringify(reads)}`);
 
   const firstButton = orderRow(page, "Робочий блокнот").getByRole("button", {
@@ -399,12 +399,20 @@ test("ORD-04–06 · ownership, detail update and independent cancellation", asy
       data: { id: first.id },
     });
     expect(external.ok()).toBeTruthy();
+    const readsBeforeConflict = reads.back;
     await firstHold.release();
     await expect(
       orderRow(page, "Робочий блокнот")
         .getByRole("alert")
         .filter({ hasText: "вже скасовано" }),
     ).toBeVisible();
+    if (!isReact(info)) {
+      await expect(orderRow(page, "Робочий блокнот")).toContainText(
+        "Скасовано",
+      );
+      await expect(firstButton).toHaveCount(0);
+      expect(reads.back).toBe(readsBeforeConflict);
+    }
     await expect(secondButton).toBeDisabled();
     await secondHold.release();
     await expect(orderRow(page, second.product)).toContainText("Скасовано");
@@ -416,12 +424,32 @@ test("ORD-04–06 · ownership, detail update and independent cancellation", asy
   }
 
   await orderRow(page, third.product).getByRole("link").click();
+  if (!isReact(info)) {
+    await expect(
+      orderDetail(page).getByRole("heading", { name: third.product }),
+    ).toBeVisible();
+    await expect(
+      orderDetail(page).getByText("Завантажуємо замовлення…"),
+    ).toHaveCount(0);
+    const external = await request.post(orderPath(info, "/cancel"), {
+      headers: auth(user.id),
+      data: { id: third.id },
+    });
+    expect(external.ok()).toBeTruthy();
+  }
+  const readsBeforeDetailConflict = reads.back;
   await orderDetail(page)
     .getByRole("button", { name: /Скасувати/ })
     .click();
   await expect(
     orderDetail(page).getByText("Скасовано", { exact: true }),
   ).toBeVisible();
+  if (!isReact(info)) {
+    await expect(
+      orderDetail(page).getByRole("alert").filter({ hasText: "вже скасовано" }),
+    ).toBeVisible();
+    expect(reads.back).toBe(readsBeforeDetailConflict);
+  }
   await expect(
     orderDetail(page).getByRole("button", { name: "Зберегти зміни" }),
   ).toHaveCount(0);

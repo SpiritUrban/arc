@@ -49,10 +49,11 @@ const ordersRepository = resource({
       async cancel(id: string, userId: string) {
         const index = orders.findIndex((order) => order.id === id && order.userId === userId);
         if (index < 0) return "ORDER_NOT_FOUND" as const;
-        if (orders[index].cancelled) return "ORDER_ALREADY_CANCELLED" as const;
-        const order = { ...orders[index], cancelled: true };
+        const current = orders[index];
+        if (current.cancelled) return { order: current, alreadyCancelled: true } as const;
+        const order = { ...current, cancelled: true };
         orders[index] = order;
-        return order;
+        return { order, alreadyCancelled: false } as const;
       },
     };
   },
@@ -93,9 +94,10 @@ const updateOrder = http.put("/orders/:id", UpdateOrder, {
 const cancelOrder = http.post("/orders/cancel", CancelOrder, {
   needs,
   effects: ["orders.write"],
-  async run({ input, user, orders }) {
+  async run({ input, user, orders, fail }) {
     const result = await orders.cancel(input.id, user.id);
-    return typeof result === "string" ? error(result) : ok(result);
+    if (typeof result === "string") return fail(result);
+    return result.alreadyCancelled ? fail("ORDER_ALREADY_CANCELLED", result.order) : ok(result.order);
   },
 });
 

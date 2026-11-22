@@ -3,7 +3,7 @@
 import { derive, view, type Signal } from "@arc/framework/web";
 import { ListOrders, CreateOrder, CancelOrder } from "./contracts.ts";
 import { activeUser } from "../user-selection.ts";
-import { orderClient } from "./client.ts";
+import { cancelAndReconcile, orderClient } from "./client.ts";
 import { money, failureMessage } from "../ui.ts";
 
 function renderOrdersPage(
@@ -167,7 +167,10 @@ function renderOrdersPage(
                           type="button"
                           data-cancel-order
                           disabled={cancelOrder.pending(order.id)}
-                          onClick={() => cancelOrder.run({ id: order.id })}
+                          onClick={() => {
+                            if (!cancelOrder.pending(order.id))
+                              return cancelAndReconcile(cancelOrder, order.id, [cancelListUpdate]);
+                          }}
                         >
                           {cancelOrder.pending(order.id) ? "Скасовуємо…" : "Скасувати"}
                         </button>
@@ -215,9 +218,10 @@ export const createOrder = orderClient.mutation(CreateOrder, {
   refresh: ordersData,
 });
 
+const cancelListUpdate = ordersData.replaceBy("id");
 const cancelOrder = orderClient.mutation(CancelOrder, {
   key: ({ id }) => id,
-  update: ordersData.replaceBy("id"),
+  update: cancelListUpdate,
 });
 
 export const visibleOrders = derive({

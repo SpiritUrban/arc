@@ -586,14 +586,14 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     const [firstRow, secondRow] = document.querySelectorAll("[data-order]");
     const orderId = firstRow.getAttribute("data-order")!;
     const secondId = secondRow.getAttribute("data-order")!;
-    const cancelOverRest = (actor: string) => handler(app)(
+    const cancelOverRest = (actor: string, id = orderId) => handler(app)(
       new Request("http://localhost/orders/cancel", {
         method: "POST",
         headers: {
           authorization: `Bearer ${actor}`,
           "content-type": "application/json",
         },
-        body: JSON.stringify({ id: orderId }),
+        body: JSON.stringify({ id }),
       }),
     );
     const denied = await cancelOverRest("00000000-0000-4000-8000-000000000001");
@@ -618,23 +618,18 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     // Simulate a cancellation from another tab while both browser requests are held.
     const external = await cancelOverRest(userId!);
     assert.equal(external.status, 200);
+    const readsBeforeCancel = listOrderRequests;
     releaseCancellations.get(orderId)!();
     await waitFor(() => rowError(orderId)?.includes("вже скасовано") === true);
-    assert.equal(firstButton.disabled, false);
+    await waitFor(() => status(orderId)?.includes("Скасовано") === true);
+    assert.equal(document.querySelector(`[data-order="${orderId}"] [data-cancel-order]`), null);
     assert.equal(secondButton.disabled, true);
     assert.match(secondButton.textContent!, /Скасовуємо/);
     assert.equal(rowError(secondId), "");
-    click(firstButton);
-    await waitFor(() => firstButton.disabled && cancelOrderRequests === 3);
-    assert.equal(rowError(orderId), "");
-    assert.equal(secondButton.disabled, true);
-    releaseCancellations.get(orderId)!();
-    await waitFor(() => rowError(orderId)?.includes("вже скасовано") === true);
-    const readsBeforeCancel = listOrderRequests;
     releaseCancellations.get(secondId)!();
     await waitFor(() => status(secondId)?.includes("Скасовано") === true);
     assert.equal(listOrderRequests, readsBeforeCancel);
-    assert.match(status(orderId)!, /Створено/);
+    assert.match(status(orderId)!, /Скасовано/);
     assert.match(rowError(orderId)!, /вже скасовано/);
     assert.equal(rowError(secondId), "");
     assert.equal(document.querySelector(`[data-order="${secondId}"] [data-cancel-order]`), null);
@@ -648,9 +643,16 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       event.type === "binding.event" && event.node.endsWith(".each") && event.traceId === cancelTrace.traceId,
     ));
     assert.ok(app.traces.some((t) => t.operation === "orders.cancel" && t.id === cancelTrace.traceId));
+    await waitFor(() => app.browserEvents.some((event) =>
+      event.type === "resource.updated" && event.node === "orders.list.query" &&
+      event.traceId === cancelTrace.traceId,
+    ));
     const duplicate = await cancelOverRest(userId!);
     assert.equal(duplicate.status, 409);
-    assert.match(await duplicate.text(), /ORDER_ALREADY_CANCELLED/);
+    const conflict = await duplicate.json();
+    assert.equal(conflict.error, "ORDER_ALREADY_CANCELLED");
+    assert.equal(conflict.details.id, orderId);
+    assert.equal(conflict.details.cancelled, true);
 
     input("[data-product]", "Cancel while switching");
     input("[data-quantity]", "1");
@@ -668,6 +670,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     document.querySelector(`[data-user="${demoId}"]`)!.dispatchEvent(new window.Event("click"));
     await waitFor(() => document.querySelector("[data-rows]")!.textContent === "" &&
       document.querySelector("[data-loading]")!.textContent === "");
+    assert.equal((await cancelOverRest(userId!, switchedId)).status, 200);
     const readsWhileAway = listOrderRequests;
     const finishedCancellations = () => app.browserEvents.filter(
       (event) => event.node === "orders.cancel.submit" && event.type === "action.finished",

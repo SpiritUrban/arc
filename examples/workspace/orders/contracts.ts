@@ -55,6 +55,9 @@ export const CancelOrder = operationContract({
   id: "orders.cancel",
   input: s.object({ id: s.uuid() }),
   output: Order,
-  errors: { ORDER_NOT_FOUND: 404, ORDER_ALREADY_CANCELLED: 409 },
+  errors: {
+    ORDER_NOT_FOUND: 404,
+    ORDER_ALREADY_CANCELLED: { status: 409, details: Order },
+  },
   expose: { web: true },
 });
