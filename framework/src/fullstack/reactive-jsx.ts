@@ -224,7 +224,41 @@ export function compileReactiveJsx(
                 while (ts.isParenthesizedExpression(handler) || ts.isAsExpression(handler) ||
                   ts.isTypeAssertionExpression(handler) || ts.isNonNullExpression(handler))
                   handler = handler.expression;
-                addReference(handler);
+                if (ts.isIdentifier(handler) || ts.isPropertyAccessExpression(handler)) {
+                  addReference(handler);
+                } else if (ts.isFunctionLike(handler) && handler.body) {
+                  const locals = new Set<string>();
+                  const addBindingNames = (name: TS.BindingName) => {
+                    if (ts.isIdentifier(name)) locals.add(name.text);
+                    else for (const element of name.elements)
+                      if (ts.isBindingElement(element)) addBindingNames(element.name);
+                  };
+                  for (const parameter of handler.parameters) addBindingNames(parameter.name);
+                  function scanLocals(statement: TS.Node) {
+                    if (ts.isVariableDeclaration(statement)) addBindingNames(statement.name);
+                    else if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name)
+                      locals.add(statement.name.text);
+                    ts.forEachChild(statement, scanLocals);
+                  }
+                  scanLocals(handler.body);
+                  function scanCalls(statement: TS.Node) {
+                    if (ts.isCallExpression(statement)) {
+                      const callee = statement.expression;
+                      if (ts.isIdentifier(callee) && !locals.has(callee.text)) {
+                        addReference(callee);
+                      } else if (ts.isPropertyAccessExpression(callee)) {
+                        const reference = ["run", "execute"].includes(callee.name.text)
+                          ? callee.expression
+                          : callee;
+                        let root = reference;
+                        while (ts.isPropertyAccessExpression(root)) root = root.expression;
+                        if (!ts.isIdentifier(root) || !locals.has(root.text)) addReference(reference);
+                      }
+                    }
+                    ts.forEachChild(statement, scanCalls);
+                  }
+                  scanCalls(handler.body);
+                }
               }
               ts.forEachChild(child, scanEventHandlers);
             }
