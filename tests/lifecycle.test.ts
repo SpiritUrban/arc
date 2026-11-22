@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { handler } from "../framework/src/http.ts";
+import { stand } from "../framework/src/stand.ts";
 import {
   application,
   resource,
@@ -361,6 +363,68 @@ test("queue/worker/ingress/schedule are compiled IR nodes, application owns drai
   await app.close();
   assert.equal((await Promise.all(results)).length, 2);
   await assert.rejects(app.queues.get("jobs")!.enqueue({}));
+});
+
+test("HTTP producer returns while its queued worker runs and Stand records both operations", async () => {
+  const workerStarted = latch();
+  const releaseWorker = latch();
+  const worker = operation({
+    id: "reports.render",
+    input: s.object({ report: s.string() }),
+    output: s.string(),
+    async run({ input }) {
+      workerStarted.release();
+      await releaseWorker.promise;
+      return ok(input.report);
+    },
+  });
+  const reports = queue({ id: "reports", operation: worker, concurrency: 1 });
+  let job: Promise<unknown> | undefined;
+  const submit = operation({
+    id: "reports.submit",
+    input: worker.input,
+    output: s.string(),
+    run({ input }): ReturnType<typeof ok<string>> {
+      job = app.queues.get(reports.id)!.enqueue(input);
+      void job.catch(() => {});
+      return ok("accepted");
+    },
+  });
+  const app = application({
+    routes: [http.post("/reports", submit, { status: 202 })],
+    queues: [reports],
+  });
+  try {
+    await app.compile();
+    const hasEdge = (from: string, to: string, kind: string) =>
+      edges.some((edge) => edge.from === from && edge.to === to && edge.kind === kind);
+    const { edges } = app.graph();
+    assert.ok(hasEdge("http:POST:/reports", submit.id, "ROUTES_TO"));
+    assert.ok(hasEdge("worker:reports", reports.id, "CONSUMES"));
+    assert.ok(hasEdge("worker:reports", worker.id, "CALLS"));
+    await app.start();
+
+    const response = await handler(app)(new Request("http://localhost/reports", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ report: "weekly" }),
+    }));
+    assert.equal(response.status, 202);
+    await workerStarted.promise;
+    assert.equal(app.queues.get(reports.id)!.metrics().running, 1);
+
+    const closing = app.close();
+    releaseWorker.release();
+    await closing;
+    assert.deepEqual(await job, ok("weekly"));
+    const live = await (await stand(app)(new Request("http://localhost/api/live"))).json();
+    const recorded = live.interactions.flatMap((interaction: { server: typeof app.traces }) =>
+      interaction.server.map((trace) => trace.operation));
+    assert.deepEqual(recorded.sort(), [worker.id, submit.id].sort());
+  } finally {
+    releaseWorker.release();
+    await app.close();
+  }
 });
 
 test("close rejects new public executions immediately while draining an active context", async () => {
