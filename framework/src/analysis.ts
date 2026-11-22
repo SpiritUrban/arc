@@ -7,8 +7,7 @@ export function analyzeGraph(ir: ArchitectureIR) {
   );
   const impact = new Map<string, Set<string>>();
   for (const edge of ir.edges) {
-    if (edge.kind === "EMITS") continue;
-    const flowsToTarget = ["DERIVES", "BINDS", "INVALIDATES", "UPDATES"].includes(edge.kind);
+    const flowsToTarget = ["DERIVES", "BINDS", "INVALIDATES", "UPDATES", "EMITS"].includes(edge.kind);
     const [source, affected] = flowsToTarget
       ? [edge.from, edge.to]
       : [edge.to, edge.from];

@@ -384,6 +384,7 @@ test("HTTP producer returns while its queued worker runs and Stand records both 
     id: "reports.submit",
     input: worker.input,
     output: s.string(),
+    emits: [reports],
     run({ input }): ReturnType<typeof ok<string>> {
       job = app.queues.get(reports.id)!.enqueue(input);
       void job.catch(() => {});
@@ -395,13 +396,22 @@ test("HTTP producer returns while its queued worker runs and Stand records both 
     queues: [reports],
   });
   try {
+    const wrongQueue = queue({ id: reports.id, operation: worker });
+    const invalid = application({ operations: [submit], queues: [wrongQueue] });
+    await assert.rejects(invalid.compile(), /Unregistered emitted queue: reports\.submit → reports/);
     await app.compile();
+    const graph = app.graph();
+    const { edges } = graph;
     const hasEdge = (from: string, to: string, kind: string) =>
       edges.some((edge) => edge.from === from && edge.to === to && edge.kind === kind);
-    const { edges } = app.graph();
     assert.ok(hasEdge("http:POST:/reports", submit.id, "ROUTES_TO"));
+    assert.ok(hasEdge(submit.id, reports.id, "EMITS"));
     assert.ok(hasEdge("worker:reports", reports.id, "CONSUMES"));
     assert.ok(hasEdge("worker:reports", worker.id, "CALLS"));
+    const impact = graph.analysis?.nodes.find(({ id }) => id === submit.id)?.affectedNodes;
+    assert.ok(impact);
+    assert.ok(impact.includes(reports.id));
+    assert.ok(impact.includes("worker:reports"));
     await app.start();
 
     const response = await handler(app)(new Request("http://localhost/reports", {

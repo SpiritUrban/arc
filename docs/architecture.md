@@ -41,10 +41,11 @@ try {
 | `DEPENDS_ON` | operation/resource → потрібний resource                                     |
 | `ROUTES_TO`  | http-route → operation                                                      |
 | `CALLS`      | operation → declared child operation; worker → operation; resource → effect |
+| `EMITS`      | operation → declared queue                                                  |
 | `CONSUMES`   | worker → queue                                                              |
 | `TRIGGERS`   | schedule → operation                                                        |
 
-`EMITS` зарезервовано в типі edge kinds; автоматичне виявлення producer-викликів enqueue не реалізовано. Черги та schedules оголошуються у application/module до compile, тому доступні у graph без start. Legacy runtime helpers можуть приєднати транспорт до вже активного application: це явно додає вузли/ребра та публікує `graph.updated`, але не компілює нові операції.
+Операція оголошує цільові черги через `emits: [queueDefinition]`. Компілятор перевіряє, що цей самий об’єкт черги зареєстровано в застосунку, і додає `EMITS`. Декларація описує можливу передачу роботи. Виклик `enqueue` лишається явним у реалізації операції. Черги та schedules оголошуються у application/module до compile, тому доступні у graph без start. Legacy runtime helpers можуть приєднати транспорт до вже активного application: це явно додає вузли/ребра та публікує `graph.updated`, але не компілює нові операції.
 
 Готовий приклад IR: [architecture-ir.json](audit/architecture-ir.json).
 
@@ -100,7 +101,7 @@ SSE `/api/events` передає operation, resource, queue/worker і metrics ev
 
 Estimate-модель: власна declared cost + max шлях залежностей/CALLS. Це умовна структурна оцінка за метаданими, а не гарантована нижня межа runtime latency: application-вузли враховуються в графі, хоча їхній open не повторюється на кожний execution. Послідовні calls, умовні гілки та тривалість методів із JS не виводяться. Відсутня оцінка на шляху дає null. Budget warning порівнює саме цю модель із declared budget. Scope-review warning є рекомендацією, scope leak — compilation error. Це не runtime measurement і не прогноз пропускної здатності. Поля `dependents` і `blastRadius` використовують ребра `DEPENDS_ON` і `CALLS`.
 
-Поле `affectedNodes` показує транзитивний статичний вплив. Від операції обхід іде до входів і викликачів, а від джерела даних до споживачів за ребрами `DERIVES`, `BINDS`, `INVALIDATES` і `UPDATES`. Результат містить унікальні ID і виключає початковий вузол. Для `orders.update` він охоплює PUT-маршрут, браузерну мутацію й обидва запити, які вона оновлює. Фактичне виконання окремої дії показує trace.
+Поле `affectedNodes` показує транзитивний статичний вплив. Від операції обхід іде до входів і викликачів, а від джерела даних до споживачів за ребрами `DERIVES`, `BINDS`, `INVALIDATES` і `UPDATES`. Для оголошеного `EMITS` обхід іде від producer до черги та її worker. Результат містить унікальні ID і виключає початковий вузол. Для `orders.update` він охоплює PUT-маршрут, браузерну мутацію й обидва запити, які вона оновлює. Фактичне виконання окремої дії показує trace.
 
 ## Карта реалізації
 

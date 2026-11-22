@@ -89,6 +89,7 @@ export interface Operation<
   needs: N;
   errors: E;
   calls: C;
+  emits?: readonly QueueDefinition[];
   run(
     ctx: Values<N> & {
       input: I;
@@ -168,6 +169,7 @@ export function operation<
     errors: {} as E,
     calls: {} as C,
     ...definition,
+    ...(definition.emits && { emits: Object.freeze([...definition.emits]) }),
   });
 }
 export interface QueueDefinition {
@@ -489,6 +491,12 @@ export class Application {
       ...this.scheduleDefinitions.map((s) => s.operation),
     ])
       visit(node);
+    const queues = new Set(this.queueDefinitions);
+    for (const node of nodes.values())
+      if (node.kind === "operation")
+        for (const target of node.emits ?? [])
+          if (!target || !queues.has(target))
+            throw new Error(`Unregistered emitted queue: ${node.id} → ${target?.id ?? "<missing>"}`);
     const paths = new Set<string>();
     for (const r of this.routes) {
       if (
@@ -1133,6 +1141,13 @@ export class Application {
             to: child.id,
             name,
             kind: "CALLS" as const,
+          })),
+        ),
+        ...this.operations.flatMap((op) =>
+          (op.emits ?? []).map((target) => ({
+            from: op.id,
+            to: target.id,
+            kind: "EMITS" as const,
           })),
         ),
         ...this.routes.map((r) => ({
