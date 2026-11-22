@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 
 const arc = "http://127.0.0.1:4428";
 const react = "http://127.0.0.1:4429";
+const benchmark = process.env.WORKSPACE_BENCH === "1";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const reactRoot = fileURLToPath(
   new URL("../../examples/react-workspace/", import.meta.url),
@@ -10,13 +11,17 @@ const reactRoot = fileURLToPath(
 
 export default defineConfig({
   testDir: ".",
-  testMatch: "workspace.spec.mjs",
-  workers: 2,
+  testMatch: benchmark ? "comparison.spec.mjs" : "workspace.spec.mjs",
+  workers: benchmark ? 1 : 2,
   webServer: [
     {
-      command: "npm run build && node framework/arc.mjs start",
+      command: `npm run build && node framework/arc.mjs ${benchmark ? "stand" : "start"}`,
       cwd: root,
-      env: { ARC_APP: "dist/examples/workspace/app.js", PORT: "4428" },
+      env: {
+        ARC_APP: "dist/examples/workspace/app.js",
+        PORT: "4428",
+        STAND_PORT: "4430",
+      },
       url: arc,
       timeout: 120_000,
     },

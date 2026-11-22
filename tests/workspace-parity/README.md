@@ -15,3 +15,20 @@ npm --prefix tests/workspace-parity test
 Для прогону лише одного застосунку додайте `-- --project=arc` або `-- --project=react`. Трасу невдалої перевірки Playwright зберігає в `test-results/`.
 
 [Сценарії й початкові дані](../../docs/workspace-parity.md)
+
+## Порівняльний прогін
+
+```sh
+npm --prefix tests/workspace-parity run benchmark
+```
+
+Прогін вимірює застосунки послідовно в одному Chromium worker і додатково відкриває ARC Stand на порту 4430. Сирі спостереження та діагностика друкуються в рядках `WORKSPACE_BENCH`. [Порівняння й результати](../../docs/workspace-comparison.md)
+
+## Експеримент із полем замовлення
+
+В окремому checkout від `1d2afd3` застосуйте [патч](reference-field.patch). Шлях у команді вказує на патч із поточної версії репозиторію. Потім встановіть залежності командами з розділу запуску та виконайте цільовий тест.
+
+```sh
+git apply --unidiff-zero /path/to/reference-field.patch
+npm --prefix tests/workspace-parity test -- -g "reference experiment"
+```
