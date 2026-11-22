@@ -419,12 +419,23 @@ type LocalViewOptions<Initial extends Record<string, unknown>> = LocalViewBase<I
   state(): Initial;
 };
 type PrimitiveInitial = string | number | boolean | bigint | null | undefined;
+type ScalarLocalViewOptions<Initial extends PrimitiveInitial> = Omit<
+  ViewOptions, "template" | "bindings" | "setup"
+> & {
+  state: Initial | (() => Initial);
+  template(value: Signal<Initial>): TemplateElement;
+  bindings?: never;
+  setup?: never;
+};
 type StaticViewState<Initial extends Record<string, PrimitiveInitial>> = {
   [Key in keyof Initial]: Initial[Key];
 };
 type StaticLocalViewOptions<Initial extends Record<string, PrimitiveInitial>> =
   LocalViewBase<Initial> & { state: StaticViewState<Initial> };
 
+export function view<Initial extends PrimitiveInitial>(
+  options: ScalarLocalViewOptions<Initial>,
+): View;
 export function view<Initial extends Record<string, unknown>>(
   options: LocalViewOptions<Initial>,
 ): View;
@@ -433,17 +444,25 @@ export function view<Initial extends Record<string, PrimitiveInitial>>(
 ): View;
 export function view(options: ViewOptions): View;
 export function view<Initial extends Record<string, unknown>>(
-  options: ViewOptions | LocalViewOptions<Initial> | StaticLocalViewOptions<any>,
+  options:
+    | ViewOptions
+    | ScalarLocalViewOptions<PrimitiveInitial>
+    | LocalViewOptions<Initial>
+    | StaticLocalViewOptions<any>,
 ): View {
   if (!("state" in options)) return buildView(options);
 
   const { state: initialize, template, ...def } = options;
   return scopedView(def, ({ local }) => {
     const initial = typeof initialize === "function" ? initialize() : initialize;
+    if (initial === null || typeof initial !== "object")
+      return (template as (value: Signal<PrimitiveInitial>) => TemplateElement)(
+        local(initial as PrimitiveInitial, "value"),
+      );
     const fields = Object.fromEntries(
       Object.entries(initial).map(([key, value]) => [key, local(value, key)]),
     ) as LocalState<Initial>;
-    return template(fields);
+    return (template as (fields: LocalState<Initial>) => TemplateElement)(fields);
   });
 }
 

@@ -122,6 +122,18 @@ ARC розпізнає пряму `.map()` із функцією від одно
 
 Задайте початкові значення через `state`, а поля використовуйте в шаблоні.
 
+Якщо локальне значення одне, передайте його напряму:
+
+```tsx
+const Counter = view({
+  id: "counter.page",
+  state: 0,
+  template: (count) => <button onClick={() => count.update((n) => n + 1)}>{count}</button>,
+});
+```
+
+ARC створює для нього локальний сигнал `counter.page.state.value`. Коли станів кілька або їм потрібні власні імена в графі, задайте об’єкт `state: { search: "" }`.
+
 ```tsx
 const SearchPage = view({
   id: "search.page",
