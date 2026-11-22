@@ -236,26 +236,6 @@ function compileTemplate(id: string, root: TemplateChild) {
         attached.push(...directive(`${id}.dom.${path}.on:submit`, "on:submit", value));
         continue;
       }
-      if (name === "onClick") {
-        delete attributes[name];
-        if (value == null) continue;
-        if (child.tag === Fragment)
-          throw new TypeError("Attach onClick to an HTML element");
-        if (typeof value !== "function") {
-          attached.push(
-            ...directive(`${id}.dom.${path}.on:click`, "on:click", value),
-          );
-          continue;
-        }
-        attached.push(binding({
-          id: `${id}.dom.${path}.onClick`,
-          type: "event",
-          name: "click",
-          sources: [],
-          handler: (event, trace) => withWriteTrace(trace, () => value(event)),
-        }));
-        continue;
-      }
       if (/^on[A-Z]/.test(name)) {
         delete attributes[name];
         if (value == null) continue;
