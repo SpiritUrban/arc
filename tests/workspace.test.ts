@@ -4,12 +4,94 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import vm from "node:vm";
+import { build } from "esbuild";
 import { parseHTML } from "linkedom";
 import { importApplication } from "../framework/src/fullstack/reactive-jsx.ts";
 import { buildWeb, staticWeb } from "../framework/src/fullstack/build.ts";
 import { internalTransport } from "../framework/src/fullstack/server.ts";
 import { serve, closeServer, handler } from "../framework/src/http.ts";
 import { stand } from "../framework/src/stand.ts";
+
+test("Workspace order edit carries the submit trace to the server operation in Stand", async () => {
+  const entry = new URL("../examples/workspace/app.ts", import.meta.url);
+  const { createApp } = await importApplication(entry) as typeof import("../examples/workspace/app.ts");
+  const { CreateOrder } = await import("../examples/workspace/orders/contracts.ts");
+  const app = createApp();
+  const dir = await mkdtemp(join(tmpdir(), "arc-workspace-trace-"));
+  const { document, window } = parseHTML('<html><head></head><body><div id="app"></div></body></html>');
+  try {
+    await app.compile({ entry });
+    const bundle = await buildWeb(app, { outDir: dir });
+    // Inline split chunks so this DOM harness can execute the built router.
+    const { outputFiles } = await build({
+      entryPoints: [join(bundle.outDir, "app.js")],
+      bundle: true,
+      format: "iife",
+      write: false,
+    });
+    await app.start();
+    const transport = internalTransport(app);
+    const created = await transport(new Request(`http://localhost/_arc/call/${CreateOrder.id}`, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer 00000000-0000-4000-8000-000000000001",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ product: "Notebook", quantity: 2 }),
+    }));
+    assert.equal(created.status, 200);
+    const { value: { id } } = await created.json();
+    const location = new URL(`http://localhost/orders/${id}`);
+    let editTrace: string | null = null;
+    const fetcher: typeof fetch = (input, init) => {
+      const request = new Request(new URL(String(input), location), init);
+      if (new URL(request.url).pathname === "/_arc/call/orders.update")
+        editTrace = request.headers.get("x-arc-trace-id");
+      return transport(request);
+    };
+    class BrowserFormData extends FormData {
+      constructor(form: HTMLFormElement) {
+        super();
+        for (const field of form.querySelectorAll<HTMLInputElement>("input[name]"))
+          this.append(field.name, field.value);
+      }
+    }
+    new vm.Script(outputFiles[0]!.text).runInNewContext({
+      document,
+      window: {
+        location,
+        addEventListener: window.addEventListener.bind(window),
+        removeEventListener: window.removeEventListener.bind(window),
+      },
+      fetch: fetcher,
+      crypto, URL, Request, Response, Headers, FormData: BrowserFormData,
+      AbortController, performance, queueMicrotask, setTimeout, clearTimeout, console,
+    });
+    const waitFor = async (predicate: () => boolean, description: string) => {
+      for (let i = 0; i < 200 && !predicate(); i++) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      assert.ok(predicate(), description);
+    };
+    await waitFor(() => !!document.querySelector("[data-edit-order]"), "order form mounted");
+    const form = document.querySelector("[data-edit-order]")!;
+    const fields = [...form.querySelectorAll<HTMLInputElement>("input[name]")];
+    Object.defineProperty(form, "elements", { value: fields });
+    form.querySelector<HTMLInputElement>('input[name="product"]')!.value = "Revised notebook";
+    form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+    await waitFor(() => document.querySelector("[data-order-detail] h2")?.textContent === "Revised notebook",
+      "detail updated from the mutation response");
+    assert.ok(editTrace);
+    const live = await (await stand(app)(new Request("http://localhost/api/live"))).json();
+    const interaction = live.interactions.find(({ traceId }: { traceId: string }) => traceId === editTrace);
+    assert.ok(interaction);
+    assert.deepEqual(interaction.server.map(({ operation }: { operation: string }) => operation), ["orders.update"]);
+  } finally {
+    window.dispatchEvent(new window.Event("pagehide"));
+    await app.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 test("Workspace order update has consistent identities and impact in build and Stand", async () => {
   const entry = new URL("../examples/workspace/app.ts", import.meta.url);
