@@ -6,7 +6,14 @@ import { activeUser } from "../user-selection.ts";
 import { orderClient } from "./client.ts";
 import { money, failureMessage } from "../ui.ts";
 
-function renderOrdersPage(quantity: Signal<string>) {
+function renderOrdersPage(quantity: Signal<string>, search: Signal<string>) {
+  function filteredOrders() {
+    const term = search().trim().toLowerCase();
+    return term
+      ? visibleOrders().filter((order) => order.product.toLowerCase().includes(term))
+      : visibleOrders();
+  }
+
   return (
     <section class="orders-panel">
       <div class="summary-grid">
@@ -102,6 +109,15 @@ function renderOrdersPage(quantity: Signal<string>) {
             role="status"
           >{ordersData.loading() ? "Завантажуємо замовлення…" : ""}</span>
         </div>
+        <label class="search-label">
+          <span>Пошук товару</span>
+          <input
+            data-order-search
+            type="search"
+            placeholder="Назва товару"
+            bind:value={search}
+          />
+        </label>
         <div class="table-scroll">
           <table>
             <thead>
@@ -113,7 +129,7 @@ function renderOrdersPage(quantity: Signal<string>) {
               </tr>
             </thead>
             <tbody data-rows>
-              {visibleOrders().map((order) => (
+              {filteredOrders().map((order) => (
                   <tr key={order.id} data-order={order.id}>
                     <td>
                       <strong><a href={`/orders/${order.id}`}>{order.product}</a></strong>
@@ -149,11 +165,15 @@ function renderOrdersPage(quantity: Signal<string>) {
             </tbody>
           </table>
         </div>
-        {visibleOrders().length === 0 && !ordersData.loading() && (
+        {filteredOrders().length === 0 && !ordersData.loading() && (
           <div class="empty order-empty" data-empty>
             <span class="empty-symbol">▤</span>
-            <strong>Тут з’являться замовлення</strong>
-            <p>Створіть перше замовлення для цього користувача.</p>
+            <strong>{search().trim() ? "Замовлень не знайдено" : "Тут з’являться замовлення"}</strong>
+            <p>
+              {search().trim()
+                ? "Змініть назву товару для пошуку."
+                : "Створіть перше замовлення для цього користувача."}
+            </p>
           </div>
         )}
       </div>
@@ -185,6 +205,6 @@ export const visibleOrders = derive({
 export const OrdersPage = view({
   id: "orders.page",
   needs: cancelOrder,
-  state: { quantity: "1" },
-  template: ({ quantity }) => renderOrdersPage(quantity),
+  state: { quantity: "1", search: "" },
+  template: ({ quantity, search }) => renderOrdersPage(quantity, search),
 });
