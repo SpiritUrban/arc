@@ -1,6 +1,6 @@
 # TSX-шаблони та bindings
 
-Пишіть HTML у файлах `.tsx`. У `template` поверніть один кореневий HTML-елемент. У ньому позначте реактивні значення через `bind:…`, а дії через `on:…`.
+Пишіть HTML у файлах `.tsx`. Статичний шаблон передавайте напряму в `template`, а функцію використовуйте, коли потрібні локальні поля стану. Шаблон має один кореневий HTML-елемент. Реактивні значення позначайте через `bind:…`, дії — через `on:…`.
 
 ```tsx
 import { state, action, view } from "@arc/framework/web";
@@ -16,7 +16,7 @@ const increment = action({
 
 export const Counter = view({
   id: "counter.page",
-  template: () => (
+  template: (
     <section>
       <p>Лічильник: <strong bind:text={count} /></p>
       <button type="button" on:click={increment}>Додати</button>
@@ -150,7 +150,7 @@ ARC створює новий сигнал під час кожного монт
 ```tsx
 const WorkspacePage = view({
   id: "workspace.page",
-  template: () => <main>{UsersPage}{OrdersPage}</main>,
+  template: <main>{UsersPage}{OrdersPage}</main>,
 });
 ```
 

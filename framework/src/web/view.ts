@@ -149,7 +149,7 @@ type ViewOptions = Omit<
 } & (
     | { setup: View["setup"]; bindings: readonly Binding[]; template?: never }
     | {
-        template(): TemplateElement;
+        template: TemplateElement | (() => TemplateElement);
         bindings?: readonly Binding[];
         setup?: never;
       }
@@ -522,8 +522,9 @@ function buildView({
   ...def
 }: ViewOptions): View {
   const owned = ownedNodes(ownedOption);
+  const templateRoot = typeof template === "function" ? template() : template;
   const compiled =
-    template && !declared ? compileTemplate(def.id, template()) : undefined;
+    templateRoot && !declared ? compileTemplate(def.id, templateRoot) : undefined;
   if (compiled && (!isTemplate(compiled.root) || compiled.root.tag === Fragment))
     throw new Error("A view template must have one root HTML element");
   const bindings = compiled?.bindings ?? declared ?? [];
@@ -535,7 +536,7 @@ function buildView({
       setup ??
       (({ document, bind, mountView }) => {
         const root = renderTemplate(
-          compiled?.root ?? template!(),
+          compiled?.root ?? templateRoot!,
           document,
           bind,
           compiled && mountView,

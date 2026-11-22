@@ -4,7 +4,7 @@ import { OrdersPage } from "../orders/page.tsx";
 
 export default view({
   id: "workspace.page",
-  template: () => (
+  template: (
     <section id="overview">
       <div class="page-heading">
         <div>
