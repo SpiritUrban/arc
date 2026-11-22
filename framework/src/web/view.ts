@@ -7,7 +7,7 @@ import {
   type WebTelemetry,
 } from "../neutral/protocol.js";
 import type { Action } from "./async.js";
-import { registerFormValue } from "./form-value.js";
+import { registerFormChecked, registerFormValue } from "./form-value.js";
 import {
   attributeReader,
   boundChild,
@@ -94,6 +94,7 @@ export interface Binding extends GraphDefinition {
   readAttribute?: () => unknown;
   submitRunning?: Readable<boolean>;
   formValue?: Writable<string>;
+  formChecked?: Writable<boolean>;
   list?: KeyedList;
   block?: RenderBlock;
   handler?:
@@ -269,6 +270,11 @@ function compileTemplate(id: string, root: TemplateChild) {
       if (!name.startsWith("bind:") && !name.startsWith("on:")) continue;
       if (child.tag === Fragment)
         throw new Error(`Attach ${name} to an HTML element in ${id}`);
+      if (
+        name === "bind:checked" &&
+        (child.tag !== "input" || attributes.type !== "checkbox")
+      )
+        throw new TypeError("bind:checked requires an input[type=checkbox]");
       delete attributes[name];
       attached.push(...directive(`${id}.dom.${path}.${name}`, name, value));
     }
@@ -371,7 +377,13 @@ function directive(id: string, name: string, value: unknown): Binding[] {
       if (transform || typeof field.set !== "function")
         throw new TypeError("bind:checked expects writable boolean state");
       return [
-        binding({ id, type: "property", name: "checked", sources: [field] }),
+        binding({
+          id,
+          type: "property",
+          name: "checked",
+          sources: [field],
+          formChecked: field,
+        }),
         binding({
           id: `${id}.change`,
           type: "event",
@@ -911,6 +923,7 @@ export function mount(
     }
     if (b.type === "property" && b.name === "disabled") boundDisabled.add(element);
     if (b.formValue) scope.add(registerFormValue(element, b.formValue));
+    if (b.formChecked) scope.add(registerFormChecked(element, b.formChecked));
     const update = () => {
       if (scope.disposed) return;
       const start = performance.now(),

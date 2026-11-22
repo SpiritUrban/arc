@@ -180,13 +180,14 @@ type RemoteForm<C extends OperationContract, Field extends string> = {
 };
 
 type NamedSubmission = {
-  values: Record<string, string | number>;
+  values: Record<string, string | number | boolean>;
   reset(ctx: ActionContext): void;
 };
 
 function readNamedSubmission(
   form: HTMLFormElement,
   numericFields: ReadonlySet<string>,
+  booleanFields: ReadonlySet<string>,
 ): NamedSubmission {
   const entries = new FormData(form);
   const values = Object.create(null) as NamedSubmission["values"];
@@ -200,27 +201,69 @@ function readNamedSubmission(
         : text;
   }
 
+  const checkboxes = Array.from(form.elements).filter(
+    (element): element is HTMLInputElement =>
+      element.localName === "input" &&
+      (element as HTMLInputElement).type === "checkbox" &&
+      booleanFields.has((element as HTMLInputElement).name),
+  );
+  for (const checkbox of checkboxes) {
+    if (
+      Object.hasOwn(values, checkbox.name) &&
+      typeof values[checkbox.name] === "boolean"
+    )
+      throw new TypeError(`Expected one checkbox for form field ${checkbox.name}`);
+    values[checkbox.name] = checkbox.checked;
+  }
+
   const fields = Array.from(form.elements).filter(
     (element): element is HTMLInputElement | HTMLTextAreaElement =>
       (element.localName === "input" || element.localName === "textarea") &&
-      entries.has((element as HTMLInputElement).name),
+      (entries.has((element as HTMLInputElement).name) ||
+        ((element as HTMLInputElement).type === "checkbox" &&
+          booleanFields.has((element as HTMLInputElement).name))),
   );
   const snapshots = fields.map((field) => {
     const binding = formValue(field);
-    return { field, value: field.value, binding, stateValue: binding?.state.get() };
+    return {
+      field,
+      value: field.value,
+      checked:
+        field.localName === "input"
+          ? (field as HTMLInputElement).checked
+          : undefined,
+      binding,
+      stateValue: binding?.state.get(),
+    };
   });
   return {
     values,
     reset(ctx) {
-      for (const { field, value, binding, stateValue } of snapshots) {
-        if (field.form !== form || field.value !== value ||
-            entries.get(field.name) !== value || formValue(field) !== binding) continue;
+      for (const { field, value, checked, binding, stateValue } of snapshots) {
+        const isCheckbox =
+          field.localName === "input" &&
+          (field as HTMLInputElement).type === "checkbox";
+        if (
+          field.form !== form ||
+          field.value !== value ||
+          (isCheckbox && (field as HTMLInputElement).checked !== checked) ||
+          (!isCheckbox && entries.get(field.name) !== value) ||
+          formValue(field) !== binding
+        ) continue;
         if (binding) {
           if (binding.state.get() !== stateValue) continue;
-          ctx.set(binding.state, binding.initial);
-          field.value = binding.initial;
+          if (binding.kind === "value") {
+            ctx.set(binding.state, binding.initial);
+            field.value = binding.initial;
+          } else {
+            ctx.set(binding.state, binding.initial);
+            (field as HTMLInputElement).checked = binding.initial;
+          }
         } else {
-          field.value = field.defaultValue;
+          if (isCheckbox)
+            (field as HTMLInputElement).checked =
+              (field as HTMLInputElement).defaultChecked;
+          else field.value = field.defaultValue;
         }
       }
     },
@@ -319,6 +362,11 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
       .filter(([, schema]) => schema.type === "number" || schema.type === "integer")
       .map(([name]) => name),
   );
+  const booleanFields = new Set(
+    Object.entries<{ type?: string }>(properties ?? {})
+      .filter(([, schema]) => schema.type === "boolean")
+      .map(([name]) => name),
+  );
   const names = Object.keys(fieldOptions ?? {}) as Field[];
   const definitions = names.map((name) => {
     const field = fieldOptions![name];
@@ -357,7 +405,8 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
         });
         return result;
       }
-      const submission = request && readNamedSubmission(request, numericFields);
+      const submission = request &&
+        readNamedSubmission(request, numericFields, booleanFields);
       const values = Object.fromEntries(
         names.map((name) => [name, fields[name].get()]),
       ) as Record<Field, string>;
