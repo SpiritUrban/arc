@@ -419,6 +419,10 @@ export interface PageContext<Param extends string = string> {
   params: Readonly<Record<Param, string>>;
   local<T>(initial: T, name?: string): Signal<T>;
   own<T extends OwnedNode>(node: T): T;
+  query<T extends OwnedNode, Contract>(
+    client: { query(contract: Contract, options?: { params?: Readonly<Record<Param, string>> }): T },
+    contract: Contract,
+  ): T;
   query<T extends OwnedNode, Args extends unknown[]>(
     client: { query(...args: Args): T },
     ...args: Args
@@ -435,7 +439,16 @@ export function pageView(
   template: (context: PageContext) => TemplateElement,
   params: Readonly<Record<string, string>> = {},
 ): View {
-  return scopedView({ id }, (context) => template({ params, ...context }));
+  return scopedView({ id }, (context) => template({
+    params,
+    ...context,
+    query: ((client: { query(...args: any[]): OwnedNode }, ...args: unknown[]) => {
+      const options = args.length === 1
+        ? { params }
+        : { ...(args[1] as object), params: (args[1] as { params?: unknown } | undefined)?.params ?? params };
+      return context.query(client, args[0], options);
+    }) as PageContext["query"],
+  }));
 }
 
 type LocalFactory = <T>(initial: T, name?: string) => Signal<T>;
@@ -463,7 +476,8 @@ function scopedView(
       }
       return node;
     };
-    const query: PageContext["query"] = (client, ...args) => own(client.query(...args));
+    const query: PageContext["query"] = (client: { query(...args: any[]): OwnedNode }, ...args: any[]) =>
+      own(client.query(...args));
     try {
       const instance = buildView({ ...def, owned, template: () => template({ local, own, query }) });
       instance.dependencies = [...(instance.dependencies ?? []), ...fields.values()];
