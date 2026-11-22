@@ -115,23 +115,25 @@ function renderOrdersPage(
             role="status"
           >{ordersData.loading() ? "Завантажуємо замовлення…" : ""}</span>
         </div>
-        <label class="search-label">
-          <span>Пошук товару</span>
-          <input
-            data-order-search
-            type="search"
-            placeholder="Назва товару"
-            bind:value={search}
-          />
-        </label>
-        <label>
-          Статус
-          <select data-order-status bind:value={status}>
-            <option value="all">Усі замовлення</option>
-            <option value="created">Створені</option>
-            <option value="cancelled">Скасовані</option>
-          </select>
-        </label>
+        <div class="order-filters">
+          <label class="search-label">
+            <span>Пошук товару</span>
+            <input
+              data-order-search
+              type="search"
+              placeholder="Назва товару"
+              bind:value={search}
+            />
+          </label>
+          <label>
+            Статус
+            <select data-order-status bind:value={status}>
+              <option value="all">Усі замовлення</option>
+              <option value="created">Створені</option>
+              <option value="cancelled">Скасовані</option>
+            </select>
+          </label>
+        </div>
         <div class="table-scroll">
           <table>
             <thead>
