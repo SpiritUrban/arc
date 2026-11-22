@@ -38,6 +38,8 @@ node --conditions=arc-source --import tsx --test docs/examples/tasks.test.ts
 
 [Перехід з ARC 0.1 на 0.2](migration-0.2.md) містить зміни bootstrap, IR, calls, errors, transports і package imports. [Звіт аудиту](audit/README.md) є зафіксованим результатом перевірки, а не автоматично оновлюваним test dashboard. `doc.md` — історичний архів концепції; джерело актуального API — цей посібник і `framework/src/`.
 
+Стратегічний напрям наступної серії frontend-ітерацій описано в [roadmap ARC 0.7](roadmap-0.7.md).
+
 ## Web і Fullstack
 
 - [ARC Server](server/README.md)
