@@ -456,6 +456,90 @@ test("HTTP producer returns while its queued worker runs and Stand records both 
   }
 });
 
+test("aborting HTTP after enqueue preserves worker execution and isolates request resources", async () => {
+  const accepted = latch();
+  const workerStarted = latch();
+  const finishProducer = latch();
+  const finishWorker = latch();
+  const events: string[] = [];
+  const requestResource = resource({
+    id: "reports.request-resource",
+    scope: "request",
+    open({ request }) {
+      const owner = request ? "producer" : "worker";
+      events.push(`open:${owner}`);
+      return { owner };
+    },
+    close({ owner }) {
+      events.push(`close:${owner}`);
+    },
+  });
+  const worker = operation({
+    id: "reports.render",
+    input: empty,
+    output: s.string(),
+    needs: { requestResource },
+    async run({ requestResource }) {
+      workerStarted.release();
+      await finishWorker.promise;
+      return ok(requestResource.owner);
+    },
+  });
+  const reports = queue({ id: "reports", operation: worker, concurrency: 1 });
+  let job: Promise<unknown> | undefined;
+  const producer = operation({
+    id: "reports.submit",
+    input: empty,
+    output: s.string(),
+    needs: { requestResource },
+    emits: [reports],
+    async run({ input, requestResource }): Promise<ReturnType<typeof ok<string>>> {
+      job = app.queues.get(reports.id)!.enqueue(input);
+      void job.catch(() => {});
+      accepted.release();
+      await finishProducer.promise;
+      return ok(requestResource.owner);
+    },
+  });
+  const app = application({
+    routes: [http.post("/reports", producer, { status: 202 })],
+    queues: [reports],
+  });
+  const controller = new AbortController();
+  let response: Promise<Response> | undefined;
+  try {
+    await app.compile();
+    await app.start();
+    response = handler(app)(new Request("http://localhost/reports", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+      signal: controller.signal,
+    }));
+    await accepted.promise;
+    await workerStarted.promise;
+    assert.deepEqual(events, ["open:producer", "open:worker"]);
+
+    controller.abort();
+    finishProducer.release();
+    assert.equal((await response).ok, false);
+    assert.deepEqual(events, ["open:producer", "open:worker", "close:producer"]);
+    assert.equal(app.queues.get(reports.id)!.metrics().running, 1);
+
+    finishWorker.release();
+    assert.deepEqual(await job, ok("worker"));
+    assert.deepEqual(events, ["open:producer", "open:worker", "close:producer", "close:worker"]);
+    const traces = app.traces.filter((trace) => [producer.id, worker.id].includes(trace.operation));
+    assert.deepEqual(traces.map(({ status }) => status), ["cancelled", "ok"]);
+    assert.equal(traces[0].id, traces[1].id);
+  } finally {
+    finishProducer.release();
+    finishWorker.release();
+    await response;
+    await app.close();
+  }
+});
+
 test("close rejects new public executions immediately while draining an active context", async () => {
   const ready = latch(),
     gate = latch();
