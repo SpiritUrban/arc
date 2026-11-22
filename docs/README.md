@@ -16,11 +16,15 @@
 
 Для прикладу з користувачами та замовленнями почніть із [ARC Workspace](workspace-app.md). Для frontend: [Web index](web/README.md) → [як писати frontend](web/writing-frontend.md) → [форми](web/forms-and-events.md) → [тести](web/testing.md). Для backend: початок роботи → як писати server код → тести. Архітектура пояснює внутрішню модель, довідник допомагає знайти точний виклик API.
 
-## Приклади, які можна запустити
+## Запускаємі застосунки та приклади коду
 
-- [`examples/workspace/app.ts`](../examples/workspace/app.ts) — основний fullstack застосунок ARC Workspace: користувачі та замовлення.
-- [`examples/tasks.ts`](examples/tasks.ts) — самодостатній приклад feature-модуля завдань.
-- [`examples/tasks.test.ts`](examples/tasks.test.ts) — тести прикладу без підняття HTTP-сервера.
+У `examples/` залишено три застосунки з різним призначенням:
+
+- [`web-counter`](../examples/web-counter/app.ts) — найменший приклад pure Web.
+- [`fullstack-tasks`](../examples/fullstack-tasks/app.ts) — мінімальний fullstack-застосунок.
+- [`workspace`](../examples/workspace/app.ts) — наскрізний доменний приклад із користувачами та замовленнями.
+
+Команди запуску наведено в [кореневому README](../README.md). Окремий server-side feature walkthrough — [`docs/examples/tasks.ts`](examples/tasks.ts); його тести запускаються без HTTP-сервера:
 
 З кореня репозиторію:
 
@@ -32,7 +36,7 @@ node --conditions=arc-source --import tsx --test docs/examples/tasks.test.ts
 
 Усі приклади використовують ESM та імпорти з `@arc/framework`. У прикладах відносні TypeScript-імпорти мають `.ts`; compiler переписує їх у JS build. Усередині `framework/src/` використовуються NodeNext-імпорти `.js`, які працюють і в source development, і в compiled package/declarations. Production import пакета веде на compiled ESM.
 
-[Звіт розширення ARC 0.3](audit/web-fullstack-report.md), [історичний аудит 0.2](audit/README.md), [IR v3 migration](migration-0.3.md).
+[Історичний звіт реалізації ARC 0.3](audit/web-fullstack-report.md), [аудит ARC 0.2](audit/README.md), [IR v3 migration](migration-0.3.md).
 
 ## Версії та міграція
 

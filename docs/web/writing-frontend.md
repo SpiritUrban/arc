@@ -16,21 +16,25 @@
 
 ```text
 examples/workspace/
-  user-selection.ts # вибраний користувач і віддалений список
+  app.ts              # один logical application graph
+  auth.ts             # серверний користувач поточного запиту
+  user-selection.ts   # вибраний користувач і віддалений список
   users/
     contracts.ts   # browser-safe schemas і operation descriptors
-    server.ts       # server repository, operation, module, REST
-    page.tsx        # browser state, resource, action, view
+    server.ts      # server repository, operation, module, REST
+    page.tsx       # browser query, mutation і view
   orders/
     contracts.ts
     server.ts
-    page.tsx
-  auth.ts          # серверний користувач поточного запиту
-  app.ts           # один logical application graph
-  browser.ts       # browser runtime та mounts
-  page.tsx          # Workspace shell
-  styles.ts        # application CSS
-  ui.ts            # невеликі helpers для bindings і повідомлень про помилки
+    client.ts      # browser query/mutation definitions
+    page.tsx       # browser query, mutation і view
+  pages/            # file routes та layouts
+    index.tsx
+    orders/
+      index.tsx
+      [id].tsx
+  styles.ts         # application CSS
+  ui.ts             # binding та error-message helpers
 ```
 
 Це структура прикладу, а не compiler convention. Runtime визначає node kind/metadata, не ім’я директорії. Shared contracts не повинні імпортувати server repositories чи secrets.

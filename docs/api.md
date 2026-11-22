@@ -171,7 +171,7 @@ Legacy `queue(app, op, options)` та `schedule(app, op, options)` лишают�
 
 ## IR та compile analysis
 
-`ArchitectureIR.version` дорівнює 2. `nodes[].kind`: operation/resource/http-route/queue/worker/schedule/effect. `edges[].kind`: DEPENDS_ON/ROUTES_TO/CALLS/CONSUMES/TRIGGERS; EMITS поки лише зарезервовано. Повні поля та [generated приклад](audit/architecture-ir.json) описано в [архітектурі](architecture.md).
+`ArchitectureIR.version` дорівнює 3. `nodes[].kind` включає server-вузли operation/resource/http-route/queue/worker/schedule/effect та browser/shared-вузли state/derived/web-resource/action/view/binding/remote-endpoint/contract. `edges[].kind` включає DEPENDS_ON/ROUTES_TO/CALLS/CONSUMES/TRIGGERS і browser/fullstack relations DERIVES/BINDS/REMOTE_CALLS/INVALIDATES; EMITS зарезервовано. [Архітектура](architecture.md) описує актуальну модель; [IR v2 snapshot](audit/architecture-ir.json) збережений лише як історичний приклад аудиту 0.2.
 
 `operation.plan` у IR — `{ scheduler: 'dependency-ready', resources: [{ id, dependencies }] }`, а не масив бар’єрів рівнів. `routes` збережено окремо для HTTP-інструментів. `effects` є авторськими метаданими, не списком дозволів. ID ingress формуються як `http:METHOD:/path`, worker — `worker:queueId`, effect — `resourceId.method`; ці ID також беруть участь у перевірці унікальності.
 
