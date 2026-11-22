@@ -10,11 +10,16 @@ const attributeExpression = Symbol("ARC reactive JSX attribute");
 export const Fragment = Symbol("ARC template fragment");
 
 type TextValue = string | number | boolean | null | undefined;
-type RenderContent = TemplateElement | TextValue | View | readonly RenderContent[];
+export type RenderContent =
+  | TemplateElement
+  | TextValue
+  | View
+  | readonly RenderContent[];
+export type RenderTemplate = () => RenderContent;
 export type ExpressionReferences = () => readonly unknown[];
 export interface RenderBlock {
   readonly [reactiveBlock]: true;
-  readonly template: () => RenderContent;
+  readonly template: RenderTemplate;
   readonly references?: ExpressionReferences;
 }
 interface ChildBinding {
@@ -37,6 +42,7 @@ export type TemplateChild =
   | Projection<TextValue>
   | KeyedList
   | RenderBlock
+  | RenderTemplate
   | View
   | ChildBinding
   | readonly TemplateChild[];
@@ -67,7 +73,7 @@ export function isKeyedList(child: TemplateChild): child is KeyedList {
 
 /** Reevaluate a JSX region when the ARC values it reads change. */
 export function render(
-  template: RenderBlock["template"],
+  template: RenderTemplate,
   references?: ExpressionReferences,
 ): RenderBlock {
   return { [reactiveBlock]: true, template, references };
