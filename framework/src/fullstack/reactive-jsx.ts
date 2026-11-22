@@ -327,13 +327,13 @@ export function compileReactiveJsx(
   }).outputText;
 }
 
-/** Load a source application with reactive JSX across each ARC page's TSX graph. */
+/** Load an application and compile its local TSX graph with reactive JSX. */
 export async function importApplication(
   url: URL | string,
   options: { loadTsx?: boolean; reactiveEntries?: ReadonlySet<string> } = {},
 ) {
   const entry = String(url);
-  const reactiveModules = new Set(options.reactiveEntries);
+  const reactiveModules = new Set(options.reactiveEntries ?? [entry]);
   const hook = registerHooks({
     resolve(specifier, context, nextResolve) {
       const resolved = nextResolve(specifier, context);

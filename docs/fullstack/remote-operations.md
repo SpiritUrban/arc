@@ -18,7 +18,6 @@ RemoteResult розрізняє `{ok:true,kind:'success',value}` і `{ok:false,k
 ## Запит зі спільного контракту
 
 ```tsx
-// @arc reactive-jsx
 import { query } from "@arc/framework/fullstack";
 import { ListUsers } from "./contracts.ts";
 
@@ -29,6 +28,8 @@ const status = () => (
 ```
 
 `users()` повертає поточний знімок із `data`, `loading`, `error` та `stale`. Пряме читання в реактивному JSX додає запит до графа сторінки. Для читання, прихованого всередині допоміжної функції, запит можна додати через `needs`. `mutation` приймає цей самий запит у `refresh`. За замовчуванням ID має вигляд `<ID операції>.query`. Для контракту з обов’язковим входом передайте функцію `input`.
+
+У файлах застосунку, що проходять через ARC CLI або browser build, reactive JSX вмикається автоматично. Pragma потрібен лише для окремої TSX-точки входу поза графом застосунку.
 
 ## Форма, що викликає операцію
 
