@@ -12,6 +12,25 @@ import { internalTransport } from "../framework/src/fullstack/server.ts";
 import { serve, closeServer, handler } from "../framework/src/http.ts";
 import { stand } from "../framework/src/stand.ts";
 
+async function workspaceScript(outDir: string) {
+  // Inline split chunks so this DOM harness can execute the built router.
+  const { outputFiles } = await build({
+    entryPoints: [join(outDir, "app.js")],
+    bundle: true,
+    format: "iife",
+    write: false,
+  });
+  return new vm.Script(outputFiles[0]!.text);
+}
+
+function browserWindow(window: ReturnType<typeof parseHTML>["window"], location: URL) {
+  return {
+    location,
+    addEventListener: window.addEventListener.bind(window),
+    removeEventListener: window.removeEventListener.bind(window),
+  };
+}
+
 test("Workspace order edit carries the submit trace to the server operation in Stand", async () => {
   const entry = new URL("../examples/workspace/app.ts", import.meta.url);
   const { createApp } = await importApplication(entry) as typeof import("../examples/workspace/app.ts");
@@ -22,13 +41,7 @@ test("Workspace order edit carries the submit trace to the server operation in S
   try {
     await app.compile({ entry });
     const bundle = await buildWeb(app, { outDir: dir });
-    // Inline split chunks so this DOM harness can execute the built router.
-    const { outputFiles } = await build({
-      entryPoints: [join(bundle.outDir, "app.js")],
-      bundle: true,
-      format: "iife",
-      write: false,
-    });
+    const script = await workspaceScript(bundle.outDir);
     await app.start();
     const transport = internalTransport(app);
     const created = await transport(new Request(`http://localhost/_arc/call/${CreateOrder.id}`, {
@@ -56,13 +69,9 @@ test("Workspace order edit carries the submit trace to the server operation in S
           this.append(field.name, field.value);
       }
     }
-    new vm.Script(outputFiles[0]!.text).runInNewContext({
+    script.runInNewContext({
       document,
-      window: {
-        location,
-        addEventListener: window.addEventListener.bind(window),
-        removeEventListener: window.removeEventListener.bind(window),
-      },
+      window: browserWindow(window, location),
       fetch: fetcher,
       crypto, URL, Request, Response, Headers, FormData: BrowserFormData,
       AbortController, performance, queueMicrotask, setTimeout, clearTimeout, console,
@@ -185,6 +194,17 @@ test("Workspace browser creates users/orders, handles business errors and isolat
   let server: Awaited<ReturnType<typeof serve>> | undefined;
   let cleanupBrowser: (() => void) | undefined;
   const pending = new Set<Promise<any>>();
+  const heldRequests = new Map<string, Promise<void>>();
+  const releaseRequests: (() => void)[] = [];
+  function holdRequest(path: string) {
+    let release!: () => void;
+    heldRequests.set(path, new Promise<void>((resolve) => { release = resolve; }));
+    releaseRequests.push(release);
+    return () => {
+      heldRequests.delete(path);
+      release();
+    };
+  }
   const releaseCancellations = new Map<string, () => void>();
   let returningOrders: { owner: string; wait: Promise<void>; release(): void } | undefined;
   try {
@@ -252,12 +272,12 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     assert.equal(ordersPage.status, 200);
     assert.match(ordersPage.headers.get("content-type")!, /text\/html/);
     const { document: ordersDocument, window: ordersWindow } = parseHTML(await ordersPage.text());
-    ordersWindow.location.href = `${origin}/orders`;
     const ordersScript = ordersDocument.querySelector("script")!.getAttribute("src")!;
     assert.equal(ordersScript, "/app.js");
     const asset = await fetch(`${origin}${ordersScript}`);
     assert.equal(asset.status, 200);
-    const ordersCode = await asset.text();
+    assert.match(await asset.text(), /import\(/);
+    const script = await workspaceScript(built.outDir);
     const orderApi = await fetch(`${origin}/orders`, {
       headers: { accept: "application/json", authorization: "Bearer 00000000-0000-4000-8000-000000000001" },
     });
@@ -267,7 +287,6 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     const { window, document } = parseHTML(
       '<html><head></head><body><div id="app"></div></body></html>',
     );
-    window.location.href = `${origin}/`;
     let createOrderRequests = 0;
     let cancelOrderRequests = 0;
     let listOrderRequests = 0;
@@ -275,7 +294,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       const url = new URL(String(input), origin);
       if (url.pathname === "/_arc/call/orders.create") createOrderRequests++;
       if (url.pathname === "/_arc/call/orders.list") listOrderRequests++;
-      let ready = Promise.resolve();
+      let ready = heldRequests.get(url.pathname) ?? Promise.resolve();
       if (url.pathname === "/_arc/call/orders.list" &&
           returningOrders && new Headers(init?.headers).get("authorization") === `Bearer ${returningOrders.owner}`) {
         ready = returningOrders.wait;
@@ -320,32 +339,32 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       clearTimeout,
       console,
     };
-    new vm.Script(ordersCode).runInContext(vm.createContext({
+    const waitFor = async (predicate: () => boolean, description = "Workspace interaction did not settle") => {
+      for (let i = 0; i < 200 && !predicate(); i++) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      assert.ok(predicate(), description);
+    };
+    script.runInNewContext({
       ...browserGlobals,
-      window: ordersWindow,
+      window: browserWindow(ordersWindow, new URL(`${origin}/orders`)),
       document: ordersDocument,
-    }));
+    });
+    await waitFor(() => !!ordersDocument.querySelector("#app h1"), "orders route mounted");
     assert.equal(ordersDocument.title, "Замовлення — ARC Workspace");
     assert.equal(ordersDocument.querySelector("#app h1")!.textContent, "Замовлення");
     assert.ok(ordersDocument.querySelector('#app a[href="/"][aria-label="ARC Workspace"]'));
     assert.ok(ordersDocument.querySelector('#app nav a[href="/orders"][aria-current="page"]'));
     assert.ok(ordersDocument.head.querySelector("style")?.textContent?.includes(".workspace"));
     ordersWindow.dispatchEvent(new ordersWindow.Event("pagehide"));
-    const context = vm.createContext({ ...browserGlobals, window, document });
-    new vm.Script(
-      await readFile(join(built.outDir, "app.js"), "utf8"),
-    ).runInContext(context);
+    script.runInNewContext({
+      ...browserGlobals, window: browserWindow(window, new URL(origin)), document,
+    });
+    cleanupBrowser = () => window.dispatchEvent(new window.Event("pagehide"));
+    await waitFor(() => !!document.querySelector("#app nav"), "workspace route mounted");
     assert.match(document.title, /ARC Workspace/);
     assert.ok(document.querySelector('#app nav a[href="/"][aria-current="page"]'));
     assert.ok(document.head.querySelector("style")?.textContent?.includes(".workspace"));
-    cleanupBrowser = () => window.dispatchEvent(new window.Event("pagehide"));
-    const waitFor = async (predicate: () => boolean) => {
-      for (let i = 0; i < 200; i++) {
-        if (predicate()) return;
-        await new Promise((r) => setTimeout(r, 5));
-      }
-      assert.ok(predicate(), "Workspace interaction did not settle");
-    };
     const input = (selector: string, value: string) => {
       const field = document.querySelector(
         selector,
@@ -389,8 +408,10 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     input("[data-name]", "<New User>");
     input("[data-email]", "new@example.com");
     const addButton = document.querySelector<HTMLButtonElement>("#users button[type=submit]")!;
+    const releaseUser = holdRequest("/_arc/call/users.create");
     submit("#users form");
-    assert.equal(addButton.disabled, true);
+    await waitFor(() => addButton.disabled, "add user button disabled while submitting");
+    releaseUser();
     await waitFor(() => document.querySelectorAll("[data-user]").length === 2);
     assert.equal(addButton.disabled, false);
     assert.match(document.querySelector("#users [data-status]")!.textContent!, /^2 /);
@@ -407,13 +428,16 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     );
     await waitFor(
       () => document.querySelector("[data-loading]")!.textContent === "",
+      "order list finished loading for the selected user",
     );
     input("[data-product]", "  ARC Notebook  ");
     input("[data-quantity]", "3");
     await waitFor(() => document.querySelector("[data-preview]")!.textContent!.includes("75"));
     const orderButton = document.querySelector<HTMLButtonElement>("#orders button[type=submit]")!;
+    const releaseOrder = holdRequest("/_arc/call/orders.create");
     submit("#orders form");
-    assert.equal(orderButton.disabled, true);
+    await waitFor(() => orderButton.disabled, "create order button disabled while submitting");
+    releaseOrder();
     await waitFor(() =>
       document
         .querySelector("[data-rows]")!
@@ -460,7 +484,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     input("[data-quantity]", "2");
     submit("#orders form");
     await waitFor(() =>
-      document.querySelector("#orders [data-error]")!.textContent!.includes("Перевірте введені дані"),
+      document.querySelector("[data-product-error]")!.textContent!.includes("Вкажіть назву товару"),
     );
     assert.equal(quantity.getAttribute("aria-invalid"), "false");
     assert.equal(document.querySelector("[data-quantity-error]")!.textContent, "");
@@ -696,17 +720,14 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     assert.equal(detail.status, 200);
     const { document: detailDocument, window: detailWindow } = parseHTML(await detail.text());
     const detailScript = detailDocument.querySelector("script")!.getAttribute("src")!;
-    const detailCode = await fetch(`${origin}${detailScript}`).then((response) => response.text());
-    new vm.Script(detailCode).runInContext(vm.createContext({
+    assert.equal(detailScript, ordersScript);
+    script.runInNewContext({
       ...browserGlobals,
       document: detailDocument,
-      window: {
-        location: new URL(`${origin}${detailPath}`),
-        addEventListener: detailWindow.addEventListener.bind(detailWindow),
-        removeEventListener: detailWindow.removeEventListener.bind(detailWindow),
-      },
-    }));
+      window: browserWindow(detailWindow, new URL(`${origin}${detailPath}`)),
+    });
     try {
+      await waitFor(() => !!detailDocument.querySelector("#app nav"), "order detail route mounted");
       assert.equal(detailDocument.title, "Деталі замовлення — ARC Workspace");
       assert.ok(detailDocument.querySelector('#app nav a[href="/orders"].active'));
       assert.ok(detailDocument.head.querySelector("style")?.textContent?.includes(".workspace"));
@@ -724,6 +745,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     assert.equal(document.head.querySelector("style"), null);
   } finally {
     cleanupBrowser?.();
+    for (const release of releaseRequests) release();
     returningOrders?.release();
     for (const release of releaseCancellations.values()) release();
     await Promise.allSettled([...pending]);

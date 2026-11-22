@@ -56,7 +56,11 @@ function renderOrdersPage(
               maxlength="100"
               placeholder="Наприклад, блокнот ARC"
               name="product"
+              aria-invalid={createOrder.invalid("product")}
             />
+            <span class="error" role="alert" data-product-error>
+              {createOrder.invalid("product") && "Вкажіть назву товару."}
+            </span>
           </label>
           <div class="quantity-field">
             <label>
@@ -113,7 +117,7 @@ function renderOrdersPage(
             class="muted"
             data-loading
             role="status"
-          >{ordersData.loading() ? "Завантажуємо замовлення…" : ""}</span>
+          >{ordersData().loading ? "Завантажуємо замовлення…" : ""}</span>
         </div>
         <div class="order-filters">
           <label class="search-label">
@@ -181,7 +185,7 @@ function renderOrdersPage(
             </tbody>
           </table>
         </div>
-        {filteredOrders().length === 0 && !ordersData.loading() && (
+        {filteredOrders().length === 0 && !ordersData().loading && (
           <div class="empty order-empty" data-empty>
             <span class="empty-symbol">▤</span>
             <strong>
