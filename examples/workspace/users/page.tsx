@@ -18,7 +18,7 @@ export const addUser = mutation(CreateUser, {
 
 export const UsersPage = view({
   id: "users.page",
-  state: () => ({ search: "" }),
+  state: { search: "" },
   template: ({ search }) => {
     function visible() {
       const query = search().toLowerCase();

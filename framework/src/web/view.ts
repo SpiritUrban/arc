@@ -374,28 +374,40 @@ type LocalState<Initial extends Record<string, unknown>> = {
   [Key in keyof Initial]: Signal<Initial[Key]>;
 };
 
-type LocalViewOptions<Initial extends Record<string, unknown>> = Omit<
+type LocalViewBase<Initial extends Record<string, unknown>> = Omit<
   ViewOptions, "template" | "bindings" | "setup"
 > & {
-  state(): Initial;
   template(local: LocalState<Initial>): TemplateElement;
   bindings?: never;
   setup?: never;
 };
+type LocalViewOptions<Initial extends Record<string, unknown>> = LocalViewBase<Initial> & {
+  state(): Initial;
+};
+type PrimitiveInitial = string | number | boolean | bigint | null | undefined;
+type StaticViewState<Initial extends Record<string, PrimitiveInitial>> = {
+  [Key in keyof Initial]: Initial[Key];
+};
+type StaticLocalViewOptions<Initial extends Record<string, PrimitiveInitial>> =
+  LocalViewBase<Initial> & { state: StaticViewState<Initial> };
 
 export function view<Initial extends Record<string, unknown>>(
   options: LocalViewOptions<Initial>,
 ): View;
+export function view<Initial extends Record<string, PrimitiveInitial>>(
+  options: StaticLocalViewOptions<Initial>,
+): View;
 export function view(options: ViewOptions): View;
 export function view<Initial extends Record<string, unknown>>(
-  options: ViewOptions | LocalViewOptions<Initial>,
+  options: ViewOptions | LocalViewOptions<Initial> | StaticLocalViewOptions<any>,
 ): View {
   if (!("state" in options)) return buildView(options);
 
   const { state: initialize, template, ...def } = options;
   return scopedView(def, ({ local }) => {
+    const initial = typeof initialize === "function" ? initialize() : initialize;
     const fields = Object.fromEntries(
-      Object.entries(initialize()).map(([key, initial]) => [key, local(initial, key)]),
+      Object.entries(initial).map(([key, value]) => [key, local(value, key)]),
     ) as LocalState<Initial>;
     return template(fields);
   });

@@ -185,6 +185,6 @@ export const visibleOrders = derive({
 export const OrdersPage = view({
   id: "orders.page",
   needs: cancelOrder,
-  state: () => ({ quantity: "1" }),
+  state: { quantity: "1" },
   template: ({ quantity }) => renderOrdersPage(quantity),
 });
