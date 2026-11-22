@@ -149,11 +149,13 @@ function renderOrdersPage(quantity: Signal<string>) {
             </tbody>
           </table>
         </div>
-        <div class="empty order-empty" data-empty bind:visible={history.empty}>
-          <span class="empty-symbol">▤</span>
-          <strong>Тут з’являться замовлення</strong>
-          <p>Створіть перше замовлення для цього користувача.</p>
-        </div>
+        {visibleOrders.get().length === 0 && !ordersData.loading.get() && (
+          <div class="empty order-empty" data-empty>
+            <span class="empty-symbol">▤</span>
+            <strong>Тут з’являться замовлення</strong>
+            <p>Створіть перше замовлення для цього користувача.</p>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -184,14 +186,6 @@ export const visibleOrders = derive({
   from: [ordersData.data],
   compute: (orders) => orders ?? [],
 });
-
-const history = {
-  empty: derive({
-    id: "orders.empty",
-    from: [visibleOrders, ordersData.loading],
-    compute: (orders, loading) => orders.length === 0 && !loading,
-  }),
-};
 
 export const OrdersPage = view({
   id: "orders.page",
