@@ -259,10 +259,9 @@ export function compileReactiveJsx(
                 return transformed;
               const name = node.parent.name.getText(file);
               if (
-                name !== "class" &&
-                name !== "className" &&
-                name !== "disabled" &&
-                !/^(aria|data)-[\w-]+$/.test(name)
+                name === "key" || name === "value" || name === "checked" ||
+                name === "selected" || name.toLowerCase() === "srcdoc" ||
+                name.startsWith("bind:") || /^on/i.test(name)
               )
                 return transformed;
               usedAttribute = true;

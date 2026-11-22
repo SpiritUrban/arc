@@ -60,6 +60,18 @@ function isReadable(value: unknown): value is Readable<unknown> {
   );
 }
 
+function reactiveAttributeName(name: string): string | undefined {
+  if (
+    name === "key" || name === "value" || name === "checked" ||
+    name === "selected" || name.toLowerCase() === "srcdoc" ||
+    name.startsWith("bind:") || /^on/i.test(name)
+  )
+    return;
+  if (name === "className") return "class";
+  if (name === "htmlFor") return "for";
+  return name;
+}
+
 export type EventHandler = (
   event: Event,
   context: { set<T>(state: Writable<T>, value: T): void },
@@ -234,23 +246,21 @@ function compileTemplate(id: string, root: TemplateChild) {
         attached.push(binding({
           id: `${id}.dom.${path}.${name}`,
           type: "attribute",
-          name: name === "className" ? "class" : name,
+          name:
+            name === "className" ? "class" : name === "htmlFor" ? "for" : name,
           sources: [],
           references: attribute.references,
           readAttribute: attribute.read,
         }));
         continue;
       }
-      if (
-        isReadable(value) &&
-        (name === "class" || name === "className" || name === "disabled" ||
-          /^(aria|data)-[\w-]+$/.test(name))
-      ) {
+      const reactiveName = reactiveAttributeName(name);
+      if (isReadable(value) && reactiveName) {
         const property = name === "disabled";
         attached.push(binding({
           id: `${id}.dom.${path}.${name}`,
           type: property ? "property" : "attribute",
-          name: name === "className" ? "class" : name,
+          name: reactiveName,
           sources: [value],
         }));
         continue;
