@@ -213,6 +213,20 @@ export function compileReactiveJsx(
               ts.forEachChild(child, scan);
             }
             scan(node);
+            function scanEventHandlers(child: TS.Node) {
+              if (ts.isJsxAttribute(child) && ts.isIdentifier(child.name) &&
+                /^on[A-Z]/.test(child.name.text) && child.initializer &&
+                ts.isJsxExpression(child.initializer) && child.initializer.expression) {
+                let handler = child.initializer.expression;
+                while (ts.isParenthesizedExpression(handler) || ts.isAsExpression(handler) ||
+                  ts.isTypeAssertionExpression(handler) || ts.isNonNullExpression(handler))
+                  handler = handler.expression;
+                if (ts.isIdentifier(handler))
+                  references.set(handler.text, handler);
+              }
+              ts.forEachChild(child, scanEventHandlers);
+            }
+            scanEventHandlers(node);
             return {
               reactive,
               references: references.size

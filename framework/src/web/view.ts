@@ -129,21 +129,35 @@ export function binding(
     );
     return [...new Set([...def.sources, ...inferred])];
   }
+  function graphReferences() {
+    return (def.references?.() ?? []).filter((value): value is GraphDefinition =>
+      value !== null && typeof value === "object" &&
+      typeof (value as GraphDefinition).id === "string" &&
+      typeof (value as GraphDefinition).kind === "string" &&
+      !isReadable(value),
+    );
+  }
   const node: Binding = {
     ...def,
     kind: "binding",
     runtime: "browser",
-    dependencies: dependencies(def.sources),
-    relations: relations(def.sources),
+    dependencies: [...dependencies(def.sources), ...graphReferences()],
+    relations: [
+      ...relations(def.sources),
+      ...graphReferences().map((reference) => ({ to: reference, kind: "DEPENDS_ON" as const })),
+    ],
   };
   if (!def.references) return node;
   return {
     ...node,
     get dependencies() {
-      return dependencies(graphSources());
+      return [...dependencies(graphSources()), ...graphReferences()];
     },
     get relations() {
-      return relations(graphSources());
+      return [
+        ...relations(graphSources()),
+        ...graphReferences().map((reference) => ({ to: reference, kind: "DEPENDS_ON" as const })),
+      ];
     },
   };
 }
