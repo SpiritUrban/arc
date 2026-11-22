@@ -37,7 +37,7 @@ const status = () => (
 ```tsx
 import { mutation } from "@arc/framework/fullstack";
 
-const addTask = mutation(CreateTask, { refresh: [tasks] });
+const addTask = mutation(CreateTask, { refresh: tasks });
 
 const form = () => (
   <form onSubmit={addTask}>
@@ -47,7 +47,7 @@ const form = () => (
 );
 ```
 
-Під час submit ARC читає значення через `FormData`, обрізає зовнішні пробіли й перетворює значення полів типу `number` та `integer` за схемою операції. Порожній рядок у числовому полі не стає нулем. Перед запитом ARC перевіряє весь вхід за контрактом. `addTask()` повертає знімок дії з `running`, `result` і `error`.
+Під час submit ARC читає значення через `FormData`, обрізає зовнішні пробіли й перетворює значення полів типу `number` та `integer` за схемою операції. Порожній рядок у числовому полі не стає нулем. Перед запитом ARC перевіряє весь вхід за контрактом. `refresh` приймає один ресурс напряму або масив ресурсів. `addTask()` повертає знімок дії з `running`, `result` і `error`.
 
 Якщо значення потрібне в інтерфейсі до submit, додайте `bind:value` до іменованого поля. Після успіху ARC скидає незмінене поле й прив’язаний стан до початкового значення. Для власного перетворення даних можна явно задати `fields`.
 
@@ -60,7 +60,7 @@ import { mutation, textField } from "@arc/framework/fullstack";
 
 const addTask = mutation(CreateTask, {
   fields: { title: textField() },
-  refresh: [tasks],
+  refresh: tasks,
 });
 
 const form = () => (
@@ -84,7 +84,7 @@ const orders = orderClient.query(ListOrders, {
   cache: true,
 });
 const createOrder = orderClient.mutation(CreateOrder, {
-  refresh: [orders],
+  refresh: orders,
 });
 ```
 
@@ -95,7 +95,7 @@ const createOrder = orderClient.mutation(CreateOrder, {
 ## Дія без форми
 
 ```tsx
-const cancelOrder = orderClient.mutation(CancelOrder, { refresh: [orders] });
+const cancelOrder = orderClient.mutation(CancelOrder, { refresh: orders });
 
 <button type="button" onClick={() => cancelOrder.run({ id: order.id })}>
   Скасувати

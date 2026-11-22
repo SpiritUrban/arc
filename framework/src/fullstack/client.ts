@@ -165,9 +165,9 @@ type RemoteFormOptions<C extends OperationContract> = {
   id?: string;
   needs?: GraphNeeds;
   /** Reload these resources after a successful submission. */
-  refresh?: readonly WebResource<any, any>[];
+  refresh?: WebResource<any, any> | readonly WebResource<any, any>[];
   /** An alias for refresh. When both are present, refresh takes precedence. */
-  invalidates?: readonly WebResource<any, any>[];
+  invalidates?: WebResource<any, any> | readonly WebResource<any, any>[];
   /** Apply local state changes after a successful response, before refreshing resources. */
   onSuccess?: (value: Infer<C["output"]>, ctx: ActionContext) => void;
   update?: QueryUpdate<Infer<C["output"]>>;
@@ -303,10 +303,15 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     baseUrl = defaults.baseUrl,
     fetch = defaults.fetch,
     input,
-    refresh = options.invalidates,
     onSuccess,
     update,
   } = options;
+  const refreshOption = options.refresh ?? options.invalidates;
+  const refresh: readonly WebResource<any, any>[] = refreshOption === undefined
+    ? []
+    : Array.isArray(refreshOption)
+      ? refreshOption
+      : [refreshOption as WebResource<any, any>];
   const fieldOptions = options.fields;
   const properties = callable && !fieldOptions ? contract.input.json.properties : undefined;
   const numericFields = new Set(

@@ -3,7 +3,7 @@ import type { PageContext } from "@arc/framework/web";
 import { ListTasks, CreateTask } from "./contracts.ts";
 
 const tasks = query(ListTasks);
-const addTask = mutation(CreateTask, { refresh: [tasks] });
+const addTask = mutation(CreateTask, { refresh: tasks });
 
 export const title = "ARC Tasks";
 

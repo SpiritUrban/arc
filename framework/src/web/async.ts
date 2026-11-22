@@ -303,11 +303,12 @@ export interface ActionContext {
   trace: TraceToken;
   set<T>(state: Writable<T>, value: T): void;
 }
+type Invalidates = WebResource<any, any> | readonly WebResource<any, any>[];
 export type ActionOptions<I, O> = {
   id: string;
   input?: Schema<I>;
   needs?: GraphNeeds;
-  invalidates?: readonly WebResource<any, any>[];
+  invalidates?: Invalidates;
   run: (input: I, ctx: ActionContext) => O | Promise<O>;
   callable?: boolean;
 };
@@ -317,6 +318,11 @@ export function action<I = void, O = unknown>(
 ): CallableAction<I, O>;
 export function action<I = void, O = unknown>(def: ActionOptions<I, O>): Action<I, O>;
 export function action<I = void, O = unknown>(def: ActionOptions<I, O>): Action<I, O> {
+  const invalidates: readonly WebResource<any, any>[] = def.invalidates === undefined
+    ? []
+    : Array.isArray(def.invalidates)
+      ? def.invalidates
+      : [def.invalidates as WebResource<any, any>];
   const createValue = def.callable ? signal : stateObject;
   const value = createValue<ActionSnapshot<O>>({
       id: def.id,
@@ -351,7 +357,7 @@ export function action<I = void, O = unknown>(def: ActionOptions<I, O>): Action<
     kind: "action" as const,
     runtime: "browser" as const,
     dependencies: graphNeeds(def.needs),
-    relations: (def.invalidates ?? []).map((to) => ({
+    relations: invalidates.map((to) => ({
       to,
       kind: "INVALIDATES" as const,
     })),
@@ -411,7 +417,7 @@ export function action<I = void, O = unknown>(def: ActionOptions<I, O>): Action<
         }
         if (outcome === "ok")
           await Promise.all(
-            (def.invalidates ?? []).map((r) =>
+            invalidates.map((r) =>
               r.invalidate({ traceId: trace.traceId, parentId: spanId }),
             ),
           );

@@ -50,7 +50,7 @@ import { selectedUser, users } from "../user-selection.ts";
 
 const addUser = mutation(CreateUser, {
   needs: [selectedUser],
-  refresh: [users],
+  refresh: users,
   onSuccess(user, ctx) {
     ctx.set(selectedUser, user.id);
   },

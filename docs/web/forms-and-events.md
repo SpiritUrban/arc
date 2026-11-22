@@ -6,7 +6,7 @@ Workspace використовує HTML-форми в TSX, вбудовані о
 
 ```ts
 const addUser = mutation(CreateUser, {
-  refresh: [users],
+  refresh: users,
 });
 ```
 
