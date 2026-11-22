@@ -225,15 +225,15 @@ function readNamedSubmission(
     values[checkbox.name] = checkbox.checked;
   }
 
-  const multipleSelects = Array.from(form.elements).filter(
-    (element): element is HTMLSelectElement =>
-      element.localName === "select" &&
-      (element as HTMLSelectElement).multiple &&
-      arrayFields.has((element as HTMLSelectElement).name),
+  const arrayControls = Array.from(form.elements).filter(
+    (element): element is HTMLSelectElement | HTMLInputElement =>
+      ((element.localName === "select" && (element as HTMLSelectElement).multiple) ||
+        (element.localName === "input" && (element as HTMLInputElement).type === "checkbox")) &&
+      !element.matches(":disabled") &&
+      arrayFields.has((element as HTMLInputElement).name),
   );
-  for (const select of multipleSelects) {
-    if (!Object.hasOwn(values, select.name))
-      values[select.name] = Array.from(select.selectedOptions, (option) => option.value.trim());
+  for (const control of arrayControls) {
+    if (!Object.hasOwn(values, control.name)) values[control.name] = [];
   }
 
   const fields = Array.from(form.elements).filter(
@@ -242,7 +242,8 @@ function readNamedSubmission(
         element.localName === "select") &&
       (entries.has((element as HTMLInputElement).name) ||
         ((element as HTMLInputElement).type === "checkbox" &&
-          booleanFields.has((element as HTMLInputElement).name)) ||
+          (booleanFields.has((element as HTMLInputElement).name) ||
+            arrayFields.has((element as HTMLInputElement).name))) ||
         ((element as HTMLInputElement).localName === "select" &&
           (element as HTMLSelectElement).multiple &&
           arrayFields.has((element as HTMLSelectElement).name))),
