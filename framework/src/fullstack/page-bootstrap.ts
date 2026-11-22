@@ -1,9 +1,9 @@
 import { startWeb } from "../web/runtime.js";
 import { layoutView, rootView } from "../neutral/page-root.js";
 import { comparePagePaths, matchPagePath, pageParamNames } from "../neutral/page-path.js";
-import { pageView, outlet, view as defineView, type View } from "../web/view.js";
-import { jsx } from "../web/jsx-runtime.js";
+import { outlet, pageView, view, type View } from "../web/view.js";
 import { signal, type Signal } from "../web/reactive.js";
+import { emptyRouteView, routerOutlet } from "./router-outlet.js";
 import { telemetryTransport } from "./client.js";
 
 type PageModule = { default: unknown; title?: string; styles?: string };
@@ -73,10 +73,7 @@ export async function bootstrapPages(routes: readonly BrowserRoute[]) {
     pageViews.set(key, page);
     return page;
   };
-  const emptyView = defineView({
-    id: "router:empty",
-    template: () => jsx("div", { style: "display:contents" }),
-  });
+  const emptyView = emptyRouteView(view);
   const makeNode = (node: RouteNode): View => {
     const choices = [
       emptyView,
@@ -87,13 +84,10 @@ export async function bootstrapPages(routes: readonly BrowserRoute[]) {
         pageModules.get(route)!,
       )),
     ];
-    const current = signal<View>({
-      id: node.path ? `router:${node.path}` : "router:root",
-      initial: choose(node, active.route) ?? choices[0]!,
-      scope: "application",
-    });
+    const { current, view: outletView } = routerOutlet(
+      node.path, choose(node, active.route) ?? emptyView, choices, { signal, outlet },
+    );
     node.current = current;
-    const outletView = outlet(node.path ? `router-outlet:${node.path}` : "router-outlet:root", current, choices);
     const firstRoute = node.path
       ? routes.find((route) => route.layouts.some((layout) => layout.path === node.path))
       : undefined;

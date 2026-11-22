@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { dirname, relative, sep } from "node:path";
 import { discoverPageDirectory } from "./fullstack/page-directory.js";
+import { emptyRouteView, routerOutlet } from "./fullstack/router-outlet.js";
 import { layoutView, rootView } from "./neutral/page-root.js";
 import { pageParamNames } from "./neutral/page-path.js";
 import {
@@ -1231,18 +1232,39 @@ export class Application {
     const pages = entries.map(({ path, entry, id }) => ({ path, entry, id }));
     const primary = pages.find(({ path }) => path === "/") ?? pages[0];
     if (layoutModules.size) await loadPageView();
+    const outletChildren = new Map<string, Set<string | ReturnType<typeof rootView>>>();
     const roots = pages.map(({ path, entry }) => {
       const applicable = [...layoutModules].filter(([base]) =>
         base === "/" || path === base || path.startsWith(`${base}/`),
       ).sort(([a], [b]) => a.length - b.length);
-      if (!applicable.length) return nodes.get(entry)!;
+      const page = nodes.get(entry)!;
+      if (config) {
+        const chain = ["", ...applicable.map(([base]) => base)];
+        for (const [index, parent] of chain.entries()) {
+          const children = outletChildren.get(parent) ?? new Set();
+          children.add(chain[index + 1] ?? page);
+          outletChildren.set(parent, children);
+        }
+      }
+      if (!applicable.length) return page;
       const createLayout = pageView;
       return applicable.map(([base, layout], index) => ({ base, layout, index })).reduceRight((child, { base, layout, index }) => layoutView(
         layout.default, child, base, createLayout!,
         Object.fromEntries(pageParamNames(base).map((name) => [name, ""])),
         index === 0 ? `layout:${path}` : `layout:${path}:${base}`,
-      ), nodes.get(entry)!);
+      ), page);
     });
+    if (config) {
+      const runtime = await import(webRuntime) as typeof import("./web/index.js");
+      const empty = emptyRouteView(runtime.view);
+      const buildOutlet = (path: string): ReturnType<typeof rootView> => {
+        const children = [...outletChildren.get(path)!].map((child) =>
+          typeof child === "string" ? buildOutlet(child) : child,
+        );
+        return routerOutlet(path, empty, [empty, ...children], runtime).view;
+      };
+      roots.push(buildOutlet(""));
+    }
     return {
       nodes: roots,
       entry: primary.entry,

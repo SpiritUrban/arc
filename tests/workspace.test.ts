@@ -86,6 +86,27 @@ test("Workspace order edit carries the submit trace to the server operation in S
     const interaction = live.interactions.find(({ traceId }: { traceId: string }) => traceId === editTrace);
     assert.ok(interaction);
     assert.deepEqual(interaction.server.map(({ operation }: { operation: string }) => operation), ["orders.update"]);
+    const outletIds = ["router-outlet:root", "router-outlet:/", "router-outlet:/orders"];
+    for (const id of outletIds) {
+      assert.ok(bundle.manifest.partitions?.browser.includes(id));
+      assert.ok(bundle.manifest.partitions?.browser.includes(`${id}.dom.0.0.render`));
+    }
+    const readLive = async () =>
+      (await stand(app)(new Request("http://localhost/api/live"))).json() as Promise<{
+        browserEvents: typeof app.browserEvents;
+      }>;
+    const mounted = await readLive();
+    for (const id of outletIds) {
+      assert.ok(mounted.browserEvents.some((event) => event.node === id && event.type === "view.mounted"), id);
+    }
+    window.dispatchEvent(new window.Event("pagehide"));
+    await waitFor(() => outletIds.every((id) => app.browserEvents.some((event) =>
+      event.node === id && event.type === "view.unmounted")),
+    "router outlet unmount telemetry reached Stand");
+    const unmounted = await readLive();
+    for (const id of outletIds) {
+      assert.ok(unmounted.browserEvents.some((event) => event.node === id && event.type === "view.unmounted"), id);
+    }
   } finally {
     window.dispatchEvent(new window.Event("pagehide"));
     await app.close();
