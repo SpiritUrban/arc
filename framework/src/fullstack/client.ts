@@ -27,6 +27,7 @@ import {
   currentWriteTrace,
   derive,
   state,
+  type Computed,
   type Readable,
   type Writable,
 } from "../web/reactive.js";
@@ -614,7 +615,7 @@ export function remoteApi<
 export type RemoteResource<C extends OperationContract> = WebResource<
   Infer<C["output"]>,
   Infer<C["input"]>
-> & { result: Readable<RemoteResult<C> | undefined> };
+> & { result: Computed<RemoteResult<C> | undefined> };
 
 type QueryItem<C extends OperationContract> =
   Infer<C["output"]> extends readonly (infer Row)[] ? Row : never;

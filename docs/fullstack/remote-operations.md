@@ -11,7 +11,7 @@ else if (result.kind === "business_error")
   console.log(result.error, result.details);
 ```
 
-`remote(contract,{id,from?,input?,baseUrl?,fetch?})` створює web resource. data — output projection, result — typed RemoteResult union. `remoteClient(contract,{id,...})` — explicit graph endpoint для mutations; додайте його до action.needs. `remoteCall(contract,input,{signal,trace,telemetry,...})` — низькорівневий виклик; graph relation при його використанні треба оголосити через remoteClient/needs, compiler не читає тіло run.
+`remote(contract,{id,from?,input?,baseUrl?,fetch?})` створює web resource. `data()` повертає output projection, `result()` — typed RemoteResult union. `remoteClient(contract,{id,...})` — explicit graph endpoint для mutations; додайте його до action.needs. `remoteCall(contract,input,{signal,trace,telemetry,...})` — низькорівневий виклик; graph relation при його використанні треба оголосити через remoteClient/needs, compiler не читає тіло run.
 
 RemoteResult розрізняє `{ok:true,kind:'success',value}` і `{ok:false,kind:'business_error',error,details}`, fault та cancelled. Codes/details виводяться з operation errors. Не всі помилки перетворюються на thrown exceptions.
 
