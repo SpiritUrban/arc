@@ -1,6 +1,7 @@
 import type { PageContext } from "@arc/framework/web";
 import { CancelOrder, GetOrder, UpdateOrder } from "../../orders/contracts.ts";
 import { cancelAndReconcile, orderClient } from "../../orders/client.ts";
+import { OrderFields } from "../../orders/fields.tsx";
 import { ordersData } from "../../orders/page.tsx";
 import { UsersPage } from "../../users/page.tsx";
 import { money } from "../../ui.ts";
@@ -61,35 +62,7 @@ export default function OrderDetail({ own, query }: PageContext<"id">) {
             <form data-edit-order novalidate onSubmit={updateOrder}>
               <h2>Редагувати замовлення</h2>
               <input type="hidden" name="id" value={order().data.id} />
-              <label>
-                Товар
-                <input
-                  name="product"
-                  required
-                  maxlength="100"
-                  value={order().data.product}
-                  aria-invalid={updateOrder.invalid("product")}
-                />
-              </label>
-              <p class="error" role="alert">
-                {updateOrder.invalid("product") && "Вкажіть назву товару."}
-              </p>
-              <label>
-                Кількість
-                <input
-                  name="quantity"
-                  required
-                  type="number"
-                  min="1"
-                  max="100"
-                  step="1"
-                  value={String(order().data.quantity)}
-                  aria-invalid={updateOrder.invalid("quantity")}
-                />
-              </label>
-              <p class="error" role="alert">
-                {updateOrder.invalid("quantity") && "Введіть ціле число від 1 до 100."}
-              </p>
+              <OrderFields mutation={updateOrder} order={order} />
               <button class="button primary" type="submit" disabled={updateOrder().running}>
                 {updateOrder().running ? "Зберігаємо…" : "Зберегти зміни"}
               </button>

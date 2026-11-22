@@ -4,6 +4,7 @@ import { derive, view, type Signal } from "@arc/framework/web";
 import { ListOrders, CreateOrder, CancelOrder } from "./contracts.ts";
 import { activeUser } from "../user-selection.ts";
 import { cancelAndReconcile, orderClient } from "./client.ts";
+import { OrderFields } from "./fields.tsx";
 import { money, failureMessage } from "../ui.ts";
 
 function renderOrdersPage(
@@ -48,39 +49,7 @@ function renderOrdersPage(
         </div>
         {/* ARC перехоплює submit, викликає createOrder і залишає користувача на цій сторінці. */}
         <form class="order-form" data-form novalidate onSubmit={createOrder}>
-          <label class="product-field">
-            Назва товару
-            <input
-              data-product
-              required
-              maxlength="100"
-              placeholder="Наприклад, блокнот ARC"
-              name="product"
-              aria-invalid={createOrder.invalid("product")}
-            />
-            <span class="error" role="alert" data-product-error>
-              {createOrder.invalid("product") && "Вкажіть назву товару."}
-            </span>
-          </label>
-          <div class="quantity-field">
-            <label>
-              Кількість
-              <input
-                data-quantity
-                name="quantity"
-                required
-                type="number"
-                min="1"
-                max="100"
-                step="1"
-                bind:value={quantity}
-                aria-invalid={createOrder.invalid("quantity")}
-              />
-            </label>
-            <p class="error" role="alert" data-quantity-error>
-              {createOrder.invalid("quantity") && "Введіть ціле число від 1 до 100."}
-            </p>
-          </div>
+          <OrderFields mutation={createOrder} quantity={quantity} />
           <button
             class="button primary"
             type="submit"

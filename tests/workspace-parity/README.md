@@ -32,3 +32,5 @@ npm --prefix tests/workspace-parity run benchmark
 git apply --unidiff-zero /path/to/reference-field.patch
 npm --prefix tests/workspace-parity test -- -g "reference experiment"
 ```
+
+[Повторний патч](reference-field-shared-form.patch) застосовується на коміті, який додав `examples/workspace/orders/fields.tsx`. Виконайте ті самі команди з цим патчем для перевірки після виділення спільної форми.

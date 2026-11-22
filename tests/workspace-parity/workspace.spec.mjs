@@ -342,6 +342,18 @@ test("ORD-04–06 · ownership, detail update and independent cancellation", asy
   const edit = orderDetail(page)
     .getByRole("button", { name: "Зберегти зміни" })
     .locator("xpath=ancestor::form");
+  await expect(edit.locator('[name="product"]')).toHaveValue(first.product);
+  await expect(edit.locator('[name="quantity"]')).toHaveValue("2");
+  await edit.locator('[name="quantity"]').fill("0");
+  await edit.getByRole("button", { name: "Зберегти зміни" }).click();
+  await expect(edit.locator('[name="quantity"]')).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await expect(
+    edit.getByRole("alert").filter({ hasText: "від 1 до 100" }),
+  ).toBeVisible();
+  await expect(edit.locator('[name="quantity"]')).toHaveValue("0");
   await edit.locator('[name="product"]').fill("Робочий блокнот");
   await edit.locator('[name="quantity"]').fill("4");
   await edit.getByRole("button", { name: "Зберегти зміни" }).click();

@@ -174,6 +174,12 @@ test("Workspace order update has consistent identities and impact in build and S
       from === `${mutation}.remote` && to === operation
     ));
     const affected = graph.analysis?.nodes.find(({ id }) => id === operation)?.affectedNodes;
+    assert.equal(graph.edges.filter(({ from, to, kind }) =>
+      from === "orders.create.submit" && to.endsWith(".aria-invalid") && kind === "BINDS",
+    ).length, 2);
+    assert.ok(graph.edges.some(({ from, to, kind }) =>
+      from === mutation && to.startsWith("page:pages/orders/[id].dom.") && kind === "BINDS",
+    ));
     assert.ok(affected);
     for (const consumer of [mutation, "http:PUT:/orders/:id", "orders.get.query", "orders.list.query"]) {
       assert.ok(affected.includes(consumer), consumer);

@@ -1,0 +1,135 @@
+diff --git a/examples/react-workspace/server/orders.ts b/examples/react-workspace/server/orders.ts
+index 161cc8d..c9ac4a8 100644
+--- a/examples/react-workspace/server/orders.ts
++++ b/examples/react-workspace/server/orders.ts
+@@ -96 +96 @@ export async function handleOrders(
+-      ? { ...order, ...edit.data, total: edit.data.quantity * orderUnitPrice }
++      ? { ...order, ...edit.data, reference: edit.data.reference, total: edit.data.quantity * orderUnitPrice }
+diff --git a/examples/react-workspace/src/orders/contracts.ts b/examples/react-workspace/src/orders/contracts.ts
+index 01f850d..6e0274a 100644
+--- a/examples/react-workspace/src/orders/contracts.ts
++++ b/examples/react-workspace/src/orders/contracts.ts
+@@ -7,0 +8 @@ export const orderInputSchema = z.object({
++  reference: z.string().trim().max(24).optional(),
+diff --git a/examples/react-workspace/src/orders/detail.tsx b/examples/react-workspace/src/orders/detail.tsx
+index 124dc27..f70db8e 100644
+--- a/examples/react-workspace/src/orders/detail.tsx
++++ b/examples/react-workspace/src/orders/detail.tsx
+@@ -30,0 +31 @@ export function OrderDetail() {
++              {order.reference && <p>{order.reference}</p>}
+diff --git a/examples/react-workspace/src/orders/panel.tsx b/examples/react-workspace/src/orders/panel.tsx
+index f4786b5..c7d8076 100644
+--- a/examples/react-workspace/src/orders/panel.tsx
++++ b/examples/react-workspace/src/orders/panel.tsx
+@@ -36,0 +37 @@ export function OrderForm({ owner, order }: { owner: string; order?: Order }) {
++  const [reference, setReference] = useState(order?.reference ?? "");
+@@ -60,0 +62 @@ export function OrderForm({ owner, order }: { owner: string; order?: Order }) {
++      reference,
+@@ -71,0 +74 @@ export function OrderForm({ owner, order }: { owner: string; order?: Order }) {
++      setReference((current) => current === reference ? (order ? saved.reference ?? "" : "") : current);
+@@ -111,0 +115,6 @@ export function OrderForm({ owner, order }: { owner: string; order?: Order }) {
++        <label>
++          Код клієнта
++          <input name="reference" maxLength={24} value={reference} aria-invalid={invalid("reference")}
++            onChange={(event) => setReference(event.target.value)} />
++          {invalid("reference") && <span role="alert">Код має містити до 24 символів.</span>}
++        </label>
+@@ -249,0 +259 @@ export function OrdersPanel() {
++                    {order.reference && <span>{order.reference}</span>}
+diff --git a/examples/workspace/orders/contracts.ts b/examples/workspace/orders/contracts.ts
+index ab32ec6..9dd4702 100644
+--- a/examples/workspace/orders/contracts.ts
++++ b/examples/workspace/orders/contracts.ts
+@@ -3,0 +4,6 @@ import { s, operationContract } from "@arc/framework/core";
++const orderFields = {
++  product: s.string({ min: 1, max: 100 }),
++  quantity: s.int({ min: 1, max: 100 }),
++  reference: s.string({ max: 24 }).optional(),
++};
++
+@@ -7,2 +13 @@ export const Order = s.object({
+-  product: s.string({ min: 1, max: 100 }),
+-  quantity: s.int({ min: 1, max: 100 }),
++  ...orderFields,
+@@ -33,5 +38 @@ export const CreateOrder = operationContract({
+-  input: s.object({
+-    product: s.string({ min: 1, max: 100 }),
+-    // Обмеження зі схеми перевіряється на сервері навіть при прямому HTTP-запиті.
+-    quantity: s.int({ min: 1, max: 100 }),
+-  }),
++  input: s.object(orderFields),
+@@ -46,2 +47 @@ export const UpdateOrder = operationContract({
+-    product: s.string({ min: 1, max: 100 }),
+-    quantity: s.int({ min: 1, max: 100 }),
++    ...orderFields,
+diff --git a/examples/workspace/orders/fields.tsx b/examples/workspace/orders/fields.tsx
+index 90f02e9..fdf8f0a 100644
+--- a/examples/workspace/orders/fields.tsx
++++ b/examples/workspace/orders/fields.tsx
+@@ -31,0 +32,5 @@ export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
++      <label>
++        Код клієнта
++        <input name="reference" maxlength="24" value={order?.().data?.reference ?? ""} aria-invalid={mutation.invalid("reference")} />
++        {mutation.invalid("reference") && <span role="alert">Код має містити до 24 символів.</span>}
++      </label>
+diff --git a/examples/workspace/orders/page.tsx b/examples/workspace/orders/page.tsx
+index 5092176..bad1316 100644
+--- a/examples/workspace/orders/page.tsx
++++ b/examples/workspace/orders/page.tsx
+@@ -125,0 +126 @@ function renderOrdersPage(
++                      {order.reference && <span>{order.reference}</span>}
+diff --git a/examples/workspace/orders/server.ts b/examples/workspace/orders/server.ts
+index b11a6e0..2c0999c 100644
+--- a/examples/workspace/orders/server.ts
++++ b/examples/workspace/orders/server.ts
+@@ -41 +41 @@ const ordersRepository = resource({
+-      async update(id: string, userId: string, product: string, quantity: number) {
++      async update(id: string, userId: string, input: ReturnType<typeof CreateOrder.input.parse>) {
+@@ -45 +45 @@ const ordersRepository = resource({
+-        const order = { ...orders[index], product, quantity, total: quantity * 25 };
++        const order = { ...orders[index], ...input, reference: input.reference, total: input.quantity * 25 };
+@@ -89 +89 @@ const updateOrder = http.put("/orders/:id", UpdateOrder, {
+-    const result = await orders.update(input.id, user.id, input.product, input.quantity);
++    const result = await orders.update(input.id, user.id, { product: input.product, quantity: input.quantity, reference: input.reference });
+diff --git a/examples/workspace/pages/orders/[id].tsx b/examples/workspace/pages/orders/[id].tsx
+index 3b585e3..7754b73 100644
+--- a/examples/workspace/pages/orders/[id].tsx
++++ b/examples/workspace/pages/orders/[id].tsx
+@@ -34,0 +35 @@ export default function OrderDetail({ own, query }: PageContext<"id">) {
++              {order().data?.reference && <p>{order().data?.reference}</p>}
+diff --git a/tests/workspace-parity/workspace.spec.mjs b/tests/workspace-parity/workspace.spec.mjs
+index 4c4cdc2..e9ee45b 100644
+--- a/tests/workspace-parity/workspace.spec.mjs
++++ b/tests/workspace-parity/workspace.spec.mjs
+@@ -475,0 +476,31 @@ test("ORD-04–06 · ownership, detail update and independent cancellation", asy
++
++test("reference experiment · order field survives create, edit and reads", async ({ page, request }, info) => {
++  const { user } = await fixture(request, info, "Reference", []);
++  const invalid = await request.post(orderPath(info), {
++    headers: auth(user.id),
++    data: { product: "Картка", quantity: 2, reference: "x".repeat(25) },
++  });
++  expect(invalid.status()).toBe(400);
++  await page.goto("/orders");
++  await userRow(page, user.name).click();
++  const create = createOrderForm(page);
++  await create.locator('[name="product"]').fill("Картка");
++  await create.locator('[name="quantity"]').fill("2");
++  await create.locator('[name="reference"]').fill("CLIENT-1");
++  await create.getByRole("button", { name: /Створити/ }).click();
++  await expect(orderRow(page, "Картка")).toContainText("CLIENT-1");
++  const [saved] = await (await request.get(orderPath(info), { headers: auth(user.id) })).json();
++  expect(saved.reference).toBe("CLIENT-1");
++  await orderRow(page, "Картка").getByRole("link").click();
++  const details = orderDetail(page);
++  await expect(details.getByText("CLIENT-1", { exact: true })).toBeVisible();
++  const reference = details.locator('[name="reference"]');
++  await expect(reference).toHaveValue("CLIENT-1");
++  await reference.fill("CLIENT-2");
++  await details.getByRole("button", { name: "Зберегти зміни" }).click();
++  await expect(details.getByText("CLIENT-2", { exact: true })).toBeVisible();
++  await page.getByRole("link", { name: "← Усі замовлення" }).click();
++  await expect(orderRow(page, "Картка")).toContainText("CLIENT-2");
++  const updated = await request.get(orderPath(info, `/${saved.id}`), { headers: auth(user.id) });
++  expect((await updated.json()).reference).toBe("CLIENT-2");
++});
