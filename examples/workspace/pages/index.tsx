@@ -25,8 +25,10 @@ export default view({
         </p>
       </div>
       <div class="content-grid">
-        <div id="users">{UsersPage}</div>
-        <div id="orders">{OrdersPage}</div>
+        <>
+          <div id="users">{UsersPage}</div>
+          <div id="orders">{OrdersPage}</div>
+        </>
       </div>
     </section>
   ),

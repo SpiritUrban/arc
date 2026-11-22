@@ -8,6 +8,7 @@ const keyedList = Symbol("ARC template keyed list");
 const reactiveBlock = Symbol("ARC reactive JSX block");
 const attributeExpression = Symbol("ARC reactive JSX attribute");
 export const Fragment = Symbol("ARC template fragment");
+const jsxFragment = Fragment;
 
 type TextValue = string | number | boolean | null | undefined;
 export type RenderContent =
@@ -119,6 +120,7 @@ export interface TemplateElement {
 
 export namespace JSX {
   export type Element = TemplateElement;
+  export const Fragment = jsxFragment;
   export interface ElementChildrenAttribute {
     children: unknown;
   }

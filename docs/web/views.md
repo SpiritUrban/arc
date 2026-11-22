@@ -167,12 +167,12 @@ ARC створює новий сигнал під час кожного монт
 
 ## Вкладені view
 
-Вставте оголошений view як дочірній елемент статичного TSX-шаблону.
+Вставте оголошений view як дочірній елемент статичного TSX-шаблону. Fragment групує кілька вузлів без зайвої HTML-обгортки.
 
 ```tsx
 const WorkspacePage = view({
   id: "workspace.page",
-  template: <main>{UsersPage}{OrdersPage}</main>,
+  template: <main><>{UsersPage}{OrdersPage}</></main>,
 });
 ```
 
