@@ -36,7 +36,7 @@ npm test
 ## Структура та graph
 
 - `examples/workspace/app.ts` — composition users/orders, health route, Workspace web entry, createApp factory.
-- `examples/workspace/users/contracts.ts`, `examples/workspace/orders/contracts.ts` — shared schema/operation descriptors. Input/output/error source один для server і browser.
+- `examples/workspace/users/contracts.ts`, `examples/workspace/orders/contracts.ts` — shared schema/operation descriptors. `UserProfile` є єдиним визначенням полів профілю для відповіді, створення й редагування; input/output/error source один для server і browser.
 - `examples/workspace/users/server.ts`, `examples/workspace/orders/server.ts` — існуючі серверні сховища, операції та REST-маршрути.
 - `examples/workspace/auth.ts` — визначення користувача в межах HTTP-запиту.
 - `examples/workspace/user-selection.ts` — спільний браузерний стан вибору та дані користувача.
