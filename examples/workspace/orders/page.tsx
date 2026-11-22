@@ -1,6 +1,6 @@
 // Браузерна частина замовлень. Зміна користувача оновлює список,
 // а надсилання форми викликає серверну операцію створення.
-import { derive, each, project, view, type Signal } from "@arc/framework/web";
+import { derive, project, view, type Signal } from "@arc/framework/web";
 import { remoteApi } from "@arc/framework/fullstack";
 import { ListOrders, CreateOrder, CancelOrder } from "./contracts.ts";
 import { selectedUser, activeUser } from "../user-selection.ts";
@@ -114,10 +114,8 @@ function renderOrdersPage(quantity: Signal<string>) {
               </tr>
             </thead>
             <tbody data-rows>
-              {each(visibleOrders, {
-                key: (order) => order.id,
-                render: (order) => (
-                  <tr data-order={order.id}>
+              {visibleOrders.get().map((order) => (
+                  <tr key={order.id} data-order={order.id}>
                     <td>
                       <strong><a href={`/orders/${order.id}`}>{order.product}</a></strong>
                       <small>#{order.id.slice(0, 8)}</small>
@@ -148,8 +146,7 @@ function renderOrdersPage(quantity: Signal<string>) {
                       </p>
                     </td>
                   </tr>
-                ),
-              })}
+              ))}
             </tbody>
           </table>
         </div>
