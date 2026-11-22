@@ -22,13 +22,13 @@ const increment = action({
 // ARC оновлює обидва реактивні значення прямо в тексті.
 export const Counter = view({
   id: "counter.page",
-  template: () => (
+  template: (
     <main style="font:24px system-ui;padding:40px">
       <h1>ARC Web — local counter</h1>
       <p>
         {count} · doubled {doubled}
       </p>
-      <button type="button" on:click={increment}>
+      <button type="button" onClick={increment}>
         Increment
       </button>
     </main>

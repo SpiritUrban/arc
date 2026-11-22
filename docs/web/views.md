@@ -18,8 +18,8 @@ export const Counter = view({
   id: "counter.page",
   template: (
     <section>
-      <p>Лічильник: <strong bind:text={count} /></p>
-      <button type="button" on:click={increment}>Додати</button>
+      <p>Лічильник: <strong>{count}</strong></p>
+      <button type="button" onClick={increment}>Додати</button>
     </section>
   ),
 });
