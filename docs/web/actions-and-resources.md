@@ -2,6 +2,8 @@
 
 `action({id,input?,needs?,invalidates?,run})` представляє mutation. `execute(input,{trace?})` повертає результат run; running/error/result — callable projections (`running()`, `error()`, `result()`). Snapshot має idle/running/success/error. Input schema перевіряється перед run. Exceptions відхиляють execute, ARC Result з business error зберігається як результат. Передавайте `{signal,trace}` з run у remote client; `ctx.set(state,value)` переносить trace до bindings.
 
+Дію без вхідних даних можна передати в кнопку напряму: `<button onClick={refresh}>Оновити</button>`. Для форми використовуйте `<form onSubmit={save}>`; обидва варіанти також підтримують `on:click` і `on:submit`.
+
 Dependencies оголошуються через `needs`: один вузол передається напряму (`needs: user`), кілька — масивом або об’єктом із назвами. Автоматична інспекція JS closures відсутня. Після успішного Result або звичайного return, resources з invalidates reload; IR містить INVALIDATES. Одночасні executions дозволені, result/status представляє останній запуск; для UI serialization використовуйте running/disabled.
 
 `webResource({id,from,input,load,scope?})` — projection зовнішнього source of truth, а не local state. from задає inspectable reactive dependencies, input отримує їхні значення. load отримує AbortSignal і trace. API: data/loading/error/stale, get(), refresh(), invalidate(), activate(), dispose(). Application.start активує application resources, mount — view-owned resources.

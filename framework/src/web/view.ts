@@ -210,8 +210,14 @@ function compileTemplate(id: string, root: TemplateChild) {
       if (name === "onClick") {
         delete attributes[name];
         if (value == null) continue;
-        if (child.tag === Fragment || typeof value !== "function")
-          throw new TypeError("onClick expects a function on an HTML element");
+        if (child.tag === Fragment)
+          throw new TypeError("Attach onClick to an HTML element");
+        if (typeof value !== "function") {
+          attached.push(
+            ...directive(`${id}.dom.${path}.on:click`, "on:click", value),
+          );
+          continue;
+        }
         attached.push(binding({
           id: `${id}.dom.${path}.onClick`,
           type: "event",
