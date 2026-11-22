@@ -7,9 +7,7 @@ import { money } from "../../ui.ts";
 export const title = "Деталі замовлення — ARC Workspace";
 
 export default function OrderDetail({ query }: PageContext<"id">) {
-  const order = query(orderClient, GetOrder, {
-    key: (userId) => userId,
-  });
+  const order = query(orderClient, GetOrder);
 
   return (
     <section>

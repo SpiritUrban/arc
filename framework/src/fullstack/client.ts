@@ -567,6 +567,7 @@ export function remoteApi<
 >(options: {
   from: Sources;
   headers: (...values: SourceValues<Sources>) => HeadersInit;
+  key?: (...values: SourceValues<Sources>) => string | number;
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
 }) {
@@ -590,7 +591,7 @@ export function remoteApi<
         ? [options?: ClientQueryOptions<C, Sources>]
         : [options: ClientQueryOptions<C, Sources>]
     ): RemoteQuery<C> {
-      const key = query?.key ?? (query?.cache
+      const key = query?.key ?? options.key ?? (query?.cache
         ? (...values: SourceValues<Sources>) => querySourceKey(values)
         : undefined);
       return createRemoteResource(contract, {
