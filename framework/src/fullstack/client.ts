@@ -642,7 +642,7 @@ export type RemoteQuery<C extends OperationContract> =
 
 type RemoteResourceOptions<C extends OperationContract> = {
   id: string;
-  from?: readonly Readable<any>[];
+  from?: Readable<any> | readonly Readable<any>[];
   input?: (...values: any[]) => Infer<C["input"]>;
   key?: () => string | number;
   cache?: boolean;
@@ -688,6 +688,11 @@ function createRemoteResource<C extends OperationContract>(
   options: RemoteResourceOptions<C>,
   callable: boolean,
 ): RemoteResource<C> {
+  const from: readonly Readable<any>[] = options.from === undefined
+    ? []
+    : Array.isArray(options.from)
+      ? options.from
+      : [options.from as Readable<any>];
   const client = remoteClient(contract, {
     ...options,
     id: options.id + ".remote",
@@ -701,7 +706,7 @@ function createRemoteResource<C extends OperationContract>(
   const result = callable
     ? webResource<Infer<C["output"]>, Infer<C["input"]>>({ ...resource, callable: true })
     : webResource<Infer<C["output"]>, Infer<C["input"]>>(resource);
-  result.dependencies = [...(options.from ?? []), client];
+  result.dependencies = [...from, client];
   result.relations = [{ to: contract, kind: "REMOTE_CALLS" }];
   const activate = result.activate.bind(result);
   result.activate = (telemetry) => {
@@ -710,7 +715,7 @@ function createRemoteResource<C extends OperationContract>(
   };
   const projection = derive({
     id: options.id + ".result",
-    from: options.key ? [result, ...(options.from ?? [])] : [result],
+    from: options.key ? [result, ...from] : [result],
     compute: (snapshot) =>
       snapshot.outcome === "ok"
         ? ({

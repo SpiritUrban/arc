@@ -44,7 +44,7 @@ export interface WebResource<T, I = unknown> extends Readable<
 }
 type WebResourceOptions<T, I> = {
   id: string;
-  from?: readonly Readable<any>[];
+  from?: Readable<any> | readonly Readable<any>[];
   input?: (...values: any[]) => I;
   load: (
     input: I,
@@ -64,6 +64,11 @@ export function webResource<T, I = unknown>(
 ): WebResource<T, I> & (() => ResourceSnapshot<T>);
 export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebResource<T, I>;
 export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebResource<T, I> {
+  const sources: readonly Readable<any>[] = def.from === undefined
+    ? []
+    : Array.isArray(def.from)
+      ? def.from
+      : [def.from as Readable<any>];
   const createValue = def.callable ? signal : stateObject;
   const initial: ResourceSnapshot<T> = {
     input: undefined,
@@ -111,7 +116,7 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
       return snapshot;
     };
   }
-  const projectionSources = key ? [value, ...(def.from ?? [])] as const : [value] as const;
+  const projectionSources = key ? [value, ...sources] as const : [value] as const;
   const projections = [
     derive({ id: def.id + ".data", from: projectionSources, compute: (s) => s.data }),
     derive({
@@ -129,7 +134,7 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
   const resource = Object.assign(value, {
     kind: "web-resource" as const,
     runtime: "browser" as const,
-    dependencies: def.from ?? [],
+    dependencies: sources,
     metadata: { scope: def.scope ?? "application" },
     data: projections[0] as Computed<T | undefined>,
     loading: projections[1] as Computed<boolean>,
@@ -184,7 +189,7 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
         snapshotKey = requestKey;
         set({ ...previous, loading: true, error: undefined, stale: true }, trace);
         input = def.input
-          ? def.input(...(def.from ?? []).map((d) => d.get()))
+          ? def.input(...sources.map((d) => d.get()))
           : ({} as I);
         const loaded: any = await def.load(input, {
           signal,
@@ -259,9 +264,9 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
       active = true;
       telemetry = next;
       const reload = () => {
-        void resource.refresh((def.from ?? []).find((d) => d._trace)?._trace);
+        void resource.refresh(sources.find((d) => d._trace)?._trace);
       };
-      for (const dep of def.from ?? []) stops.push(dep.subscribe(reload));
+      for (const dep of sources) stops.push(dep.subscribe(reload));
       void resource.refresh();
     },
     dispose() {
