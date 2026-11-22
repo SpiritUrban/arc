@@ -103,7 +103,9 @@ async function buildPage(
     } : { outfile }),
     bundle: true,
     platform: "browser",
-    conditions: ["arc-source", "browser"],
+    // Match package imports to the bootstrap's own runtime. JSX uses
+    // module-local symbols, so source and compiled runtime copies cannot mix.
+    conditions: import.meta.url.endsWith(".ts") ? ["arc-source", "browser"] : ["browser"],
     format: "esm",
     target: "es2022",
     logLevel: "silent",

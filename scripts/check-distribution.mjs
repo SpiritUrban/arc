@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { cp, mkdtemp, symlink, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -121,6 +121,26 @@ if(page.kind !== 'view' || typeof jsx !== 'function') throw Error('TSX runtime e
   console.log(
     "Packed ESM package import, CLI graph without resource activation, execution without tsx, and strict TypeScript/TSX consumers: passed",
   );
+  // Supply the build peers from the root install so this check works offline.
+  for (const peer of ["esbuild", "typescript"]) {
+    await symlink(join(root, "node_modules", peer), join(temp, "node_modules", peer), "junction");
+  }
+  await cp(join(root, "examples/fullstack-tasks"), join(temp, "tasks"), { recursive: true });
+  const manifest = JSON.parse(execFileSync(
+    process.execPath,
+    ["node_modules/@arc/framework/arc.mjs", "build"],
+    {
+      cwd: temp,
+      encoding: "utf8",
+      env: { ...process.env, ARC_APP: "tasks/app.ts", NODE_OPTIONS: "" },
+    },
+  ));
+  const runtimeInputs = manifest.inputs
+    .map((input) => input.replaceAll("\\", "/"))
+    .filter((input) => input.includes("node_modules/@arc/framework/"));
+  assert.ok(runtimeInputs.some((input) => input.endsWith("/dist/web/jsx-runtime.js")));
+  assert.ok(runtimeInputs.every((input) => input.includes("/dist/")), runtimeInputs.join("\n"));
+  console.log("Packed CLI builds Fullstack Tasks with one compiled browser runtime: passed");
 } finally {
   await rm(temp, { recursive: true, force: true });
 }
