@@ -241,6 +241,20 @@ function compileTemplate(id: string, root: TemplateChild) {
         }));
         continue;
       }
+      if (
+        isReadable(value) &&
+        (name === "class" || name === "className" || name === "disabled" ||
+          /^(aria|data)-[\w-]+$/.test(name))
+      ) {
+        const property = name === "disabled";
+        attached.push(binding({
+          id: `${id}.dom.${path}.${name}`,
+          type: property ? "property" : "attribute",
+          name: name === "className" ? "class" : name,
+          sources: [value],
+        }));
+        continue;
+      }
       if (!name.startsWith("bind:") && !name.startsWith("on:")) continue;
       if (child.tag === Fragment)
         throw new Error(`Attach ${name} to an HTML element in ${id}`);
