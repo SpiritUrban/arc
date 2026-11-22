@@ -90,14 +90,17 @@ function renderOrdersPage(quantity: Signal<string>) {
         <div class="panel-heading">
           <div>
             <span class="eyebrow">ІСТОРІЯ</span>
-            <h2 data-owner bind:text={history.title}></h2>
+            <h2 data-owner>
+              {activeUser.get()
+                ? `Замовлення · ${activeUser.get()!.name}`
+                : "Оберіть користувача"}
+            </h2>
           </div>
           <span
             class="muted"
             data-loading
             role="status"
-            bind:text={history.loading}
-          ></span>
+          >{ordersData.loading.get() ? "Завантажуємо замовлення…" : ""}</span>
         </div>
         <div class="table-scroll">
           <table>
@@ -183,17 +186,6 @@ export const visibleOrders = derive({
 });
 
 const history = {
-  title: derive({
-    id: "orders.user-label",
-    from: [activeUser],
-    compute: (user) =>
-      user ? `Замовлення · ${user.name}` : "Оберіть користувача",
-  }),
-  loading: derive({
-    id: "orders.loading",
-    from: [ordersData.loading],
-    compute: (loading) => (loading ? "Завантажуємо замовлення…" : ""),
-  }),
   empty: derive({
     id: "orders.empty",
     from: [visibleOrders, ordersData.loading],
