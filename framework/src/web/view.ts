@@ -162,7 +162,8 @@ function compileTemplate(id: string, root: TemplateChild) {
   function visit(child: TemplateChild, path: string): TemplateChild {
     if (Array.isArray(child))
       return child.map((item, index) => visit(item, `${path}.${index}`));
-    if (typeof child === "function") child = render(child);
+    if (typeof child === "function" && !isReadable(child))
+      child = render(child);
     if (isNestedView(child)) {
       views.add(child);
       return child;
