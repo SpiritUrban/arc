@@ -178,8 +178,12 @@ export function compileReactiveJsx(
           }
 
           function directReads(node: TS.Node) {
-            const references = new Map<string, TS.Identifier>();
+            const references = new Map<string, TS.Expression>();
             let reactive = false;
+            function addReference(reference: TS.Expression) {
+              if (ts.isIdentifier(reference) || ts.isPropertyAccessExpression(reference))
+                references.set(reference.getText(file), reference);
+            }
             function scan(child: TS.Node) {
               if (
                 ts.isFunctionLike(child) ||
@@ -206,8 +210,7 @@ export function compileReactiveJsx(
                 }
                 if (reference) {
                   reactive = true;
-                  if (ts.isIdentifier(reference))
-                    references.set(reference.text, reference);
+                  addReference(reference);
                 }
               }
               ts.forEachChild(child, scan);
@@ -221,8 +224,7 @@ export function compileReactiveJsx(
                 while (ts.isParenthesizedExpression(handler) || ts.isAsExpression(handler) ||
                   ts.isTypeAssertionExpression(handler) || ts.isNonNullExpression(handler))
                   handler = handler.expression;
-                if (ts.isIdentifier(handler))
-                  references.set(handler.text, handler);
+                addReference(handler);
               }
               ts.forEachChild(child, scanEventHandlers);
             }
