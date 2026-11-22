@@ -1,6 +1,7 @@
 import type { PageContext } from "@arc/framework/web";
 import { GetOrder, UpdateOrder } from "../../orders/contracts.ts";
 import { orderClient } from "../../orders/client.ts";
+import { ordersData } from "../../orders/page.tsx";
 import { UsersPage } from "../../users/page.tsx";
 import { money } from "../../ui.ts";
 
@@ -9,7 +10,7 @@ export const title = "Деталі замовлення — ARC Workspace";
 export default function OrderDetail({ query }: PageContext<"id">) {
   const order = query(orderClient, GetOrder);
   const updateOrder = orderClient.mutation(UpdateOrder, {
-    update: order.replace(),
+    update: [order.replace(), ordersData.replaceBy("id")],
   });
 
   return (

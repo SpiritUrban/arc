@@ -60,7 +60,7 @@ orders.create.submit.fields.product / orders.create.submit.fields.quantity
 users.update.submit → users.update.submit.remote → users.update [server]
   UPDATES → users.list.query
 page:orders/[id] → orders.update.submit → orders.update.submit.remote → orders.update [server]
-  UPDATES → orders.get.query
+  UPDATES → orders.get.query + orders.list.query
 orders.list.query → orders.visible → DOM bindings підсумку
 ```
 

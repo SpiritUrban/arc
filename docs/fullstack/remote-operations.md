@@ -131,6 +131,16 @@ const cancelOrder = orderClient.mutation(CancelOrder, { refresh: orders });
 | `update: query.replaceBy("id")` | Відповідь уже містить повний актуальний запис, який є в завантаженому списку | Замінює запис у поточному snapshot і кеші без запиту. У графі — `UPDATES`. |
 | `update: detail.replace()` | Відповідь є повним значенням detail query | Замінює весь detail snapshot і кеш без запиту. У графі — `UPDATES`. |
 
+Якщо одна відповідь має синхронізувати кілька запитів, передайте масив `update`-стратегій. Усі цілі отримають ту саму типізовану відповідь в одному batch:
+
+```ts
+const updateOrder = orderClient.mutation(UpdateOrder, {
+  update: [order.replace(), orders.replaceBy("id")],
+});
+```
+
+Це підходить, коли одна й та сама операція має оновити detail і список. Для запитів із різними output contracts використовуйте окремі мутації або `refresh`.
+
 ```ts
 const cancelOrder = orderClient.mutation(CancelOrder, {
   key: ({ id }) => id,

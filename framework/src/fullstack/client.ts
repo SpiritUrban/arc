@@ -170,7 +170,7 @@ type RemoteFormOptions<C extends OperationContract> = {
   invalidates?: WebResource<any, any> | readonly WebResource<any, any>[];
   /** Apply local state changes after a successful response, before refreshing resources. */
   onSuccess?: (value: Infer<C["output"]>, ctx: ActionContext) => void;
-  update?: QueryUpdate<Infer<C["output"]>>;
+  update?: QueryUpdate<Infer<C["output"]>> | readonly QueryUpdate<Infer<C["output"]>>[];
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
 };
@@ -401,7 +401,6 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     fetch = defaults.fetch,
     input,
     onSuccess,
-    update,
   } = options;
   const refreshOption = options.refresh ?? options.invalidates;
   const refresh: readonly WebResource<any, any>[] = refreshOption === undefined
@@ -409,6 +408,11 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     : Array.isArray(refreshOption)
       ? refreshOption
       : [refreshOption as WebResource<any, any>];
+  const updates: readonly QueryUpdate<Infer<C["output"]>>[] = options.update === undefined
+    ? []
+    : Array.isArray(options.update)
+      ? options.update
+      : [options.update as QueryUpdate<Infer<C["output"]>>];
   const fieldOptions = options.fields;
   const properties = callable && !fieldOptions ? contract.input.json.properties : undefined;
   const numericFields = new Set(
@@ -458,11 +462,11 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     ),
     invalidates: refresh,
     async run(request, ctx) {
-      const apply = update?.capture();
+      const apply = updates.map((update) => update.capture());
       if (request && directInput in request) {
         const result = await client.call(contract.input.parse(request[directInput]), ctx);
         if (result.ok && !ctx.signal.aborted) batch(() => {
-          apply?.(result.value, ctx.trace);
+          for (const applyUpdate of apply) applyUpdate(result.value, ctx.trace);
           onSuccess?.(result.value, ctx);
         });
         return result;
@@ -493,7 +497,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
               ctx.set(fields[name], initial);
           }
           submission?.reset(ctx);
-          apply?.(result.value, ctx.trace);
+          for (const applyUpdate of apply) applyUpdate(result.value, ctx.trace);
           onSuccess?.(result.value, ctx);
         });
       }
@@ -501,9 +505,9 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     },
   };
   const submit = callable ? action({ ...definition, callable: true }) : action(definition);
-  if (update) submit.relations = [
+  if (updates.length) submit.relations = [
     ...(submit.relations ?? []),
-    { to: update.target, kind: "UPDATES" },
+    ...updates.map((update) => ({ to: update.target, kind: "UPDATES" as const })),
   ];
   if (!fieldOptions) {
     submit.submitForm = (form, ctx) => submit.execute(form, ctx);
