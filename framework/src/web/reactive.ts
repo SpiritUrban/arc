@@ -14,6 +14,16 @@ export interface Writable<T> extends Readable<T> {
 }
 export type Signal<T> = Writable<T> & (() => T);
 
+export type GraphNeeds = GraphDefinition | readonly GraphDefinition[] | Readonly<Record<string, GraphDefinition>>;
+
+/** Normalize one, many, or named graph dependencies for internal definitions. */
+export function graphNeeds(needs?: GraphNeeds): GraphDefinition[] {
+  if (!needs) return [];
+  if (Array.isArray(needs)) return [...needs];
+  if ("id" in needs && "kind" in needs) return [needs as GraphDefinition];
+  return Object.values(needs);
+}
+
 let writeTrace: TraceToken | undefined;
 
 export function currentWriteTrace(): TraceToken | undefined {

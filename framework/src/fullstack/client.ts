@@ -26,8 +26,10 @@ import {
   batch,
   currentWriteTrace,
   derive,
+  graphNeeds,
   state,
   type Computed,
+  type GraphNeeds,
   type Readable,
   type Signal,
 } from "../web/reactive.js";
@@ -161,7 +163,7 @@ export function integerField(initial: number) {
 
 type RemoteFormOptions<C extends OperationContract> = {
   id?: string;
-  needs?: readonly GraphDefinition[];
+  needs?: GraphNeeds;
   /** Reload these resources after a successful submission. */
   refresh?: readonly WebResource<any, any>[];
   /** An alias for refresh. When both are present, refresh takes precedence. */
@@ -336,7 +338,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
       [
         client,
         ...names.map((name) => fields[name]),
-        ...new Set([...(defaults.needs ?? []), ...(options.needs ?? [])]),
+        ...new Set([...(defaults.needs ?? []), ...graphNeeds(options.needs)]),
       ].map((node, index) => [index, node]),
     ),
     invalidates: refresh,

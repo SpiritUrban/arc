@@ -13,7 +13,7 @@ export const doubled = derive({
 // needs оголошує в графі, що дія працює зі станом лічильника.
 const increment = action({
   id: "counter.increment",
-  needs: { count },
+  needs: count,
   run() {
     count.update((n) => n + 1);
   },

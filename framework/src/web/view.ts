@@ -26,7 +26,7 @@ import {
   type TemplateChild,
   type TemplateElement,
 } from "./jsx-runtime.js";
-import { Scope, signal, trackReads, withWriteTrace, type Readable, type Signal, type Writable } from "./reactive.js";
+import { graphNeeds, Scope, signal, trackReads, withWriteTrace, type GraphNeeds, type Readable, type Signal, type Writable } from "./reactive.js";
 
 const projection = Symbol("ARC binding projection");
 const instantiateView = Symbol("ARC view instance");
@@ -142,9 +142,9 @@ export interface View extends GraphDefinition {
 }
 type ViewOptions = Omit<
   View,
-  "kind" | "runtime" | "dependencies" | "setup" | "bindings"
+  "kind" | "runtime" | "dependencies" | "needs" | "setup" | "bindings"
 > & {
-  needs?: Record<string, GraphDefinition>;
+  needs?: GraphNeeds;
 } & (
     | { setup: View["setup"]; bindings: readonly Binding[]; template?: never }
     | {
@@ -499,6 +499,7 @@ function buildView({
   template,
   setup,
   bindings: declared,
+  needs,
   ...def
 }: ViewOptions): View {
   const compiled =
@@ -524,8 +525,9 @@ function buildView({
       }),
     kind: "view",
     runtime: "browser",
+    needs: Object.fromEntries(graphNeeds(needs).map((node) => [node.id, node])),
     dependencies: [
-      ...Object.values(def.needs ?? {}),
+      ...graphNeeds(needs),
       ...(compiled?.views ?? []),
       ...bindings,
       ...((def.owned ?? []) as GraphDefinition[]),

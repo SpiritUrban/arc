@@ -12,7 +12,9 @@ import {
   signal,
   derive,
   batch,
+  graphNeeds,
   type Computed,
+  type GraphNeeds,
   type Readable,
   type Writable,
 } from "./reactive.js";
@@ -299,7 +301,7 @@ export interface ActionContext {
 export type ActionOptions<I, O> = {
   id: string;
   input?: Schema<I>;
-  needs?: Record<string, GraphDefinition>;
+  needs?: GraphNeeds;
   invalidates?: readonly WebResource<any, any>[];
   run: (input: I, ctx: ActionContext) => O | Promise<O>;
   callable?: boolean;
@@ -343,7 +345,7 @@ export function action<I = void, O = unknown>(def: ActionOptions<I, O>): Action<
   return Object.assign(value, {
     kind: "action" as const,
     runtime: "browser" as const,
-    dependencies: Object.values(def.needs ?? {}),
+    dependencies: graphNeeds(def.needs),
     relations: (def.invalidates ?? []).map((to) => ({
       to,
       kind: "INVALIDATES" as const,

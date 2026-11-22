@@ -8,7 +8,7 @@ import { selectedUser, users } from "../user-selection.ts";
 
 // CreateUser — спільний контракт. На сервері його виконує createUser у ./server.ts.
 export const addUser = mutation(CreateUser, {
-  needs: [selectedUser],
+  needs: selectedUser,
   refresh: [users],
   onSuccess(user, ctx) {
     ctx.set(selectedUser, user.id);

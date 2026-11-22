@@ -8,7 +8,7 @@ import { state, action, view } from "@arc/framework/web";
 const count = state({ id: "counter.value", initial: 0 });
 const increment = action({
   id: "counter.increment",
-  needs: { count },
+  needs: count,
   run(_, ctx) {
     ctx.set(count, count() + 1);
   },
