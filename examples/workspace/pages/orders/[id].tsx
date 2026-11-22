@@ -1,16 +1,10 @@
-import { remoteApi } from "@arc/framework/fullstack";
 import type { PageContext } from "@arc/framework/web";
 import { GetOrder } from "../../orders/contracts.ts";
-import { selectedUser } from "../../user-selection.ts";
+import { orderClient } from "../../orders/client.ts";
 import { UsersPage } from "../../users/page.tsx";
 import { money } from "../../ui.ts";
 
 export const title = "Деталі замовлення — ARC Workspace";
-
-const orderClient = remoteApi({
-  from: [selectedUser],
-  headers: (userId) => ({ authorization: `Bearer ${userId}` }),
-});
 
 export default function OrderDetail({ query }: PageContext<"id">) {
   const order = query(orderClient, GetOrder, {

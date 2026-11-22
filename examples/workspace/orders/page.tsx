@@ -1,9 +1,9 @@
 // Браузерна частина замовлень. Зміна користувача оновлює список,
 // а надсилання форми викликає серверну операцію створення.
 import { derive, view, type Signal } from "@arc/framework/web";
-import { remoteApi } from "@arc/framework/fullstack";
 import { ListOrders, CreateOrder, CancelOrder } from "./contracts.ts";
-import { selectedUser, activeUser } from "../user-selection.ts";
+import { activeUser } from "../user-selection.ts";
+import { orderClient } from "./client.ts";
 import { money, failureMessage } from "../ui.ts";
 
 function renderOrdersPage(quantity: Signal<string>) {
@@ -162,11 +162,6 @@ function renderOrdersPage(quantity: Signal<string>) {
 }
 
 // Список і форма працюють від імені вибраного демо-користувача.
-const orderClient = remoteApi({
-  from: [selectedUser],
-  headers: (userId) => ({ authorization: `Bearer ${userId}` }),
-});
-
 export const ordersData = orderClient.query(ListOrders, {
   cache: true,
 });
