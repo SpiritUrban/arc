@@ -1,34 +1,59 @@
 import { useState, type FormEvent } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useIsMutating,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { generatePath, Link } from "react-router";
+import { paths } from "../paths.ts";
 import { ApiError } from "../http.ts";
 import { useSelectedUser, useUsers } from "../users/panel.tsx";
-import { createOrder, ordersKey, ordersQuery } from "./api.ts";
+import { CancelOrder, orderError, orderWriteKey } from "./actions.tsx";
+import {
+  createOrder,
+  ordersKey,
+  ordersQuery,
+  saveConfirmedOrder,
+  updateOrder,
+} from "./api.ts";
 import { orderHistory } from "./history.ts";
 import {
   orderInputSchema,
   orderUnitPrice,
   type OrderInput,
+  type Order,
 } from "./contracts.ts";
 
-const money = new Intl.NumberFormat("uk-UA", {
+export const money = new Intl.NumberFormat("uk-UA", {
   style: "currency",
   currency: "UAH",
   maximumFractionDigits: 0,
 });
 
-function CreateOrderForm({ owner }: { owner: string }) {
-  const [product, setProduct] = useState("");
-  const [quantity, setQuantity] = useState("1");
+export function OrderForm({ owner, order }: { owner: string; order?: Order }) {
+  const label = order ? "Редагувати замовлення" : "Створити замовлення";
+  const [product, setProduct] = useState(order?.product ?? "");
+  const [quantity, setQuantity] = useState(String(order?.quantity ?? 1));
   const [invalidFields, setInvalidFields] = useState<string[]>([]);
   const cache = useQueryClient();
+  const mutationKey = order
+    ? orderWriteKey(owner, order.id)
+    : ["orders.create", owner];
+  const pending = useIsMutating({ mutationKey, exact: true }) > 0;
   const mutation = useMutation({
-    mutationFn: (input: OrderInput) => createOrder(owner, input),
-    onSuccess: () => cache.invalidateQueries({ queryKey: ordersKey(owner) }),
+    mutationKey,
+    mutationFn: (input: OrderInput) =>
+      order ? updateOrder(owner, order.id, input) : createOrder(owner, input),
+    onSuccess: (saved) =>
+      order
+        ? saveConfirmedOrder(cache, saved)
+        : cache.invalidateQueries({ queryKey: ordersKey(owner) }),
   });
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (mutation.isPending) return;
+    if (cache.isMutating({ mutationKey, exact: true })) return;
     mutation.reset();
     const parsed = orderInputSchema.safeParse({
       product,
@@ -40,9 +65,13 @@ function CreateOrderForm({ owner }: { owner: string }) {
     }
     setInvalidFields([]);
     try {
-      await mutation.mutateAsync(parsed.data);
-      setProduct((current) => (current === product ? "" : current));
-      setQuantity((current) => (current === quantity ? "1" : current));
+      const saved = await mutation.mutateAsync(parsed.data);
+      setProduct((current) =>
+        current === product ? (order ? saved.product : "") : current,
+      );
+      setQuantity((current) =>
+        current === quantity ? (order ? String(saved.quantity) : "1") : current,
+      );
     } catch {
       // TanStack Query keeps the error for the form.
     }
@@ -54,10 +83,10 @@ function CreateOrderForm({ owner }: { owner: string }) {
     invalidFields.includes(name) || serverFields.includes(name);
   return (
     <section className="panel">
-      <h2>Створити замовлення</h2>
+      <h2>{label}</h2>
       <form
         className="order-form"
-        aria-label="Створити замовлення"
+        aria-label={label}
         noValidate
         onSubmit={submit}
       >
@@ -101,12 +130,14 @@ function CreateOrderForm({ owner }: { owner: string }) {
             </p>
           )}
         </div>
-        <button
-          className="button primary"
-          type="submit"
-          disabled={mutation.isPending}
-        >
-          {mutation.isPending ? "Створюємо…" : "Створити"}
+        <button className="button primary" type="submit" disabled={pending}>
+          {order
+            ? mutation.isPending
+              ? "Зберігаємо…"
+              : "Зберегти зміни"
+            : mutation.isPending
+              ? "Створюємо…"
+              : "Створити"}
         </button>
       </form>
       <div className="form-footer">
@@ -119,7 +150,12 @@ function CreateOrderForm({ owner }: { owner: string }) {
       </div>
       {error && !serverFields.length && (
         <p className="error" role="alert">
-          Не вдалося створити замовлення.
+          {orderError(
+            error,
+            order
+              ? "Не вдалося зберегти замовлення."
+              : "Не вдалося створити замовлення.",
+          )}
         </p>
       )}
     </section>
@@ -151,7 +187,7 @@ export function OrdersPanel() {
           <strong>{money.format(total)}</strong>
         </div>
       </div>
-      <CreateOrderForm key={owner} owner={owner} />
+      <OrderForm key={owner} owner={owner} />
       <section className="panel history">
         <div className="panel-heading">
           <h2>
@@ -198,13 +234,18 @@ export function OrdersPanel() {
                 <th>Кількість</th>
                 <th>Сума</th>
                 <th>Статус</th>
+                <th>Дії</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((order) => (
                 <tr key={order.id}>
                   <td>
-                    <strong>{order.product}</strong>
+                    <strong>
+                      <Link to={generatePath(paths.order, { id: order.id })}>
+                        {order.product}
+                      </Link>
+                    </strong>
                     <small>#{order.id.slice(0, 8)}</small>
                   </td>
                   <td>{order.quantity}</td>
@@ -213,6 +254,11 @@ export function OrdersPanel() {
                     <span className="order-status">
                       {order.cancelled ? "Скасовано" : "Створено"}
                     </span>
+                  </td>
+                  <td>
+                    {!order.cancelled && (
+                      <CancelOrder owner={owner} id={order.id} />
+                    )}
                   </td>
                 </tr>
               ))}

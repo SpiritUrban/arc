@@ -17,3 +17,6 @@ export const orderSchema = orderInputSchema.extend({
 export const ordersSchema = z.array(orderSchema);
 export type OrderInput = z.infer<typeof orderInputSchema>;
 export type Order = z.infer<typeof orderSchema>;
+
+export const orderIdSchema = z.uuid();
+export const cancelOrderSchema = z.object({ id: orderIdSchema });

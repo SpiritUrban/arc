@@ -8,9 +8,9 @@ import {
   Outlet,
   Route,
   Routes,
-  useParams,
 } from "react-router";
 import { styles } from "../../workspace/styles.ts";
+import { OrderDetail } from "./orders/detail.tsx";
 import { OrdersPanel } from "./orders/panel.tsx";
 import { paths } from "./paths.ts";
 import { UserSelection, UsersPanel } from "./users/panel.tsx";
@@ -47,20 +47,6 @@ function WorkspaceLayout() {
         </main>
       </div>
     </div>
-  );
-}
-
-function OrderDetail() {
-  const { id } = useParams<"id">();
-  return (
-    <section>
-      <Link to={paths.orders}>← Усі замовлення</Link>
-      <h1>Деталі замовлення</h1>
-      <p>Замовлення {id}</p>
-      <div className="content-grid">
-        <UsersPanel />
-      </div>
-    </section>
   );
 }
 
