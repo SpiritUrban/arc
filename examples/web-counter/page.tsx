@@ -1,4 +1,4 @@
-import { state, derive, action, project, view } from "@arc/framework/web";
+import { state, derive, action, view } from "@arc/framework/web";
 
 // state зберігає змінне значення. Ідентифікатор вузла видно в графі Stand.
 export const count = state({ id: "counter.value", initial: 0 });
@@ -19,15 +19,14 @@ const increment = action({
   },
 });
 
-// ARC оновлює значення прямо в тексті. project форматує похідне число.
+// ARC оновлює обидва реактивні значення прямо в тексті.
 export const Counter = view({
   id: "counter.page",
   template: () => (
     <main style="font:24px system-ui;padding:40px">
       <h1>ARC Web — local counter</h1>
       <p>
-        {count}
-        {project(doubled, (value) => ` · doubled ${value}`)}
+        {count} · doubled {doubled}
       </p>
       <button type="button" on:click={increment}>
         Increment
