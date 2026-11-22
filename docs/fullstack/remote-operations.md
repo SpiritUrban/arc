@@ -15,6 +15,8 @@ else if (result.kind === "business_error")
 
 RemoteResult розрізняє `{ok:true,kind:'success',value}` і `{ok:false,kind:'business_error',error,details}`, fault та cancelled. Codes/details виводяться з operation errors. Не всі помилки перетворюються на thrown exceptions.
 
+У новому коді використовуйте `mutation` і `refresh`. `remoteForm` та опція `invalidates` у fullstack form/mutation лишаються сумісними застарілими назвами. `action({ invalidates })` у базовому Web API — окремий загальний механізм і зберігає свою назву.
+
 ## Запит зі спільного контракту
 
 ```tsx

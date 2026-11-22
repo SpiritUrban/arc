@@ -181,7 +181,7 @@ Legacy `queue(app, op, options)` та `schedule(app, op, options)` лишают�
 
 ## Package subpaths і browser API
 
-`/core`: neutral contracts, schemas, graph/module/application metadata, compiler diagnostics, instrumentation protocol. `/server`: operations/resources/transports, `handles`, `handlerModule`. `/web`: state, derive, batch/flush/tick, Scope, action, webResource, binding/view/mount, `project`, webApplication. `/fullstack`: remote, remoteApi, `mutation`, `textField`, `integerField`, remoteClient, remoteCall, telemetryTransport. `remoteForm` лишається застарілим сумісним API. `/fullstack/server`: internalTransport. `/fullstack/build`: buildWeb/staticWeb. `/stand`: Node Stand.
+`/core`: neutral contracts, schemas, graph/module/application metadata, compiler diagnostics, instrumentation protocol. `/server`: operations/resources/transports, `handles`, `handlerModule`. `/web`: state, derive, batch/flush/tick, Scope, action, webResource, binding/view/mount, `project`, webApplication. `/fullstack`: remote, remoteApi, `mutation`, `textField`, `integerField`, remoteClient, remoteCall, telemetryTransport. `remoteForm` and fullstack mutation option `invalidates` are deprecated compatibility aliases; new code uses `mutation` and `refresh`. `/fullstack/server`: internalTransport. `/fullstack/build`: buildWeb/staticWeb. `/stand`: Node Stand.
 
 Повні сигнатури browser API та практичні приклади: [Web](web/getting-started.md), [remote](fullstack/remote-operations.md). Server `resource` і browser `webResource` мають різну semantics; fullstack imports не вводять двозначний resource alias.
 
