@@ -27,10 +27,10 @@ export const hello = operation(Hello, {
 Browser імпортує descriptor, не implementation:
 
 ```ts
-import { remoteForm, textField } from "@arc/framework/fullstack";
+import { mutation, textField } from "@arc/framework/fullstack";
 import { Hello } from "./contract.ts";
 
-export const { fields, submit: greet } = remoteForm(Hello, {
+export const greet = mutation(Hello, {
   fields: { name: textField("ARC") },
 });
 ```
@@ -38,9 +38,9 @@ export const { fields, submit: greet } = remoteForm(Hello, {
 У TSX підключіть дію і поле безпосередньо до HTML:
 
 ```tsx
-<form on:submit={greet}>
-  <input aria-label="Ім’я" bind:value={fields.name} required />
-  <button type="submit" bind:disabled={greet.running}>Привітатися</button>
+<form onSubmit={greet}>
+  <input aria-label="Ім’я" bind:value={greet.fields.name} required />
+  <button type="submit" disabled={greet.running}>Привітатися</button>
 </form>
 ```
 

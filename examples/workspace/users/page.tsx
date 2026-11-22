@@ -20,6 +20,7 @@ export const UsersPage = view({
   id: "users.page",
   state: { search: "" },
   template: ({ search }) => {
+
     function visible() {
       const query = search().toLowerCase();
       return (users().data ?? []).filter((user) =>

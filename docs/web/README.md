@@ -17,4 +17,4 @@ ARC Web описує frontend як явний reactive graph: local state → de
 
 Для frontend розробника рекомендований шлях: початок роботи → як писати frontend → форми → lifecycle → тести. Backend окремо: [Server](../server/README.md).
 
-Зараз package один: імпорти `@arc/framework/web`, `/core`, `/fullstack`. Окремих npm packages `@arc/web` чи `@arc/core` ще немає. Для форм зі спільним серверним контрактом використовуйте [`remoteForm`](../fullstack/remote-operations.md).
+Зараз package один: імпорти `@arc/framework/web`, `/core`, `/fullstack`. Окремих npm packages `@arc/web` чи `@arc/core` ще немає. Для форм зі спільним серверним контрактом використовуйте [`mutation`](../fullstack/remote-operations.md), яка також працює як дія з `run()`.

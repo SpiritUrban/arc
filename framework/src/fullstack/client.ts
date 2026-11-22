@@ -617,6 +617,7 @@ function bindMutation(defaults: RemoteFormDefaults) {
   return mutate;
 }
 
+/** @deprecated Use `mutation`; it provides the same fields and form submission API plus `run` for direct actions. */
 export const remoteForm = bindRemoteForm({});
 export const mutation = bindMutation({});
 

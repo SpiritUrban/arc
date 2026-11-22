@@ -205,9 +205,9 @@ const tasks = remote(ListTasks, {
   id: 'tasks.current',
 });
 
-const { fields, submit } = remoteForm(CreateTask, {
+const createTask = mutation(CreateTask, {
   fields: { title: textField() },
-  refresh: [tasks],
+  refresh: tasks,
 });</code></pre>
       </div>
       <div class="demo-footer">
