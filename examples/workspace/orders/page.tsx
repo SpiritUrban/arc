@@ -13,14 +13,14 @@ function renderOrdersPage(quantity: Signal<string>) {
         <div class="summary-card">
           <span class="muted">Замовлень користувача</span>
           <strong data-count>
-            {String(visibleOrders.get().length).padStart(2, "0")}
+            {String(visibleOrders().length).padStart(2, "0")}
           </strong>
           <span class="summary-note">У поточній сесії</span>
         </div>
         <div class="summary-card accent">
           <span>Загальна сума</span>
           <strong data-amount>
-            {money(visibleOrders.get().reduce((sum, order) => sum + order.total, 0))}
+            {money(visibleOrders().reduce((sum, order) => sum + order.total, 0))}
           </strong>
           <span class="summary-note">25 ₴ за одиницю товару</span>
         </div>
@@ -91,8 +91,8 @@ function renderOrdersPage(quantity: Signal<string>) {
           <div>
             <span class="eyebrow">ІСТОРІЯ</span>
             <h2 data-owner>
-              {activeUser.get()
-                ? `Замовлення · ${activeUser.get()!.name}`
+              {activeUser()
+                ? `Замовлення · ${activeUser()!.name}`
                 : "Оберіть користувача"}
             </h2>
           </div>
@@ -100,7 +100,7 @@ function renderOrdersPage(quantity: Signal<string>) {
             class="muted"
             data-loading
             role="status"
-          >{ordersData.loading.get() ? "Завантажуємо замовлення…" : ""}</span>
+          >{ordersData.loading() ? "Завантажуємо замовлення…" : ""}</span>
         </div>
         <div class="table-scroll">
           <table>
@@ -113,7 +113,7 @@ function renderOrdersPage(quantity: Signal<string>) {
               </tr>
             </thead>
             <tbody data-rows>
-              {visibleOrders.get().map((order) => (
+              {visibleOrders().map((order) => (
                   <tr key={order.id} data-order={order.id}>
                     <td>
                       <strong><a href={`/orders/${order.id}`}>{order.product}</a></strong>
@@ -149,7 +149,7 @@ function renderOrdersPage(quantity: Signal<string>) {
             </tbody>
           </table>
         </div>
-        {visibleOrders.get().length === 0 && !ordersData.loading.get() && (
+        {visibleOrders().length === 0 && !ordersData.loading() && (
           <div class="empty order-empty" data-empty>
             <span class="empty-symbol">▤</span>
             <strong>Тут з’являться замовлення</strong>

@@ -163,6 +163,7 @@ function createState<T, Target extends object>(def: StateOptions<T>, target: Tar
   return node;
 }
 export interface Computed<T> extends Readable<T> {
+  (): T;
   dirty: boolean;
   recompute(): void;
 }
@@ -177,14 +178,15 @@ export function derive<const D extends readonly Readable<any>[], T>(def: {
     ready = false,
     computing = false,
     disposed = false;
-  const node: Computed<T> = {
+  let node!: Computed<T>;
+  node = Object.assign(() => node.get(), {
     id: def.id,
-    kind: "derived",
-    runtime: "browser",
+    kind: "derived" as const,
+    runtime: "browser" as const,
     dependencies: def.from,
     dirty: true,
-    _children: new Set(),
-    _listeners: new Set(),
+    _children: new Set<Computed<any>>(),
+    _listeners: new Set<() => void>(),
     recompute() {
       if (!node.dirty || disposed) return;
       if (computing) throw new Error(`ARC-WEB-204 derived cycle: ${node.id}`);
@@ -215,7 +217,7 @@ export function derive<const D extends readonly Readable<any>[], T>(def: {
       }
       return value!;
     },
-    subscribe(fn) {
+    subscribe(fn: () => void) {
       if (disposed) throw new Error("Disposed derived");
       node._listeners.add(fn);
       return () => {
@@ -231,7 +233,7 @@ export function derive<const D extends readonly Readable<any>[], T>(def: {
       node._listeners.clear();
       node._children.clear();
     },
-  };
+  });
   for (const dep of def.from) {
     if (!dep?._children)
       throw new Error(`ARC-WEB-202 invalid reactive dependency: ${def.id}`);

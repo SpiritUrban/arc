@@ -12,6 +12,7 @@ import {
   signal,
   derive,
   batch,
+  type Computed,
   type Readable,
   type Writable,
 } from "./reactive.js";
@@ -28,10 +29,10 @@ export const captureResourceUpdate = Symbol("ARC resource update");
 export interface WebResource<T, I = unknown> extends Readable<
   ResourceSnapshot<T>
 > {
-  data: Readable<T | undefined>;
-  loading: Readable<boolean>;
-  error: Readable<unknown>;
-  stale: Readable<boolean>;
+  data: Computed<T | undefined>;
+  loading: Computed<boolean>;
+  error: Computed<unknown>;
+  stale: Computed<boolean>;
   refresh(trace?: TraceToken): Promise<void>;
   invalidate(trace?: TraceToken): Promise<void>;
   activate(telemetry?: WebTelemetry): void;
@@ -128,10 +129,10 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
     runtime: "browser" as const,
     dependencies: def.from ?? [],
     metadata: { scope: def.scope ?? "application" },
-    data: projections[0] as Readable<T | undefined>,
-    loading: projections[1] as Readable<boolean>,
-    error: projections[2],
-    stale: projections[3] as Readable<boolean>,
+    data: projections[0] as Computed<T | undefined>,
+    loading: projections[1] as Computed<boolean>,
+    error: projections[2] as Computed<unknown>,
+    stale: projections[3] as Computed<boolean>,
     [captureResourceUpdate]() {
       const targetKey = key?.();
       return (update: (data: T) => T, trace: TraceToken) => {
