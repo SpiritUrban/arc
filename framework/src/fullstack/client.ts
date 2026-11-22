@@ -739,7 +739,11 @@ export function remoteApi<
 export type RemoteResource<C extends OperationContract> = WebResource<
   Infer<C["output"]>,
   Infer<C["input"]>
-> & { result: Computed<RemoteResult<C> | undefined> };
+> & {
+  result: Computed<RemoteResult<C> | undefined>;
+  /** Use a successful mutation response as the complete query value. */
+  replace(): QueryUpdate<Infer<C["output"]>>;
+};
 
 type QueryItem<C extends OperationContract> =
   Infer<C["output"]> extends readonly (infer Row)[] ? Row : never;
@@ -850,6 +854,15 @@ function createRemoteResource<C extends OperationContract>(
   };
   return Object.assign(result, {
     result: projection,
+    replace(): QueryUpdate<Infer<C["output"]>> {
+      return {
+        target: result,
+        capture() {
+          const apply = result[captureResourceUpdate]?.();
+          return (value, trace) => apply?.(() => value, trace);
+        },
+      };
+    },
     replaceBy(field: RowKey<QueryItem<C>>): QueryUpdate<QueryItem<C>> {
       return {
         target: result,

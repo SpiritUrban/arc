@@ -39,6 +39,18 @@ export const CreateOrder = operationContract({
   expose: { web: true },
 });
 
+export const UpdateOrder = operationContract({
+  id: "orders.update",
+  input: s.object({
+    id: s.uuid(),
+    product: s.string({ min: 1, max: 100 }),
+    quantity: s.int({ min: 1, max: 100 }),
+  }),
+  output: Order,
+  errors: { ORDER_NOT_FOUND: 404, ORDER_ALREADY_CANCELLED: 409 },
+  expose: { web: true },
+});
+
 export const CancelOrder = operationContract({
   id: "orders.cancel",
   input: s.object({ id: s.uuid() }),
