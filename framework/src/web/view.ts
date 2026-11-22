@@ -256,6 +256,19 @@ function compileTemplate(id: string, root: TemplateChild) {
         }));
         continue;
       }
+      if (/^on[A-Z]/.test(name)) {
+        delete attributes[name];
+        if (value == null) continue;
+        if (child.tag === Fragment)
+          throw new Error(`Attach ${name} to an HTML element in ${id}`);
+        const event = name === "onDoubleClick"
+          ? "dblclick"
+          : name.slice(2).toLowerCase();
+        attached.push(
+          ...directive(`${id}.dom.${path}.on:${event}`, `on:${event}`, value),
+        );
+        continue;
+      }
       const attribute = attributeReader(value);
       if (attribute) {
         delete attributes[name];

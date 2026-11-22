@@ -54,7 +54,7 @@ ARC CLI використовує esbuild для браузерної збірк�
 | `bind:checked` | Синхронізує одиночний checkbox із writable boolean state |
 | `bind:visible` | Керує видимістю через властивість `hidden` |
 
-Події задавайте через `onClick`, `onSubmit` або `on:…` для інших DOM-подій. Вони приймають обробник або ARC action.
+Події задавайте через JSX-пропси на кшталт `onClick`, `onSubmit`, `onChange` та `onKeyDown`. Вони приймають обробник або ARC action. Синтаксис `on:…` також лишається доступним.
 
 Radio-кнопки однієї групи використовують спільний string state:
 

@@ -108,6 +108,18 @@ interface TemplateProps {
   "bind:checked"?: Writable<boolean>;
   onClick?: Action<void, unknown> | ((event: MouseEvent) => unknown);
   onSubmit?: Action<void, unknown> | ((event: SubmitEvent) => unknown);
+  onChange?: Action<void, unknown> | EventHandler;
+  onInput?: Action<void, unknown> | EventHandler;
+  onFocus?: Action<void, unknown> | EventHandler;
+  onBlur?: Action<void, unknown> | EventHandler;
+  onKeyDown?: Action<void, unknown> | EventHandler;
+  onKeyUp?: Action<void, unknown> | EventHandler;
+  onDoubleClick?: Action<void, unknown> | EventHandler;
+  onMouseEnter?: Action<void, unknown> | EventHandler;
+  onMouseLeave?: Action<void, unknown> | EventHandler;
+  onPointerDown?: Action<void, unknown> | EventHandler;
+  onPointerUp?: Action<void, unknown> | EventHandler;
+  onReset?: Action<void, unknown> | EventHandler;
   [event: `on:${string}`]: Action<void, unknown> | EventHandler | undefined;
   [attribute: string]: unknown;
 }
