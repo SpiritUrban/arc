@@ -81,7 +81,7 @@ Read-only значення оновлюють DOM-властивість чи а
 
 ```tsx
 {() => users().map((user) => (
-  <button type="button" on:click={(_, { set }) => set(selectedUser, user.id)}>
+  <button type="button" onClick={(_, { set }) => set(selectedUser, user.id)}>
     {user.name}
   </button>
 ))}

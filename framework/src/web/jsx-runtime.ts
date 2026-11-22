@@ -106,8 +106,8 @@ interface TemplateProps {
   "bind:visible"?: Readable<boolean> | Projection<boolean>;
   "bind:value"?: Writable<string> | Writable<string[]>;
   "bind:checked"?: Writable<boolean>;
-  onClick?: Action<void, unknown> | ((event: MouseEvent) => unknown);
-  onSubmit?: Action<void, unknown> | ((event: SubmitEvent) => unknown);
+  onClick?: Action<void, unknown> | ((event: MouseEvent, context: EventContext) => unknown);
+  onSubmit?: Action<void, unknown> | ((event: SubmitEvent, context: EventContext) => unknown);
   onChange?: Action<void, unknown> | EventHandler;
   onInput?: Action<void, unknown> | EventHandler;
   onFocus?: Action<void, unknown> | EventHandler;
@@ -123,10 +123,14 @@ interface TemplateProps {
   [event: `on${Capitalize<string>}`]:
     | Action<void, unknown>
     | EventHandler
-    | ((event: any) => unknown)
+    | ((event: any, context: EventContext) => unknown)
     | undefined;
   [event: `on:${string}`]: Action<void, unknown> | EventHandler | undefined;
   [attribute: string]: unknown;
+}
+
+interface EventContext {
+  set<T>(state: Writable<T>, value: T): void;
 }
 
 export interface TemplateElement {
