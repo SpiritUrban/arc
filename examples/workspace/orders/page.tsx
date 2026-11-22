@@ -1,6 +1,6 @@
 // Браузерна частина замовлень. Зміна користувача оновлює список,
 // а надсилання форми викликає серверну операцію створення.
-import { derive, project, view, type Signal } from "@arc/framework/web";
+import { derive, view, type Signal } from "@arc/framework/web";
 import { remoteApi } from "@arc/framework/fullstack";
 import { ListOrders, CreateOrder, CancelOrder } from "./contracts.ts";
 import { selectedUser, activeUser } from "../user-selection.ts";
@@ -13,18 +13,14 @@ function renderOrdersPage(quantity: Signal<string>) {
         <div class="summary-card">
           <span class="muted">Замовлень користувача</span>
           <strong data-count>
-            {project(visibleOrders, (orders) =>
-              String(orders.length).padStart(2, "0"),
-            )}
+            {String(visibleOrders.get().length).padStart(2, "0")}
           </strong>
           <span class="summary-note">У поточній сесії</span>
         </div>
         <div class="summary-card accent">
           <span>Загальна сума</span>
           <strong data-amount>
-            {project(visibleOrders, (orders) =>
-              money(orders.reduce((sum, order) => sum + order.total, 0)),
-            )}
+            {money(visibleOrders.get().reduce((sum, order) => sum + order.total, 0))}
           </strong>
           <span class="summary-note">25 ₴ за одиницю товару</span>
         </div>
