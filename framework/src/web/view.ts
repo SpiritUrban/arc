@@ -366,6 +366,24 @@ function directive(id: string, name: string, value: unknown): Binding[] {
           format: transform?.format,
         }),
       ];
+    case "bind:checked": {
+      const field = source as Writable<boolean>;
+      if (transform || typeof field.set !== "function")
+        throw new TypeError("bind:checked expects writable boolean state");
+      return [
+        binding({ id, type: "property", name: "checked", sources: [field] }),
+        binding({
+          id: `${id}.change`,
+          type: "event",
+          name: "change",
+          sources: [field],
+          handler(event, trace) {
+            field._trace = trace;
+            field.set((event.currentTarget as HTMLInputElement).checked);
+          },
+        }),
+      ];
+    }
     case "bind:value": {
       const field = source as Writable<string>;
       if (transform || typeof field.set !== "function")

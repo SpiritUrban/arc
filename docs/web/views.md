@@ -48,6 +48,7 @@ ARC CLI використовує esbuild для браузерної збірк�
 | --- | --- |
 | `bind:text` | Читає state або derive й оновлює текст |
 | `bind:value` | Синхронізує текстове значення поля з writable string state через два вузли, property та input event |
+| `bind:checked` | Синхронізує checkbox із writable boolean state через property та change event |
 | `bind:disabled` | Оновлює DOM-властивість `disabled` із реактивного boolean |
 | `bind:visible` | Керує видимістю через властивість `hidden` |
 | `bind:children` | Замінює вміст контейнера реактивними TSX-елементами або текстом |
