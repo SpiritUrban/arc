@@ -65,7 +65,9 @@
 
 **Рекомендований frontend-шлях — узгоджено.** README та frontend/fullstack/Workspace guides показують один доменний маршрут: контракт → query/mutation → TSX. Документовано повну відповідь для detail query через `replace()` і `running` без окремого локального state. У формах Workspace submit-кнопки блокуються та показують короткий pending-текст. Перевірено `npm run typecheck`, `npm run build`, `npm run build:site` і згенерований graph.
 
-**Наступний крок — прибрати ручне дублювання контрактної валідації у формах.** Зіставити HTML-обмеження, помилки `mutation.invalid(field)` і повідомлення Workspace. Знайти мінімальний API, який допомагає показати коректну помилку біля поля, не переносячи схему чи UX-тексти у framework.
+**Валідацію форм звірено.** Контракт залишається остаточним правилом для browser та server; HTML `required`, `min`, `max`, `maxlength` і `type` додають форму вводу й ранні браузерні affordances, а `mutation.invalid(field)` дає сторінці поле для власного повідомлення. Не додавати framework-помічник лише для копіювання schema constraints або доменних текстів у JSX.
+
+**Наступний крок — звірити deprecated frontend API з цільовою версією.** У нових прикладах залишити один рекомендований шлях `mutation`/`refresh`, окремо визначити долю сумісних `remoteForm` і `invalidates`, не ламати їх без потреби та явно зафіксувати межу між публічним alias і внутрішнім API базового `action`.
 
 ## Контекст продовження
 
