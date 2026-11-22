@@ -98,7 +98,9 @@ SSE `/api/events` передає operation, resource, queue/worker і metrics ev
 
 `graph.analysis` містить fanOut, dependencyCount, dependents/blastRadius, declaredEstimateMs, compilerDerivedCriticalPathMs, budgetMs і warnings.
 
-Estimate-модель: власна declared cost + max шлях залежностей/CALLS. Це умовна структурна оцінка за метаданими, а не гарантована нижня межа runtime latency: application-вузли враховуються в графі, хоча їхній open не повторюється на кожний execution. Послідовні calls, умовні гілки та тривалість методів із JS не виводяться. Відсутня оцінка на шляху дає null. Budget warning порівнює саме цю модель із declared budget. Scope-review warning є рекомендацією, scope leak — compilation error. Це не runtime measurement і не прогноз пропускної здатності. Dependents/blastRadius зараз обходять тільки DEPENDS_ON/CALLS; route ingress і schedule TRIGGERS потребують окремого аналізу для повного operational impact.
+Estimate-модель: власна declared cost + max шлях залежностей/CALLS. Це умовна структурна оцінка за метаданими, а не гарантована нижня межа runtime latency: application-вузли враховуються в графі, хоча їхній open не повторюється на кожний execution. Послідовні calls, умовні гілки та тривалість методів із JS не виводяться. Відсутня оцінка на шляху дає null. Budget warning порівнює саме цю модель із declared budget. Scope-review warning є рекомендацією, scope leak — compilation error. Це не runtime measurement і не прогноз пропускної здатності. Поля `dependents` і `blastRadius` використовують ребра `DEPENDS_ON` і `CALLS`.
+
+Поле `affectedNodes` показує транзитивний статичний вплив. Від операції обхід іде до входів і викликачів, а від джерела даних до споживачів за ребрами `DERIVES`, `BINDS`, `INVALIDATES` і `UPDATES`. Результат містить унікальні ID і виключає початковий вузол. Для `orders.update` він охоплює PUT-маршрут, браузерну мутацію й обидва запити, які вона оновлює. Фактичне виконання окремої дії показує trace.
 
 ## Карта реалізації
 

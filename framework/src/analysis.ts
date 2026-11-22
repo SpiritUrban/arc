@@ -5,6 +5,31 @@ export function analyzeGraph(ir: ArchitectureIR) {
   const edges = ir.edges.filter((e) =>
     ["DEPENDS_ON", "CALLS"].includes(e.kind),
   );
+  const impact = new Map<string, Set<string>>();
+  for (const edge of ir.edges) {
+    if (edge.kind === "EMITS") continue;
+    const flowsToTarget = ["DERIVES", "BINDS", "INVALIDATES", "UPDATES"].includes(edge.kind);
+    const [source, affected] = flowsToTarget
+      ? [edge.from, edge.to]
+      : [edge.to, edge.from];
+    const neighbors = impact.get(source) ?? new Set<string>();
+    neighbors.add(affected);
+    impact.set(source, neighbors);
+  }
+  const affectedNodes = (id: string) => {
+    const visited = new Set([id]);
+    const affected: string[] = [];
+    const visitNeighbors = (source: string) => {
+      for (const neighbor of impact.get(source) ?? []) {
+        if (visited.has(neighbor)) continue;
+        visited.add(neighbor);
+        affected.push(neighbor);
+      }
+    };
+    visitNeighbors(id);
+    for (const node of affected) visitNeighbors(node);
+    return affected;
+  };
   const deps = (id: string) =>
     edges.filter((e) => e.from === id).map((e) => e.to);
   const closure = (id: string, reverse = false) => {
@@ -68,6 +93,7 @@ export function analyzeGraph(ir: ArchitectureIR) {
       fanOut: deps(node.id).length,
       dependencyCount: dependencies.length,
       dependents,
+      affectedNodes: affectedNodes(node.id),
       blastRadius: dependents.filter(
         (id) => byId.get(id)?.kind === "operation",
       ),

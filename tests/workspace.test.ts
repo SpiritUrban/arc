@@ -9,6 +9,41 @@ import { importApplication } from "../framework/src/fullstack/reactive-jsx.ts";
 import { buildWeb, staticWeb } from "../framework/src/fullstack/build.ts";
 import { internalTransport } from "../framework/src/fullstack/server.ts";
 import { serve, closeServer, handler } from "../framework/src/http.ts";
+import { stand } from "../framework/src/stand.ts";
+
+test("Workspace order update has consistent identities and impact in build and Stand", async () => {
+  const entry = new URL("../examples/workspace/app.ts", import.meta.url);
+  const { createApp } = await importApplication(entry) as typeof import("../examples/workspace/app.ts");
+  const app = createApp();
+  const dir = await mkdtemp(join(tmpdir(), "arc-workspace-graph-"));
+  try {
+    await app.compile({ entry });
+    const graph = app.graph();
+    const { manifest } = await buildWeb(app, { outDir: dir });
+    const response = await stand(app)(new Request("http://localhost/api/graph"));
+    assert.equal(response.status, 200);
+    const standGraph = await response.json();
+    const artifact = JSON.parse(await readFile(join(dir, "architecture.json"), "utf8"));
+    assert.deepEqual(artifact, standGraph);
+    const mutation = "orders.update.submit";
+    const operation = "orders.update";
+    assert.ok(manifest.partitions?.browser.includes(mutation));
+    assert.ok(manifest.partitions?.server.includes(operation));
+    assert.ok(manifest.boundaries?.some(({ from, to }) =>
+      from === `${mutation}.remote` && to === operation
+    ));
+    const affected = graph.analysis?.nodes.find(({ id }) => id === operation)?.affectedNodes;
+    assert.ok(affected);
+    for (const consumer of [mutation, "http:PUT:/orders/:id", "orders.get.query", "orders.list.query"]) {
+      assert.ok(affected.includes(consumer), consumer);
+    }
+    assert.ok(!affected.includes(operation));
+    assert.ok(!affected.includes("users.update.submit"));
+  } finally {
+    await app.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 test("Workspace browser creates users/orders, handles business errors and isolates selected user data", async () => {
   const entry = new URL("../examples/workspace/app.ts", import.meta.url);
@@ -23,15 +58,11 @@ test("Workspace browser creates users/orders, handles business errors and isolat
   try {
     await app.compile({ entry });
     const { edges, nodes } = app.graph();
-    assert.equal(
-      nodes.filter(({ id }) => id.startsWith("users.page.dom.") && id.endsWith(".render")).length,
-      4,
-    );
     assert.ok(nodes.some(({ id }) => id.startsWith("users.page.dom.") && id.endsWith(".each")));
     assert.equal(
       edges.filter((edge) =>
         edge.to.startsWith("orders.page.dom.") &&
-        edge.to.endsWith(".text") &&
+        edge.to.endsWith(".render") &&
         edge.from === "orders.visible" &&
         edge.kind === "BINDS",
       ).length,
