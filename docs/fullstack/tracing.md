@@ -15,6 +15,8 @@ browser tasks.create.submit
 
 Передавайте ctx.trace явно через async boundaries; ctx.set переносить trace на local state. Browser не має прихованого AsyncLocalStorage. Незв’язані програмні writes без trace можуть почати окрему activity.
 
+Коли `mutation.update` застосовує підтверджену відповідь, кожен змінений query отримує подію `resource.updated` під trace і span мутації. Поля `data.snapshot` та `data.cache` показують, куди записано зміну. Якщо зміна вперше застосувалася до відповіді вже запущеного читання, подія має `data.replayed: true`. Відсутні дані й оновлення, яке повернуло попереднє значення, самі по собі події не створюють.
+
 `telemetryTransport()` batches browser events у POST /_arc/telemetry, Stand отримує їх через SSE разом із server telemetry. Browser events — недовірені debugging дані; endpoint не призначено для відкритого production telemetry ingestion.
 
 Stand interaction показує action/resource/remote/binding durations і server spans. Remote duration включає fetch/network/server/serialization; це не ізольована network latency. Browser та server clocks не синхронізуються; total action duration — browser measurement. Production distributed tracing, clock correction, sampling і durable storage не реалізовані.

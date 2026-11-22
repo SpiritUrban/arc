@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import type { BrowserEvent } from "../framework/src/neutral/protocol.ts";
 import {
   action,
   captureResourceUpdate,
@@ -157,6 +158,44 @@ test("a confirmed resource update survives an older refresh", async () => {
     { id: "unrelated", cancelled: false },
   ]);
   resource.dispose();
+});
+
+test("resource update telemetry reports materialized changes under the mutation trace", async () => {
+  const events: BrowserEvent[] = [];
+  const loadInitial = deferred<number>();
+  let key = "first";
+  const resource = webResource({
+    id: "orders",
+    key: () => key,
+    cache: true,
+    load: () => key === "first" ? loadInitial.promise : Promise.resolve(20),
+  });
+  const changes = () => events.filter((event) => event.type === "resource.updated");
+  const trace = { traceId: "mutation", parentId: "action" };
+  try {
+    resource.activate({ emit: (event) => events.push(event) });
+    const refresh = resource.refresh();
+    const updateFirst = resource[captureResourceUpdate]!();
+    updateFirst((value) => value + 1, trace);
+    assert.deepEqual(changes(), []);
+    loadInitial.resolve(10);
+    await refresh;
+    assert.equal(resource.data.get(), 11);
+    assert.deepEqual(changes().map((event) => event.data), [
+      { snapshot: true, cache: true, replayed: true },
+    ]);
+    key = "second";
+    await resource.refresh();
+    updateFirst((value) => value + 1, trace);
+    updateFirst((value) => value, trace);
+    assert.equal(resource.data.get(), 20);
+    assert.deepEqual(changes().map((event) => [event.traceId, event.parentId, event.data]), [
+      ["mutation", "action", { snapshot: true, cache: true, replayed: true }],
+      ["mutation", "action", { snapshot: false, cache: true }],
+    ]);
+  } finally {
+    resource.dispose();
+  }
 });
 
 test("resource errors, invalidation after success, activation and dispose ownership", async () => {

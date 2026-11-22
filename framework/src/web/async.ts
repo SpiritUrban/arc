@@ -144,22 +144,41 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
       const targetKey = key?.();
       return (update: (data: T) => T, trace: TraceToken) => {
         if (disposed) return;
-        if (pendingRead && Object.is(pendingRead.key, targetKey))
-          pendingRead.updates.push(update);
+        let cacheChanged = false;
+        let snapshotChanged = false;
         if (targetKey !== undefined) {
           const cached = cache?.get(targetKey);
           if (cached?.data !== undefined) {
             const data = update(cached.data);
-            if (!Object.is(data, cached.data)) remember(targetKey, { ...cached, data });
+            if (!Object.is(data, cached.data)) {
+              remember(targetKey, { ...cached, data });
+              cacheChanged = true;
+            }
           }
         }
         if (Object.is(snapshotKey, targetKey)) {
           const snapshot = readSnapshot();
           if (snapshot.data !== undefined) {
             const data = update(snapshot.data);
-            if (!Object.is(data, snapshot.data)) set({ ...snapshot, data }, trace);
+            if (!Object.is(data, snapshot.data)) {
+              set({ ...snapshot, data }, trace);
+              snapshotChanged = true;
+            }
           }
         }
+        if (snapshotChanged || cacheChanged)
+          browserEvent(telemetry, def.id, "resource.updated", trace, {
+            data: { snapshot: snapshotChanged, cache: cacheChanged },
+          });
+        if (pendingRead && Object.is(pendingRead.key, targetKey))
+          pendingRead.updates.push((data) => {
+            const next = update(data);
+            if (!snapshotChanged && !cacheChanged && !Object.is(next, data))
+              browserEvent(telemetry, def.id, "resource.updated", trace, {
+                data: { snapshot: true, cache: cache !== undefined, replayed: true },
+              });
+            return next;
+          });
       };
     },
     async refresh(trace: TraceToken = { traceId: identity() }) {

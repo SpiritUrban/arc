@@ -74,6 +74,9 @@ test("Workspace order edit carries the submit trace to the server operation in S
       assert.ok(predicate(), description);
     };
     await waitFor(() => !!document.querySelector("[data-edit-order]"), "order form mounted");
+    await waitFor(() => app.browserEvents.some((event) =>
+      event.node === "orders.list.query" && event.type === "resource.finished" && event.outcome === "ok"),
+    "order list snapshot loaded");
     const form = document.querySelector("[data-edit-order]")!;
     const fields = [...form.querySelectorAll<HTMLInputElement>("input[name]")];
     Object.defineProperty(form, "elements", { value: fields });
@@ -87,6 +90,8 @@ test("Workspace order edit carries the submit trace to the server operation in S
       ["action.started", "orders.update.submit"],
       ["remote.started", "orders.update.submit.remote"],
       ["remote.finished", "orders.update.submit.remote"],
+      ["resource.updated", "orders.get.query"],
+      ["resource.updated", "orders.list.query"],
       ["action.finished", "orders.update.submit"],
     ] as const;
     await waitFor(() => mutationEvents.every(([type, node]) => app.browserEvents.some((event) =>
@@ -103,6 +108,13 @@ test("Workspace order edit carries the submit trace to the server operation in S
       event.type === "remote.started" && event.node === "orders.update.submit.remote");
     assert.ok(started?.spanId);
     assert.equal(remote?.parentId, started.spanId);
+    const updates = interaction.browser.filter((event: (typeof app.browserEvents)[number]) =>
+      event.type === "resource.updated");
+    assert.deepEqual(updates.map((event: (typeof app.browserEvents)[number]) =>
+      [event.node, event.parentId]).sort(), [
+      ["orders.get.query", started.spanId],
+      ["orders.list.query", started.spanId],
+    ]);
     const outletIds = ["router-outlet:root", "router-outlet:/", "router-outlet:/orders"];
     for (const id of outletIds) {
       assert.ok(bundle.manifest.partitions?.browser.includes(id));
