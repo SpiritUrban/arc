@@ -505,11 +505,12 @@ function bindMutation(defaults: RemoteFormDefaults) {
 export const remoteForm = bindRemoteForm({});
 export const mutation = bindMutation({});
 
-type SourceValues<Sources extends readonly Readable<unknown>[]> = {
-  [K in keyof Sources]: Sources[K] extends Readable<infer Value>
-    ? Value
+type RemoteSources = Readable<unknown> | readonly Readable<unknown>[];
+type SourceValues<Sources extends RemoteSources> = Sources extends Readable<infer Value>
+  ? [Value]
+  : Sources extends readonly Readable<unknown>[]
+    ? { [K in keyof Sources]: Sources[K] extends Readable<infer Value> ? Value : never }
     : never;
-};
 
 function encodeCacheValue(value: unknown, ancestors = new Set<object>()): string {
   if (value === null) return "null";
@@ -547,7 +548,7 @@ function querySourceKey(values: readonly unknown[]) {
   return JSON.stringify(values.map((value) => encodeCacheValue(value)));
 }
 
-type ClientQueryOptions<C extends OperationContract, Sources extends readonly Readable<unknown>[]> = {
+type ClientQueryOptions<C extends OperationContract, Sources extends RemoteSources> = {
   id?: string;
   /** Override the cache context. By default, cached queries use all `from` values. */
   key?: (...values: SourceValues<Sources>) => string | number;
@@ -566,7 +567,7 @@ type ClientQueryOptions<C extends OperationContract, Sources extends readonly Re
 
 /** Share request headers and their reactive dependencies between queries and forms. */
 export function remoteApi<
-  const Sources extends readonly Readable<unknown>[],
+  const Sources extends RemoteSources,
 >(options: {
   from: Sources;
   headers: (...values: SourceValues<Sources>) => HeadersInit;
@@ -574,7 +575,10 @@ export function remoteApi<
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
 }) {
-  const { from, headers, baseUrl } = options;
+  const from: readonly Readable<unknown>[] = Array.isArray(options.from)
+    ? options.from
+    : [options.from as Readable<unknown>];
+  const { headers, baseUrl } = options;
   const fetchWithHeaders: typeof globalThis.fetch = (url, init) => {
     const values = from.map((source) => source.get()) as SourceValues<Sources>;
     const merged = new Headers(headers(...values));

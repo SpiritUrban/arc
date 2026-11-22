@@ -77,7 +77,7 @@ const form = () => (
 
 ```ts
 const orderClient = remoteApi({
-  from: [selectedUser],
+  from: selectedUser,
   headers: (userId) => ({ authorization: `Bearer ${userId}` }),
 });
 const orders = orderClient.query(ListOrders, {

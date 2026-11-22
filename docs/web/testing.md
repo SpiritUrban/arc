@@ -26,7 +26,7 @@ import { state, derive, batch, flush } from "@arc/framework/web";
 const quantity = state({ id: "test.quantity", initial: 1 });
 const total = derive({
   id: "test.total",
-  from: [quantity],
+  from: quantity,
   compute: (n) => n * 25,
 });
 batch(() => {

@@ -7,7 +7,7 @@ import { state, derive } from "@arc/framework/web";
 const count = state({ id: "counter.value", initial: 0 });
 const doubled = derive({
   id: "counter.doubled",
-  from: [count],
+  from: count,
   compute: (n) => n * 2,
 });
 count.update((n) => n + 1);
