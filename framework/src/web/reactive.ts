@@ -174,13 +174,21 @@ export interface Computed<T> extends Readable<T> {
   dirty: boolean;
   recompute(): void;
 }
-export function derive<const D extends readonly Readable<any>[], T>(def: {
+type DerivedFrom = Readable<any> | readonly Readable<any>[];
+type DerivedValues<From extends DerivedFrom> = From extends Readable<infer Value>
+  ? [Value]
+  : From extends readonly Readable<any>[]
+    ? { [K in keyof From]: From[K] extends Readable<infer Value> ? Value : never }
+    : never;
+
+export function derive<const From extends DerivedFrom, T>(def: {
   id: string;
-  from: D;
-  compute: (
-    ...values: { [K in keyof D]: D[K] extends Readable<infer V> ? V : never }
-  ) => T;
+  from: From;
+  compute: (...values: DerivedValues<From>) => T;
 }): Computed<T> {
+  const sources: readonly Readable<any>[] = Array.isArray(def.from)
+    ? def.from
+    : [def.from as Readable<any>];
   let value: T,
     ready = false,
     computing = false,
@@ -190,7 +198,7 @@ export function derive<const D extends readonly Readable<any>[], T>(def: {
     id: def.id,
     kind: "derived" as const,
     runtime: "browser" as const,
-    dependencies: def.from,
+    dependencies: sources,
     dirty: true,
     _children: new Set<Computed<any>>(),
     _listeners: new Set<() => void>(),
@@ -199,9 +207,9 @@ export function derive<const D extends readonly Readable<any>[], T>(def: {
       if (computing) throw new Error(`ARC-WEB-204 derived cycle: ${node.id}`);
       computing = true;
       try {
-        const next = def.compute(...(def.from.map((d) => d.get()) as any));
+        const next = def.compute(...(sources.map((d) => d.get()) as any));
         const changed = !ready || !Object.is(next, value);
-        node._trace = def.from.find((d) => d._trace)?._trace;
+        node._trace = sources.find((d) => d._trace)?._trace;
         value = next;
         ready = true;
         node.dirty = false;
@@ -235,13 +243,13 @@ export function derive<const D extends readonly Readable<any>[], T>(def: {
     dispose() {
       disposed = true;
       dirty.delete(node);
-      for (const dep of def.from) dep._children.delete(node);
+      for (const dep of sources) dep._children.delete(node);
       for (const fn of node._listeners) notifications.delete(fn);
       node._listeners.clear();
       node._children.clear();
     },
   });
-  for (const dep of def.from) {
+  for (const dep of sources) {
     if (!dep?._children)
       throw new Error(`ARC-WEB-202 invalid reactive dependency: ${def.id}`);
     dep._children.add(node);

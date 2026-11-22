@@ -178,7 +178,7 @@ const cancelOrder = orderClient.mutation(CancelOrder, {
 
 export const visibleOrders = derive({
   id: "orders.visible",
-  from: [ordersData.data],
+  from: ordersData.data,
   compute: (orders) => orders ?? [],
 });
 
