@@ -9,7 +9,7 @@ npm ci
 PORT=4323 STAND_PORT=4324 npm run dev:workspace
 ```
 
-Застосунок доступний на `http://localhost:4323`, Stand — на `http://localhost:4324`. Для перевірки збірки виконати `npm run build`, для прогону тестів Workspace — `node --conditions=arc-source --import tsx --test tests/workspace.test.ts`. Тести Workspace запускають локальний HTTP і використовують LinkeDOM та VM. Команди React додамо після запуску його каркаса.
+Застосунок доступний на `http://localhost:4323`, Stand — на `http://localhost:4324`. Для перевірки збірки виконати `npm run build`, для прогону тестів Workspace — `node --conditions=arc-source --import tsx --test tests/workspace.test.ts`. Тести Workspace запускають локальний HTTP і використовують LinkeDOM та VM. Каркас React запускається через `npm ci && npm run dev` у каталозі прикладу. [Команди React Workspace](../examples/react-workspace/README.md)
 
 ## Початкові дані
 

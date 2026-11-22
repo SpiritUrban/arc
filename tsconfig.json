@@ -22,5 +22,6 @@
     "scripts/**/*.ts",
     "examples/**/*.ts",
     "examples/**/*.tsx"
-  ]
+  ],
+  "exclude": ["examples/react-workspace"]
 }
