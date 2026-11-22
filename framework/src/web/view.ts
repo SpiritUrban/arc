@@ -7,7 +7,11 @@ import {
   type WebTelemetry,
 } from "../neutral/protocol.js";
 import type { Action } from "./async.js";
-import { registerFormChecked, registerFormValue } from "./form-value.js";
+import {
+  registerFormChecked,
+  registerFormRadio,
+  registerFormValue,
+} from "./form-value.js";
 import {
   attributeReader,
   boundChild,
@@ -95,6 +99,7 @@ export interface Binding extends GraphDefinition {
   submitRunning?: Readable<boolean>;
   formValue?: Writable<string>;
   formChecked?: Writable<boolean>;
+  formRadio?: Writable<string>;
   list?: KeyedList;
   block?: RenderBlock;
   handler?:
@@ -211,6 +216,9 @@ function compileTemplate(id: string, root: TemplateChild) {
 
     const { children, bind, ...attributes } = child.props;
     const attached = [...elementBindings(bind)];
+    const radioValue = child.tag === "input" && attributes.type === "radio"
+      ? attributes.value
+      : undefined;
     for (const [name, value] of Object.entries(attributes)) {
       if (name === "onSubmit") {
         delete attributes[name];
@@ -276,7 +284,12 @@ function compileTemplate(id: string, root: TemplateChild) {
       )
         throw new TypeError("bind:checked requires an input[type=checkbox]");
       delete attributes[name];
-      attached.push(...directive(`${id}.dom.${path}.${name}`, name, value));
+      attached.push(
+        ...directive(`${id}.dom.${path}.${name}`, name, value, {
+          radio: child.tag === "input" && attributes.type === "radio",
+          radioValue,
+        }),
+      );
     }
     for (const item of attached) bindings.add(item);
     return {
@@ -293,7 +306,12 @@ function compileTemplate(id: string, root: TemplateChild) {
   return { root: compiled, bindings: [...bindings], views };
 }
 
-function directive(id: string, name: string, value: unknown): Binding[] {
+function directive(
+  id: string,
+  name: string,
+  value: unknown,
+  options: { radio?: boolean; radioValue?: unknown } = {},
+): Binding[] {
   if (name.startsWith("on:")) {
     const event = name.slice(3);
     const action = value as Action<void, unknown> | undefined;
@@ -400,6 +418,33 @@ function directive(id: string, name: string, value: unknown): Binding[] {
       const field = source as Writable<string>;
       if (transform || typeof field.set !== "function")
         throw new TypeError("bind:value expects writable string state");
+      if (options.radio) {
+        if (typeof options.radioValue !== "string")
+          throw new TypeError("Radio bind:value requires a static string value");
+        const radioValue = options.radioValue;
+        return [
+          binding({
+            id,
+            type: "property",
+            name: "checked",
+            sources: [field],
+            format: (current) => current === radioValue,
+            formRadio: field,
+          }),
+          binding({
+            id: `${id}.change`,
+            type: "event",
+            name: "change",
+            sources: [field],
+            handler(event, trace) {
+              const input = event.currentTarget as HTMLInputElement;
+              if (!input.checked) return;
+              field._trace = trace;
+              field.set(input.value);
+            },
+          }),
+        ];
+      }
       return [
         binding({ id, type: "property", name: "value", sources: [field], formValue: field }),
         binding({
@@ -924,6 +969,7 @@ export function mount(
     if (b.type === "property" && b.name === "disabled") boundDisabled.add(element);
     if (b.formValue) scope.add(registerFormValue(element, b.formValue));
     if (b.formChecked) scope.add(registerFormChecked(element, b.formChecked));
+    if (b.formRadio) scope.add(registerFormRadio(element, b.formRadio));
     const update = () => {
       if (scope.disposed) return;
       const start = performance.now(),

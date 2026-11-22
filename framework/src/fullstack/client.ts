@@ -240,14 +240,14 @@ function readNamedSubmission(
     values,
     reset(ctx) {
       for (const { field, value, checked, binding, stateValue } of snapshots) {
-        const isCheckbox =
+        const isCheckedControl =
           field.localName === "input" &&
-          (field as HTMLInputElement).type === "checkbox";
+          ["checkbox", "radio"].includes((field as HTMLInputElement).type);
         if (
           field.form !== form ||
           field.value !== value ||
-          (isCheckbox && (field as HTMLInputElement).checked !== checked) ||
-          (!isCheckbox && entries.get(field.name) !== value) ||
+          (isCheckedControl && (field as HTMLInputElement).checked !== checked) ||
+          (!isCheckedControl && entries.get(field.name) !== value) ||
           formValue(field) !== binding
         ) continue;
         if (binding) {
@@ -255,12 +255,14 @@ function readNamedSubmission(
           if (binding.kind === "value") {
             ctx.set(binding.state, binding.initial);
             field.value = binding.initial;
+          } else if (binding.kind === "radio") {
+            ctx.set(binding.state, binding.initial);
           } else {
             ctx.set(binding.state, binding.initial);
             (field as HTMLInputElement).checked = binding.initial;
           }
         } else {
-          if (isCheckbox)
+          if (isCheckedControl)
             (field as HTMLInputElement).checked =
               (field as HTMLInputElement).defaultChecked;
           else field.value = field.defaultValue;

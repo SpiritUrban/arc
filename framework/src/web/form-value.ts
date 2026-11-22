@@ -2,6 +2,7 @@ import type { Writable } from "./reactive.js";
 
 type FormValueBinding =
   | { kind: "value"; state: Writable<string>; initial: string }
+  | { kind: "radio"; state: Writable<string>; initial: string }
   | { kind: "checked"; state: Writable<boolean>; initial: boolean };
 
 const formValues = new WeakMap<Element, FormValueBinding>();
@@ -13,6 +14,11 @@ export function registerFormValue(element: Element, state: Writable<string>) {
 
 export function registerFormChecked(element: Element, state: Writable<boolean>) {
   formValues.set(element, { kind: "checked", state, initial: state.get() });
+  return () => { formValues.delete(element); };
+}
+
+export function registerFormRadio(element: Element, state: Writable<string>) {
+  formValues.set(element, { kind: "radio", state, initial: state.get() });
   return () => { formValues.delete(element); };
 }
 

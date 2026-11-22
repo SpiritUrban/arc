@@ -47,12 +47,19 @@ ARC CLI використовує esbuild для браузерної збірк�
 | Директива | Що приймає та робить |
 | --- | --- |
 | `bind:text` | Читає state або derive й оновлює текст |
-| `bind:value` | Синхронізує текстове значення поля з writable string state через два вузли, property та input event |
+| `bind:value` | Синхронізує текстове поле або select із writable string state; на `input[type=radio]` зв’язує групу за спільним state та статичними `value` |
 | `bind:checked` | Синхронізує checkbox із writable boolean state через property та change event |
 | `bind:disabled` | Оновлює DOM-властивість `disabled` із реактивного boolean |
 | `bind:visible` | Керує видимістю через властивість `hidden` |
 | `bind:children` | Замінює вміст контейнера реактивними TSX-елементами або текстом |
 | `on:click`, `on:submit` та інші `on:…` | Підписуються на DOM-подію та викликають функцію або ARC action без аргументів |
+
+Radio-кнопки однієї групи використовують спільний string state:
+
+```tsx
+<input type="radio" name="plan" value="basic" bind:value={plan} />
+<input type="radio" name="plan" value="pro" bind:value={plan} />
+```
 
 `on:submit` скасовує стандартну навігацію та ігнорує повторний submit, поки дія виконується. ARC на цей час блокує кнопки надсилання без явного `bind:disabled`. У Stand дія з’єднана з event-вузлом ребром `TRIGGERS`; залежності даних видно через `BINDS`.
 
