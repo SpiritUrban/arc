@@ -117,6 +117,7 @@ export function state<T>(def: StateOptions<T>): Signal<T> {
   return node;
 }
 
+/** @deprecated Use state; it now provides the same callable writable value. */
 export function signal<T>(def: StateOptions<T>): Signal<T> {
   return state(def);
 }

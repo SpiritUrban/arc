@@ -1,6 +1,6 @@
 # State, derive та scheduler
 
-`state({id,initial})` — client-owned local state: викликайте `value()` для читання; також доступні `get`, `set`, `update`, `subscribe`, `dispose`. `derive({id,from,compute})` створює кешований callable graph node з явними dependencies; IR містить DERIVES від source до derived. Compute має бути чистим. Compiler відхиляє declared cycles та повторні ID. `signal` лишається сумісним псевдонімом `state`.
+`state({id,initial})` — client-owned local state: викликайте `value()` для читання; також доступні `get`, `set`, `update`, `subscribe`, `dispose`. `derive({id,from,compute})` створює кешований callable graph node з явними dependencies; IR містить DERIVES від source до derived. Compute має бути чистим. Compiler відхиляє declared cycles та повторні ID. `signal` лишається deprecated сумісним псевдонімом `state`.
 
 Записи синхронно змінюють state; propagation планується microtask. `batch(fn)` групує synchronous writes. Scheduler спочатку обчислює dirty derived dependencies, потім повідомляє subscriptions/bindings у deterministic порядку. Scheduled derived/binding виконується не більше одного разу на batch; DOM не отримує проміжних derived значень. `flush()` виконує propagation зараз; `await tick()` очікує її.
 

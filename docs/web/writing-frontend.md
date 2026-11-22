@@ -7,7 +7,7 @@
 | Потреба | API | Приклад Workspace |
 | --- | --- | --- |
 | Стан екземпляра сторінки | `view.state` | `search` |
-| Спільний вибір | `signal` | `selectedUser` |
+| Спільний вибір | `state` | `selectedUser` |
 | Похідні дані | функція або `derive` | `visible()`, `visibleOrders` |
 | Читання з сервера | `query` | `users`, `ordersData` |
 | Запис на сервер | `mutation` | `addUser`, `createOrder` |
