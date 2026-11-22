@@ -1,6 +1,6 @@
 # Actions і зовнішні resources
 
-`action({id,input?,needs?,invalidates?,run})` представляє mutation. `execute(input,{trace?})` повертає результат run; running/error/result — readable projections. Snapshot має idle/running/success/error. Input schema перевіряється перед run. Exceptions відхиляють execute, ARC Result з business error зберігається як результат. Передавайте `{signal,trace}` з run у remote client; `ctx.set(state,value)` переносить trace до bindings.
+`action({id,input?,needs?,invalidates?,run})` представляє mutation. `execute(input,{trace?})` повертає результат run; running/error/result — callable projections (`running()`, `error()`, `result()`). Snapshot має idle/running/success/error. Input schema перевіряється перед run. Exceptions відхиляють execute, ARC Result з business error зберігається як результат. Передавайте `{signal,trace}` з run у remote client; `ctx.set(state,value)` переносить trace до bindings.
 
 Dependencies оголошуються через needs, автоматична інспекція JS closures відсутня. Після успішного Result або звичайного return, resources з invalidates reload; IR містить INVALIDATES. Одночасні executions дозволені, result/status представляє останній запуск; для UI serialization використовуйте running/disabled.
 

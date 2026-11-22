@@ -283,9 +283,9 @@ export interface ActionSnapshot<O> {
   error: unknown;
 }
 export interface Action<I, O> extends Readable<ActionSnapshot<O>> {
-  running: Readable<boolean>;
-  error: Readable<unknown>;
-  result: Readable<O | undefined>;
+  running: Computed<boolean>;
+  error: Computed<unknown>;
+  result: Computed<O | undefined>;
   execute(input: I, ctx?: { trace?: TraceToken }): Promise<O>;
   submitForm?(form: HTMLFormElement, ctx: { trace: TraceToken }): Promise<O>;
   activate(telemetry?: WebTelemetry): void;
