@@ -62,7 +62,9 @@ export default function OrderDetail({ query }: PageContext<"id">) {
               <p class="error" role="alert">
                 {updateOrder.invalid("quantity") && "Введіть ціле число від 1 до 100."}
               </p>
-              <button class="button primary" type="submit">Зберегти зміни</button>
+              <button class="button primary" type="submit" disabled={updateOrder().running}>
+                {updateOrder().running ? "Зберігаємо…" : "Зберегти зміни"}
+              </button>
               <p class="error" role="alert">
                 {updateOrder.failed("ORDER_ALREADY_CANCELLED")
                   ? "Скасоване замовлення не можна редагувати."

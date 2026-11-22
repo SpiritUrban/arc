@@ -1,6 +1,6 @@
 # Як писати frontend на ARC
 
-Почніть із доменної операції, яку виконує сторінка. У Workspace форма створює користувача через контракт `CreateUser`, а список читає користувачів через `ListUsers`. [ARC Workspace](../workspace-app.md)
+Почніть із доменних операцій сторінки. У Workspace контракти `ListOrders`, `CreateOrder` і `UpdateOrder` задають читання, створення та редагування замовлень; TSX описує інтерфейс цих операцій. [ARC Workspace](../workspace-app.md)
 
 ## 1. Оберіть власника даних
 
@@ -70,6 +70,8 @@ const addUser = mutation(CreateUser, {
 ```
 
 ARC створює вузли директив ще до монтування. На сторінці замовлень `project` обчислює кількість і суму в JSX, а `visibleOrders` лишається спільним джерелом для підсумку й таблиці. [Посібник про шаблони](views.md)
+
+Після успішного запису використовуйте `refresh: query`, якщо треба перечитати список із сервера. Якщо відповідь містить повний актуальний запис, `update: query.replaceBy("id")` оновить рядок без додаткового запиту. На detail-сторінці `update: order.replace()` замінює весь query-вміст. [Оновлення query після mutation](../fullstack/remote-operations.md#оновлення-query-з-відповіді)
 
 ## 6. Підключіть logical graph і browser runtime
 

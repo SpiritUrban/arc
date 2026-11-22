@@ -107,8 +107,8 @@ export const UsersPage = view({
               {addUser.failed("EMAIL_EXISTS") && "Користувач із такою поштою вже існує."}
             </p>
           </div>
-          <button class="button secondary" type="submit">
-            ＋ Додати користувача
+          <button class="button secondary" type="submit" disabled={addUser().running}>
+            {addUser().running ? "Додаємо…" : "＋ Додати користувача"}
           </button>
         </form>
         <p class="error" role="alert" data-error>

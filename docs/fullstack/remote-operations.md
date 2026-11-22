@@ -119,7 +119,7 @@ const cancelOrder = orderClient.mutation(CancelOrder, { refresh: orders });
 </button>
 ```
 
-## Оновлення списку з відповіді
+## Оновлення query з відповіді
 
 Після успішної mutation є два способи привести query до актуального стану:
 
@@ -127,6 +127,7 @@ const cancelOrder = orderClient.mutation(CancelOrder, { refresh: orders });
 | --- | --- | --- |
 | `refresh: query` | Серверна операція могла змінити склад або інші поля списку, а її відповідь не є повним списком | Позначає query застарілим і чекає повторного читання з сервера. У графі — `INVALIDATES`. |
 | `update: query.replaceBy("id")` | Відповідь уже містить повний актуальний запис, який є в завантаженому списку | Замінює запис у поточному snapshot і кеші без запиту. У графі — `UPDATES`. |
+| `update: detail.replace()` | Відповідь є повним значенням detail query | Замінює весь detail snapshot і кеш без запиту. У графі — `UPDATES`. |
 
 ```ts
 const cancelOrder = orderClient.mutation(CancelOrder, {
@@ -138,6 +139,29 @@ const cancelOrder = orderClient.mutation(CancelOrder, {
 Після успіху ARC замінює наявний рядок даними з відповіді. Ключ запиту фіксується під час запуску мутації, тому навіть після перемикання користувача оновлюється його початковий список або кеш. Запит списку, який уже виконується, застосує підтверджену зміну перед показом результату. Якщо відповідь не містить повного запису, або його ще немає в списку, використовуйте `refresh`.
 
 Якщо потрібне миттєве відображення відповіді, а потім остаточне узгодження з сервером, задайте обидві опції: `update` застосовується першою, `refresh` запускається після неї. У більшості випадків достатньо однієї.
+
+Для detail-сторінки достатньо передати повну відповідь до query:
+
+```tsx
+function OrderDetail({ query }: PageContext<"id">) {
+  const order = query(orderClient, GetOrder);
+  const updateOrder = orderClient.mutation(UpdateOrder, {
+    update: order.replace(),
+  });
+
+  return <form onSubmit={updateOrder}>{/* поля з name */}</form>;
+}
+```
+
+`query(client, contract)` бере параметри зі сторінки, якщо вони повністю задають вхід контракту. Після успіху `replace()` одразу оновлює показане замовлення й відповідний кеш.
+
+Для звичайної форми не потрібен окремий pending state: submit action уже має `running`. Його можна відобразити прямо в кнопці:
+
+```tsx
+<button type="submit" disabled={updateOrder().running}>
+  {updateOrder().running ? "Зберігаємо…" : "Зберегти зміни"}
+</button>
+```
 
 ## HTTP-транспорт
 

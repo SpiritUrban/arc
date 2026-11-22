@@ -67,8 +67,9 @@ function renderOrdersPage(quantity: Signal<string>) {
           <button
             class="button primary"
             type="submit"
+            disabled={createOrder().running}
           >
-            Створити <span>→</span>
+            {createOrder().running ? "Створюємо…" : <>Створити <span>→</span></>}
           </button>
         </form>
         <div class="form-footer">
