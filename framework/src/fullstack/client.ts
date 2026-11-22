@@ -364,6 +364,7 @@ export type Mutation<
   CallableAction<void, RemoteResult<C>> & {
     fields: RemoteForm<C, Field>["fields"];
     failed(code: keyof C["errors"] & string, key?: Key): boolean;
+    invalid(): boolean;
     invalid(field: InputField<C>): boolean;
     run(input: Infer<C["input"]>): Promise<RemoteResult<C>>;
     pending(key: Key): boolean;
@@ -608,9 +609,10 @@ function bindMutation(defaults: RemoteFormDefaults) {
         return result?.kind === "business_error" &&
           result.error === code;
       },
-      invalid(field: InputField<C>) {
+      invalid(field?: InputField<C>) {
         const { error } = submit();
-        return error instanceof ValidationError && error.fields.includes(field);
+        return error instanceof ValidationError &&
+          (field === undefined || error.fields.includes(field));
       },
     });
   }

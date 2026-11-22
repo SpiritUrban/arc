@@ -80,9 +80,8 @@ function renderOrdersPage(quantity: Signal<string>) {
         </div>
         <p class="error" role="alert" data-error>
           {failureMessage(
-            (createOrder.invalid("quantity") && !createOrder.invalid("product")
-              ? undefined
-              : createOrder().error) ?? ordersData().error,
+            (createOrder.invalid() ? undefined : createOrder().error) ??
+              ordersData().error,
           )}
         </p>
       </div>
