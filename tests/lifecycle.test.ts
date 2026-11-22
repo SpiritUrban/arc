@@ -383,20 +383,23 @@ test("HTTP producer returns while its queued worker runs and Stand records both 
       return ok(input.report);
     },
   });
-  const reports = queue({ id: "reports", operation: worker, concurrency: 1 });
+  const reports = queue({ id: "reports", operation: worker, concurrency: 1, capacity: 1 });
   let job: Promise<unknown> | undefined;
   const submit = operation({
     id: "reports.submit",
     input: worker.input,
     output: s.string(),
     emits: [reports],
-    run({ input }): ReturnType<typeof ok<string>> {
-      job = app.queues.get(reports.id)!.enqueue(input);
+    errors: { REPORT_QUEUE_UNAVAILABLE: 503 },
+    run({ input, fail }) {
+      const admission = app.queues.get(reports.id)!.tryEnqueue(input);
+      if (!admission.accepted) return fail("REPORT_QUEUE_UNAVAILABLE");
+      job = admission.completion;
       void job.catch(() => {});
       return ok("accepted");
     },
   });
-  const app = application({
+  const app: ReturnType<typeof application> = application({
     routes: [http.post("/reports", submit, { status: 202 })],
     queues: [reports],
   });
@@ -421,13 +424,21 @@ test("HTTP producer returns while its queued worker runs and Stand records both 
     const runtime = app.queues.get(reports.id)!;
     const blocker = runtime.enqueue({ report: "blocker" });
 
-    const response = await handler(app)(new Request("http://localhost/reports", {
+    const handle = handler(app);
+    const requestReport = (report: string) => handle(new Request("http://localhost/reports", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ report: "weekly" }),
+      body: JSON.stringify({ report }),
     }));
+    const response = await requestReport("weekly");
     assert.equal(response.status, 202);
     assert.equal(runtime.metrics().pending, 1);
+    assert.deepEqual(runtime.tryEnqueue({ report: "overflow" }), {
+      accepted: false, reason: "capacity",
+    });
+    const overflow = await requestReport("overflow");
+    assert.equal(overflow.status, 503);
+    assert.equal((await overflow.json()).error, "REPORT_QUEUE_UNAVAILABLE");
     releaseBlocker.release();
     assert.deepEqual(await blocker, ok("blocker"));
     await workerStarted.promise;
@@ -446,9 +457,13 @@ test("HTTP producer returns while its queued worker runs and Stand records both 
     const producerSpan = producerTrace.spans.find(({ node }) => node === submit.id);
     assert.ok(producerSpan);
     assert.equal(workerTrace.spans.find(({ node }) => node === worker.id)?.parentId, producerSpan.id);
-    const standalone = interactions.filter(({ traceId }) => traceId !== linked.traceId);
+    const standalone = interactions.filter(({ traceId, server }) =>
+      traceId !== linked.traceId && server.some((trace) => trace.operation === worker.id));
     assert.deepEqual(standalone.flatMap(({ server }) => server.map(({ operation }) => operation)), [worker.id]);
     assert.equal(standalone[0].server[0].spans.find(({ node }) => node === worker.id)?.parentId, undefined);
+    assert.deepEqual(runtime.tryEnqueue({ report: "too late" }), {
+      accepted: false, reason: "closed",
+    });
   } finally {
     releaseBlocker.release();
     releaseWorker.release();

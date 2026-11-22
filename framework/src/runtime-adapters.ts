@@ -65,16 +65,25 @@ export function createQueueRuntime(
     if (!running && !pending.length)
       drains.splice(0).forEach((resolve) => resolve());
   };
+  const tryEnqueue = (input: unknown) => {
+    if (closed) return { accepted: false, reason: "closed" } as const;
+    if (pending.length >= capacity)
+      return { accepted: false, reason: "capacity" } as const;
+    const completion = new Promise<Result>((resolve, reject) => {
+      pending.push({ input, trace: captureTrace(), resolve, reject });
+      state();
+      pump();
+    });
+    return { accepted: true, completion } as const;
+  };
   return {
+    tryEnqueue,
     enqueue(input: unknown): Promise<Result> {
-      if (closed) return Promise.reject(new Error("Queue is closed"));
-      if (pending.length >= capacity)
-        return Promise.reject(new Error("Queue capacity exceeded"));
-      return new Promise((resolve, reject) => {
-        pending.push({ input, trace: captureTrace(), resolve, reject });
-        state();
-        pump();
-      });
+      const admission = tryEnqueue(input);
+      if (admission.accepted) return admission.completion;
+      return Promise.reject(new Error(
+        admission.reason === "closed" ? "Queue is closed" : "Queue capacity exceeded",
+      ));
     },
     metrics,
     async close() {
