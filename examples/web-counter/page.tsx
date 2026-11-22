@@ -6,7 +6,7 @@ export const count = state({ id: "counter.value", initial: 0 });
 // derive перераховує результат, коли змінюється значення з масиву from.
 export const doubled = derive({
   id: "counter.doubled",
-  from: [count],
+  from: count,
   compute: (n) => n * 2,
 });
 

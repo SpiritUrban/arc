@@ -49,7 +49,7 @@ import { CreateUser } from "./contracts.ts";
 import { selectedUser, users } from "../user-selection.ts";
 
 const addUser = mutation(CreateUser, {
-  needs: [selectedUser],
+  needs: selectedUser,
   refresh: users,
   onSuccess(user, ctx) {
     ctx.set(selectedUser, user.id);
