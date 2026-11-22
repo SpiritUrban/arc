@@ -117,6 +117,11 @@ export function state<T>(def: StateOptions<T>): Signal<T> {
   return node;
 }
 
+/** Internal plain writable node for APIs whose public value is not callable. */
+export function stateObject<T>(def: StateOptions<T>): Writable<T> {
+  return createState(def, {});
+}
+
 /** @deprecated Use state; it now provides the same callable writable value. */
 export function signal<T>(def: StateOptions<T>): Signal<T> {
   return state(def);

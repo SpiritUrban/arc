@@ -8,7 +8,7 @@ import {
   type WebTelemetry,
 } from "../neutral/protocol.js";
 import {
-  state,
+  stateObject,
   signal,
   derive,
   batch,
@@ -62,7 +62,7 @@ export function webResource<T, I = unknown>(
 ): WebResource<T, I> & (() => ResourceSnapshot<T>);
 export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebResource<T, I>;
 export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebResource<T, I> {
-  const createValue = def.callable ? signal : state;
+  const createValue = def.callable ? signal : stateObject;
   const initial: ResourceSnapshot<T> = {
     input: undefined,
     data: undefined,
@@ -310,7 +310,7 @@ export function action<I = void, O = unknown>(
 ): CallableAction<I, O>;
 export function action<I = void, O = unknown>(def: ActionOptions<I, O>): Action<I, O>;
 export function action<I = void, O = unknown>(def: ActionOptions<I, O>): Action<I, O> {
-  const createValue = def.callable ? signal : state;
+  const createValue = def.callable ? signal : stateObject;
   const value = createValue<ActionSnapshot<O>>({
       id: def.id,
       initial: {
