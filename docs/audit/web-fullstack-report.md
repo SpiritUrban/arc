@@ -37,7 +37,7 @@ Scheduled reactive propagation обчислює dependencies перед bindings
 
 ## API та канонічні приклади
 
-[Pure Web counter](../../examples/web-counter/app.ts), [його view](../../examples/web-counter/page.tsx): `npm run dev:web`. Server operations відсутні в graph. [External fetch](../../examples/web-external/example.ts) працює без ARC backend.
+[Pure Web counter](../../examples/web-counter/app.ts), [його view](../../examples/web-counter/page.tsx): `npm run dev:web`. Server operations відсутні в graph. [External fetch](../examples/web-external.ts) працює без ARC backend.
 
 [Fullstack Tasks](../../examples/fullstack-tasks/app.ts), [contracts](../../examples/fullstack-tasks/contracts.ts), [server](../../examples/fullstack-tasks/server.ts), [browser page](../../examples/fullstack-tasks/page.tsx): `npm run dev:fullstack`.
 

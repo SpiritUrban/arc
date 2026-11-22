@@ -19,7 +19,7 @@ count.update((n) => n + 1);
 
 Розмітку пишіть у `.tsx` через `view({ template })`. Для нового проєкту налаштуйте `jsxImportSource: "@arc/framework/web"` за [посібником TSX](views.md#налаштування-typescript).
 
-[State/derive](state-and-derived.md) · [Actions/resources](actions-and-resources.md) · [Views](views.md). Звичайний external fetch показано у [прикладі](../../examples/web-external/example.ts); ARC backend не потрібен.
+[State/derive](state-and-derived.md) · [Actions/resources](actions-and-resources.md) · [Views](views.md). Звичайний external fetch без ARC backend показано у [прикладі](../examples/web-external.ts).
 
 ## Що запускати й збирати
 

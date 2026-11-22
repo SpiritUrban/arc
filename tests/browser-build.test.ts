@@ -9,7 +9,7 @@ import counter from "../examples/web-counter/app.ts";
 import { createApp } from "../examples/fullstack-tasks/app.ts";
 import { application } from "../framework/src/index.ts";
 import { remoteClient } from "../framework/src/fullstack/client.ts";
-import { read } from "../examples/leak-check/server.ts";
+import { read } from "./fixtures/browser-boundary/server.ts";
 import { mount, tick, type View } from "../framework/src/web/index.ts";
 const tasksEntry = new URL("../examples/fullstack-tasks/app.ts", import.meta.url);
 test("pure Web and Fullstack build manifests have no Node/server implementation in browser", async () => {
@@ -80,8 +80,8 @@ test("direct remote(serverOperation) compiles server module to descriptors; unma
   const remote = remoteClient(read, { id: "leak.remote" });
   const config = {
     nodes: [remote],
-    entry: "examples/leak-check/browser.ts",
-    serverModules: ["examples/leak-check/server.ts"],
+    entry: "tests/fixtures/browser-boundary/browser.ts",
+    serverModules: ["tests/fixtures/browser-boundary/server.ts"],
   };
   const app = application({ operations: [read], web: config });
   try {
@@ -138,7 +138,7 @@ test("Web/Core/Fullstack client entrypoints bundle browser-only; server entry ex
   }
 });
 test("external web resource works with normal fetch without ARC backend", async () => {
-  const { externalTodo } = await import("../examples/web-external/example.ts");
+  const { externalTodo } = await import("../docs/examples/web-external.ts");
   let requested = "";
   const resource = externalTodo(async (input) => {
     requested = String(input);
