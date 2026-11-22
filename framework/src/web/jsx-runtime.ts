@@ -120,6 +120,11 @@ interface TemplateProps {
   onPointerDown?: Action<void, unknown> | EventHandler;
   onPointerUp?: Action<void, unknown> | EventHandler;
   onReset?: Action<void, unknown> | EventHandler;
+  [event: `on${Capitalize<string>}`]:
+    | Action<void, unknown>
+    | EventHandler
+    | ((event: any) => unknown)
+    | undefined;
   [event: `on:${string}`]: Action<void, unknown> | EventHandler | undefined;
   [attribute: string]: unknown;
 }
