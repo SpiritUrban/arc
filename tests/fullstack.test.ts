@@ -11,9 +11,43 @@ import { internalTransport } from "../framework/src/fullstack/server.ts";
 import {
   remoteClient,
   remoteCall,
+  remoteApi,
   telemetryTransport,
 } from "../framework/src/fullstack/client.ts";
 import { operationContract } from "../framework/src/core-entry.ts";
+import { jsx } from "../framework/src/web/jsx-runtime.ts";
+import { state } from "../framework/src/web/reactive.ts";
+import { pageView } from "../framework/src/web/view.ts";
+
+test("page operations use only route parameters declared by the contract", () => {
+  const input = s.object({ id: s.string() });
+  const read = operationContract({ id: "route.read", input, output: s.string() });
+  const write = operationContract({ id: "route.write", input, output: s.string() });
+  const source = state({ id: "route.source", initial: "" });
+  const remote = remoteApi({ from: source, headers: () => ({}) });
+  const calls: unknown[] = [];
+  const client = new Proxy(remote, {
+    get(target, key) {
+      const method = Reflect.get(target, key);
+      return (contract: typeof read, options: { params: unknown }) => {
+        calls.push(contract.input.parse(options.params));
+        return method(contract, options);
+      };
+    },
+  });
+  const page = pageView("route.page", ({ query, mutation }) => {
+    query(client, read);
+    mutation(client, write, { id: "route.write.default" });
+    mutation(client, write, { params: { id: "explicit" } });
+    return jsx("div", {});
+  }, { owner: "workspace", id: "route" });
+
+  assert.deepEqual(calls, [{ id: "route" }, { id: "route" }, { id: "explicit" }]);
+  assert.equal(page.owned?.length, 3);
+  for (const node of page.owned ?? []) node.dispose();
+  source.dispose();
+});
+
 test("fullstack remote validates contracts, exposure, errors and trace continuity", async () => {
   const schema = s.object({ n: s.int() });
   const repo = resource({ id: "repo", open: () => 1 });

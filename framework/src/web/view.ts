@@ -685,10 +685,15 @@ export function pageView(
   template: (context: PageContext) => TemplateElement,
   params: Readonly<Record<string, string>> = {},
 ): View {
-  function withRouteParams<Options extends { params?: unknown }>(options?: Options) {
+  function withRouteParams<Options extends { params?: unknown }>(contract: unknown, options?: Options) {
+    const operation = contract as Partial<OperationContract> | undefined;
+    const fields = operation?.kind === "operation" ? operation.input?.json?.properties : undefined;
+    const routeInput = options?.params ?? (fields
+      ? Object.fromEntries(Object.entries(params).filter(([name]) => Object.hasOwn(fields, name)))
+      : params);
     return {
       ...options,
-      params: (options?.params ?? params) as NonNullable<Options["params"]>,
+      params: routeInput as NonNullable<Options["params"]>,
     };
   }
   return scopedView({ id }, ({ local, own }) => template({
@@ -696,10 +701,10 @@ export function pageView(
     local,
     own,
     query: ((client: { query(...args: any[]): OwnedNode }, ...args: unknown[]) =>
-      own(client.query(args[0], withRouteParams(args[1] as { params?: unknown } | undefined)))
+      own(client.query(args[0], withRouteParams(args[0], args[1] as { params?: unknown } | undefined)))
     ) as PageContext["query"],
     mutation: (client, contract, options) =>
-      own(client.mutation(contract, withRouteParams(options))),
+      own(client.mutation(contract, withRouteParams(contract, options))),
   }));
 }
 
