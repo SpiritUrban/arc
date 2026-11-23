@@ -2,7 +2,7 @@
 // локальний пошук фільтрує їх, а вибір рядка змінює список замовлень.
 import { view } from "@arc/framework/web";
 import { mutation } from "@arc/framework/fullstack";
-import { CreateUser, UpdateUser } from "./contracts.ts";
+import { CreateUser, UpdateUser, type User } from "./contracts.ts";
 import { failureMessage } from "../ui.ts";
 import { activeUser, selectedUser, users } from "../user-selection.ts";
 
@@ -18,9 +18,85 @@ const updateUser = mutation(UpdateUser, {
   update: users.replaceBy("id"),
 });
 
+function ProfileFields({ saved }: { saved?: ReturnType<typeof User.parse> }) {
+  const editing = saved !== undefined;
+  const form = editing ? updateUser : addUser;
+  const duplicate = () => form.failed("EMAIL_EXISTS");
+  const invalidName = () => editing && form.invalid("name");
+  const invalidEmail = () => editing && form.invalid("email");
+
+  return (
+    <>
+      <label>
+        Ім’я
+        <input
+          data-name={editing ? undefined : ""}
+          name="name"
+          required
+          minlength="2"
+          maxlength="100"
+          placeholder={editing ? undefined : "Олена Коваль"}
+          autocomplete="name"
+          value={saved?.name}
+          aria-invalid={editing ? invalidName() : undefined}
+        />
+      </label>
+      {editing && (
+        <p class="error" role="alert">
+          {invalidName() && "Перевірте ім’я користувача."}
+        </p>
+      )}
+      <div>
+        <label>
+          Email
+          <input
+            data-email={editing ? undefined : ""}
+            name="email"
+            required
+            type="email"
+            placeholder={editing ? undefined : "olena@example.com"}
+            autocomplete="email"
+            value={saved?.email}
+            aria-invalid={duplicate() || invalidEmail()}
+          />
+        </label>
+        <p class="error" role="alert" data-email-error={editing ? undefined : ""}>
+          {duplicate()
+            ? "Користувач із такою поштою вже існує."
+            : invalidEmail() && "Перевірте адресу email."}
+        </p>
+      </div>
+    </>
+  );
+}
+
+function renderProfileEditor(saved: ReturnType<typeof User.parse> | undefined) {
+  if (!saved) return null;
+  return (
+    <>
+      <div class="panel-divider"></div>
+      <h3>Редагувати вибраного користувача</h3>
+      <form data-edit-user onSubmit={updateUser}>
+        <input type="hidden" name="id" value={saved.id} />
+        <ProfileFields saved={saved} />
+        <button class="button secondary" type="submit">
+          {updateUser().running ? "Зберігаємо…" : "Зберегти користувача"}
+        </button>
+        <p class="error" role="alert">
+          {updateUser.failed("USER_NOT_FOUND")
+            ? "Користувача не знайдено."
+            : updateUser().error && !updateUser.invalid() && !updateUser.failed("EMAIL_EXISTS")
+              ? failureMessage(updateUser().error)
+              : ""}
+        </p>
+      </form>
+    </>
+  );
+}
 
 export const UsersPage = view({
   id: "users.page",
+  needs: updateUser,
   state: { search: "" },
   template: ({ search }) => {
 
@@ -81,36 +157,8 @@ export const UsersPage = view({
         <div class="panel-divider"></div>
         <h3>Новий користувач</h3>
         <form data-form onSubmit={addUser}>
-          <label>
-            Ім’я
-            <input
-              data-name
-              required
-              minlength="2"
-              maxlength="100"
-              placeholder="Олена Коваль"
-              autocomplete="name"
-              name="name"
-            />
-          </label>
-          <div>
-            <label>
-              Email
-              <input
-                data-email
-                required
-                type="email"
-                placeholder="olena@example.com"
-                autocomplete="email"
-                name="email"
-                aria-invalid={addUser.failed("EMAIL_EXISTS")}
-              />
-            </label>
-            <p class="error" role="alert" data-email-error>
-              {addUser.failed("EMAIL_EXISTS") && "Користувач із такою поштою вже існує."}
-            </p>
-          </div>
-          <button class="button secondary" type="submit" disabled={addUser().running}>
+          <ProfileFields />
+          <button class="button secondary" type="submit">
             {addUser().running ? "Додаємо…" : "＋ Додати користувача"}
           </button>
         </form>
@@ -120,54 +168,7 @@ export const UsersPage = view({
               users().error,
           )}
         </p>
-        {activeUser() && (
-          <>
-            <div class="panel-divider"></div>
-            <h3>Редагувати вибраного користувача</h3>
-            <form data-edit-user onSubmit={updateUser}>
-              <input type="hidden" name="id" value={activeUser()!.id} />
-              <label>
-                Ім’я
-                <input
-                  name="name"
-                  required
-                  minlength="2"
-                  maxlength="100"
-                  value={activeUser()!.name}
-                  aria-invalid={updateUser.invalid("name")}
-                />
-              </label>
-              <p class="error" role="alert">
-                {updateUser.invalid("name") && "Перевірте ім’я користувача."}
-              </p>
-              <label>
-                Email
-                <input
-                  name="email"
-                  required
-                  type="email"
-                  value={activeUser()!.email}
-                  aria-invalid={updateUser.invalid("email") || updateUser.failed("EMAIL_EXISTS")}
-                />
-              </label>
-              <p class="error" role="alert">
-                {updateUser.failed("EMAIL_EXISTS")
-                  ? "Користувач із такою поштою вже існує."
-                  : updateUser.invalid("email") && "Перевірте адресу email."}
-              </p>
-              <button class="button secondary" type="submit" disabled={updateUser().running}>
-                {updateUser().running ? "Зберігаємо…" : "Зберегти користувача"}
-              </button>
-              <p class="error" role="alert">
-                {updateUser.failed("USER_NOT_FOUND")
-                  ? "Користувача не знайдено."
-                  : updateUser().error && !updateUser.invalid() && !updateUser.failed("EMAIL_EXISTS")
-                    ? failureMessage(updateUser().error)
-                    : ""}
-              </p>
-            </form>
-          </>
-        )}
+        {renderProfileEditor(activeUser())}
       </section>
     );
   },
