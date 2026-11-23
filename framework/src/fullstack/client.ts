@@ -394,6 +394,12 @@ export type Mutation<
     invalid(): boolean;
     invalid(field: InputField<C>): boolean;
     run(input: Infer<C["input"]>): Promise<RemoteResult<C>>;
+    for(input: Infer<C["input"]>): {
+      run(): Promise<RemoteResult<C>>;
+      pending(): boolean;
+      outcome(): MutationOutcome<C> | undefined;
+      failed(code: keyof C["errors"] & string): boolean;
+    };
     with: [Field] extends [never]
       ? (params: Partial<Infer<C["input"]>>) => FormSubmission
       : never;
@@ -633,9 +639,18 @@ function bindMutation(defaults: RemoteFormDefaults) {
         submit: (form, ctx) => submit.execute({ [formInput]: form, params: values }, ctx),
       };
     };
-    return Object.assign(submit, {
+    const mutation = Object.assign(submit, {
       fields,
       with: (options.fields ? undefined : bindForm) as Mutation<C, Field, Key>["with"],
+      for(payload: Infer<C["input"]>) {
+        if (!keyOf) throw new TypeError("mutation.for requires a mutation key");
+        return {
+          run: () => mutation.run(payload),
+          pending: () => mutation.pending(keyOf(payload)),
+          outcome: () => mutation.outcome(keyOf(payload)),
+          failed: (code: keyof C["errors"] & string) => mutation.failed(code, keyOf(payload)),
+        };
+      },
       run(payload: Infer<C["input"]>) {
         const trace = currentWriteTrace();
         if (!keyOf || !revision || disposed)
@@ -690,6 +705,7 @@ function bindMutation(defaults: RemoteFormDefaults) {
           (field === undefined || error.fields.includes(field));
       },
     });
+    return mutation;
   }
   return mutate;
 }

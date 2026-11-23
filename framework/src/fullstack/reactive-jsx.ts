@@ -211,7 +211,7 @@ export function compileReactiveJsx(
                     (method === "failed" && (child.arguments.length === 1 || child.arguments.length === 2)) ||
                     (method === "invalid" && child.arguments.length <= 1) ||
                     ((method === "pending" || method === "outcome") &&
-                      child.arguments.length === 1)
+                      child.arguments.length <= 1)
                   ) {
                     reference = callee.expression;
                   }

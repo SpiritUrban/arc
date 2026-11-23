@@ -132,6 +132,8 @@ const cancelOrder = orderClient.mutation(CancelOrder, { refresh: orders });
 
 `cancelOrder.failed("ORDER_ALREADY_CANCELLED", order.id)` перевіряє бізнес-помилку конкретного рядка. `cancelOrder.outcome(order.id)` повертає його останній результат і помилку або `undefined` до завершення виклику. Новий запуск очищає попередній результат лише для свого ключа.
 
+Для кнопки, яка запускає дію й читає її стан, прив’яжіть вхід один раз через `const cancel = cancelOrder.for({ id: order.id })`. Передайте `onClick={cancel.run}` і читайте `cancel.pending()`, `cancel.outcome()` або `cancel.failed(code)` без повторного передавання ID. `for` працює з мутаціями, для яких задано `key`. Усі прив’язки з однаковим ключем використовують спільний стан мутації.
+
 ## Оновлення query з відповіді
 
 Після успішної mutation є два способи привести query до актуального стану:

@@ -9,6 +9,7 @@ import { orderWriteMessage } from "./messages.ts";
 import { money, failureMessage } from "../ui.ts";
 
 function CancelOrderControl({ order: { id, cancelled } }: { order: ReturnType<typeof Order.parse> }) {
+  const cancel = cancelOrder.for({ id });
   return (
     <>
       {!cancelled && (
@@ -16,14 +17,14 @@ function CancelOrderControl({ order: { id, cancelled } }: { order: ReturnType<ty
           class="button secondary"
           type="button"
           data-cancel-order
-          disabled={cancelOrder.pending(id)}
-          onClick={() => cancelOrder.run({ id })}
+          disabled={cancel.pending()}
+          onClick={cancel.run}
         >
-          {cancelOrder.pending(id) ? "Скасовуємо…" : "Скасувати"}
+          {cancel.pending() ? "Скасовуємо…" : "Скасувати"}
         </button>
       )}
       <p class="error" role="alert" data-cancel-error>
-        {orderWriteMessage(cancelOrder.outcome(id), "Це замовлення вже скасовано.")}
+        {orderWriteMessage(cancel.outcome(), "Це замовлення вже скасовано.")}
       </p>
     </>
   );

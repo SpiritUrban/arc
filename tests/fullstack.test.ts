@@ -9,6 +9,7 @@ import {
 } from "../framework/src/index.ts";
 import { internalTransport } from "../framework/src/fullstack/server.ts";
 import {
+  mutation,
   remoteClient,
   remoteCall,
   remoteApi,
@@ -51,6 +52,39 @@ test("page operations use only route parameters declared by the contract", () =>
   assert.equal(page.owned?.length, 3);
   for (const node of page.owned ?? []) node.dispose();
   source.dispose();
+});
+
+test("bound mutation inputs share keyed requests and outcomes", async () => {
+  const write = operationContract({
+    id: "row.write",
+    input: s.object({ id: s.string() }),
+    output: s.string(),
+    errors: { CONFLICT: 409 },
+  });
+  const save = mutation(write, {
+    key: "id",
+    fetch: async () => Response.json(
+      { ok: false, kind: "business_error", error: "CONFLICT" },
+      { status: 409 },
+    ),
+  });
+  try {
+    const first = save.for({ id: "first" });
+    const same = save.for({ id: "first" });
+    const other = save.for({ id: "other" });
+    const request = first.run();
+    assert.equal(same.run(), request);
+    assert.equal(save.run({ id: "first" }), request);
+    assert.equal(same.pending(), true);
+    assert.equal(other.pending(), false);
+    const result = await request;
+    assert.equal(first.pending(), false);
+    assert.equal(same.outcome()?.result, result);
+    assert.equal(same.failed("CONFLICT"), true);
+    assert.equal(other.outcome(), undefined);
+  } finally {
+    save.dispose();
+  }
 });
 
 test("fullstack remote validates contracts, exposure, errors and trace continuity", async () => {
