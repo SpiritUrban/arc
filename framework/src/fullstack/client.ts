@@ -33,6 +33,7 @@ import {
   type GraphNeeds,
   type Readable,
   type Signal,
+  type Writable,
 } from "../web/reactive.js";
 import type { GraphDefinition } from "../neutral/graph.js";
 export type RemoteResult<C extends OperationContract> =
@@ -177,7 +178,7 @@ type RemoteFormOptions<C extends OperationContract> = {
   invalidates?: WebResource<any, any> | readonly WebResource<any, any>[];
   /** Apply local state changes after a successful response, before refreshing resources. */
   onSuccess?: (value: Infer<C["output"]>, ctx: ActionContext) => void;
-  update?: QueryUpdate<Infer<C["output"]>> | readonly QueryUpdate<Infer<C["output"]>>[];
+  update?: MutationUpdate<Infer<C["output"]>> | readonly MutationUpdate<Infer<C["output"]>>[];
   /** Also apply update using the typed details of these business errors. */
   updateOnError?: UpdateErrorCode<NoInfer<C>> | readonly UpdateErrorCode<NoInfer<C>>[];
   baseUrl?: string;
@@ -436,11 +437,11 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     : Array.isArray(refreshOption)
       ? refreshOption
       : [refreshOption as WebResource<any, any>];
-  const updates: readonly QueryUpdate<Infer<C["output"]>>[] = options.update === undefined
+  const updates: readonly MutationUpdate<Infer<C["output"]>>[] = options.update === undefined
     ? []
     : Array.isArray(options.update)
       ? options.update
-      : [options.update as QueryUpdate<Infer<C["output"]>>];
+      : [options.update as MutationUpdate<Infer<C["output"]>>];
   const updateErrors = new Set<string>(
     typeof updateOnError === "string" ? [updateOnError] : updateOnError,
   );
@@ -798,7 +799,7 @@ export type RemoteResource<C extends OperationContract> = WebResource<
 > & {
   result: Computed<RemoteResult<C> | undefined>;
   /** Use a successful mutation response as the complete query value. */
-  replace(): QueryUpdate<Infer<C["output"]>>;
+  replace(): MutationUpdate<Infer<C["output"]>>;
 };
 
 type QueryItem<C extends OperationContract> =
@@ -808,16 +809,31 @@ type RowKey<Row> = [Row] extends [never] ? never : {
   [Key in keyof Row]-?: Row[Key] extends string | number ? Key : never;
 }[keyof Row] & string;
 
-type QueryUpdate<Row> = {
+type MutationUpdate<Row> = {
   readonly target: GraphDefinition;
   capture(): (row: Row, trace: TraceToken) => void;
 };
 
+/** Set a writable value from a confirmed mutation response. */
+export function setFrom<Output, Value>(
+  target: Writable<Value>,
+  select: (output: Output) => NoInfer<Value>,
+): MutationUpdate<Output> {
+  return {
+    target,
+    capture: () => (output, trace) => {
+      const value = select(output);
+      target._trace = trace;
+      target.set(value);
+    },
+  };
+}
+
 export type RemoteQuery<C extends OperationContract> =
   RemoteResource<C> & (() => ResourceSnapshot<Infer<C["output"]>>) & {
-    replaceBy(field: RowKey<QueryItem<C>>): QueryUpdate<QueryItem<C>>;
+    replaceBy(field: RowKey<QueryItem<C>>): MutationUpdate<QueryItem<C>>;
     /** Append a confirmed new row to a loaded list, preserving any row with the same key. */
-    insertBy(field: RowKey<QueryItem<C>>): QueryUpdate<QueryItem<C>>;
+    insertBy(field: RowKey<QueryItem<C>>): MutationUpdate<QueryItem<C>>;
   };
 
 type RemoteResourceOptions<C extends OperationContract> = {
@@ -912,7 +928,7 @@ function createRemoteResource<C extends OperationContract>(
   };
   return Object.assign(result, {
     result: projection,
-    replace(): QueryUpdate<Infer<C["output"]>> {
+    replace(): MutationUpdate<Infer<C["output"]>> {
       return {
         target: result,
         capture() {
@@ -921,7 +937,7 @@ function createRemoteResource<C extends OperationContract>(
         },
       };
     },
-    replaceBy(field: RowKey<QueryItem<C>>): QueryUpdate<QueryItem<C>> {
+    replaceBy(field: RowKey<QueryItem<C>>): MutationUpdate<QueryItem<C>> {
       return {
         target: result,
         capture() {
@@ -937,7 +953,7 @@ function createRemoteResource<C extends OperationContract>(
         },
       };
     },
-    insertBy(field: RowKey<QueryItem<C>>): QueryUpdate<QueryItem<C>> {
+    insertBy(field: RowKey<QueryItem<C>>): MutationUpdate<QueryItem<C>> {
       return {
         target: result,
         capture() {

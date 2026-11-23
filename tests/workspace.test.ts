@@ -250,6 +250,9 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       e.from === "users.create.submit" && e.to === "users.list.query" && e.kind === "UPDATES",
     ));
     assert.ok(edges.some((e) =>
+      e.from === "users.create.submit" && e.to === "workspace.selected-user" && e.kind === "UPDATES",
+    ));
+    assert.ok(edges.some((e) =>
       e.from === "users.list.query" && e.to === "users.list" && e.kind === "REMOTE_CALLS",
     ));
     for (const from of ["users.list.query.loading", "users.list.query.data"]) {

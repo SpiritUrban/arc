@@ -1,18 +1,14 @@
 // Браузерна частина користувачів. Мережевий ресурс завантажує записи,
 // локальний пошук фільтрує їх, а вибір рядка змінює список замовлень.
 import { view } from "@arc/framework/web";
-import { mutation } from "@arc/framework/fullstack";
+import { mutation, setFrom } from "@arc/framework/fullstack";
 import { CreateUser, UpdateUser, type User } from "./contracts.ts";
 import { failureMessage } from "../ui.ts";
 import { activeUser, selectedUser, users } from "../user-selection.ts";
 
 // CreateUser — спільний контракт. На сервері його виконує createUser у ./server.ts.
 export const addUser = mutation(CreateUser, {
-  needs: selectedUser,
-  update: users.insertBy("id"),
-  onSuccess(user, ctx) {
-    ctx.set(selectedUser, user.id);
-  },
+  update: [users.insertBy("id"), setFrom(selectedUser, (user) => user.id)],
 });
 const updateUser = mutation(UpdateUser, {
   update: users.replaceBy("id"),
