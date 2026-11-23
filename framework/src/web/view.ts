@@ -296,6 +296,8 @@ function compileTemplate(id: string, root: TemplateChild) {
         continue;
       }
       if (!name.startsWith("bind:") && !name.startsWith("on:")) continue;
+      delete attributes[name];
+      if (name === "bind:value" && value === undefined) continue;
       if (child.tag === Fragment)
         throw new Error(`Attach ${name} to an HTML element in ${id}`);
       if (
@@ -303,7 +305,6 @@ function compileTemplate(id: string, root: TemplateChild) {
         (child.tag !== "input" || attributes.type !== "checkbox")
       )
         throw new TypeError("bind:checked requires an input[type=checkbox]");
-      delete attributes[name];
       attached.push(
         ...directive(`${id}.dom.${path}.${name}`, name, value, {
           radio: child.tag === "input" && attributes.type === "radio",

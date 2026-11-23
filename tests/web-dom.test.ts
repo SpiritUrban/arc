@@ -380,6 +380,7 @@ test("TSX directives declare graph nodes before mount and preserve form behavior
         "on:submit": save,
         children: [
           jsx("input", { "bind:value": field }),
+          jsx("input", { id: "unbound", value: "initial", "bind:value": undefined }),
           jsx("p", { "bind:text": field }),
           jsx("button", { "bind:disabled": save.running }),
           jsx("button", { id: "auto-submit" }),
@@ -410,6 +411,12 @@ test("TSX directives declare graph nodes before mount and preserve form behavior
   await tick();
   assert.equal(field.get(), "after");
   assert.equal(target.querySelector("p")!.textContent, "after");
+  const unbound = target.querySelector<HTMLInputElement>("#unbound")!;
+  assert.equal(unbound.value, "initial");
+  assert.equal(unbound.hasAttribute("bind:value"), false);
+  unbound.value = "local edit";
+  unbound.dispatchEvent(new window.Event("input"));
+  assert.equal(field.get(), "after");
 
   const submit = () =>
     form.dispatchEvent(new window.Event("submit", { cancelable: true }));

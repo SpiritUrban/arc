@@ -11,7 +11,6 @@ interface OrderFieldsProps {
 }
 
 export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
-  const quantityBinding = quantity ? { "bind:value": quantity } : {};
   return (
     <>
       <label class="product-field">
@@ -42,7 +41,7 @@ export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
             step="1"
             value={order?.()?.quantity}
             aria-invalid={mutation.invalid("quantity")}
-            {...quantityBinding}
+            bind:value={quantity}
           />
         </label>
         <p class="error" role="alert" data-quantity-error>
