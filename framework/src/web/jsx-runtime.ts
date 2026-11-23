@@ -230,6 +230,7 @@ export function renderTemplate(
     throw new TypeError("Nested views must be declared in a static view template");
   const element = document.createElement(tag);
   for (const [name, value] of Object.entries(attributes)) {
+    if (name === "bind:value" && value === undefined) continue;
     if (name.startsWith("bind:") || name.startsWith("on:"))
       throw new Error(`${name} requires a statically declared view element`);
     if (value == null) continue;

@@ -253,7 +253,9 @@ test("TSX changes the bound list region without rerunning the template", async (
     type: "children",
     sources: [items],
     format: (labels: string[]) =>
-      labels.map((label) => jsx("li", { children: label })),
+      labels.map((label) => jsx("li", {
+        children: [label, jsx("input", { value: label, "bind:value": undefined })],
+      })),
   });
   let renders = 0;
   const page = view({
@@ -270,6 +272,8 @@ test("TSX changes the bound list region without rerunning the template", async (
   const instance = mount(page, target as unknown as Element);
   const list = target.querySelector("ul")!;
   assert.equal(list.querySelector("li")!.textContent, "<first>");
+  assert.equal(list.querySelector("input")!.value, "<first>");
+  assert.equal(list.querySelector("input")!.hasAttribute("bind:value"), false);
   assert.equal(list.querySelector("first"), null);
   items.set(["second", "third"]);
   await tick();
@@ -278,6 +282,7 @@ test("TSX changes the bound list region without rerunning the template", async (
     Array.from(list.querySelectorAll("li"), (row) => row.textContent),
     ["second", "third"],
   );
+  assert.deepEqual(Array.from(list.querySelectorAll("input"), (input) => input.value), ["second", "third"]);
   assert.equal(renders, 1);
   instance.unmount();
   assert.equal(items._listeners.size, 0);
