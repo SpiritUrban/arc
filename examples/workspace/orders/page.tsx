@@ -7,28 +7,26 @@ import { orderClient } from "./client.ts";
 import { OrderFields } from "./fields.tsx";
 import { money, failureMessage } from "../ui.ts";
 
-function CancelOrderControl({ order }: { order: ReturnType<typeof Order.parse> }) {
-  const cancel = cancelOrder.for({ id: order.id });
-  const { pending, error } = cancel;
+function CancelOrderControl({ order: { id, cancelled } }: { order: ReturnType<typeof Order.parse> }) {
   return (
     <>
-      {!order.cancelled && (
+      {!cancelled && (
         <button
           class="button secondary"
           type="button"
           data-cancel-order
-          disabled={pending()}
-          onClick={cancel.run}
+          disabled={cancelOrder.pending(id)}
+          onClick={() => cancelOrder.run({ id })}
         >
-          {pending() ? "Скасовуємо…" : "Скасувати"}
+          {cancelOrder.pending(id) ? "Скасовуємо…" : "Скасувати"}
         </button>
       )}
       <p class="error" role="alert" data-cancel-error>
-        {cancel.failed("ORDER_ALREADY_CANCELLED")
+        {cancelOrder.failed("ORDER_ALREADY_CANCELLED", id)
           ? "Це замовлення вже скасовано."
-          : cancel.failed("ORDER_NOT_FOUND")
+          : cancelOrder.failed("ORDER_NOT_FOUND", id)
             ? "Замовлення не знайдено."
-            : failureMessage(error())}
+            : failureMessage(cancelOrder.outcome(id)?.error)}
       </p>
     </>
   );

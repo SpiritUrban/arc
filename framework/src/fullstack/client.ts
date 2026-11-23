@@ -381,13 +381,6 @@ export type Mutation<
     invalid(): boolean;
     invalid(field: InputField<C>): boolean;
     run(input: Infer<C["input"]>): Promise<RemoteResult<C>>;
-    /** Bind a payload once for use by a row's controls. */
-    for(input: Infer<C["input"]>): {
-      run(): Promise<RemoteResult<C>>;
-      pending(): boolean;
-      failed(code: keyof C["errors"] & string): boolean;
-      error(): unknown;
-    };
     pending(key: Key): boolean;
     outcome(key: Key): MutationOutcome<C> | undefined;
   };
@@ -601,7 +594,7 @@ function bindMutation(defaults: RemoteFormDefaults) {
         dispose();
       };
     }
-    const mutation: Mutation<C, Field, Key> = Object.assign(submit, {
+    return Object.assign(submit, {
       fields,
       run(payload: Infer<C["input"]>) {
         const trace = currentWriteTrace();
@@ -631,15 +624,6 @@ function bindMutation(defaults: RemoteFormDefaults) {
         start();
         return request;
       },
-      for(input: Infer<C["input"]>): ReturnType<Mutation<C, Field, Key>["for"]> {
-        const key = keyOf?.(input);
-        return {
-          run: () => mutation.run(input),
-          pending: () => key === undefined ? submit().running : mutation.pending(key),
-          failed: (code) => mutation.failed(code, key),
-          error: () => key === undefined ? submit().error : mutation.outcome(key)?.error,
-        };
-      },
       pending(key: Key) {
         revision?.get();
         return requests.has(key);
@@ -666,7 +650,6 @@ function bindMutation(defaults: RemoteFormDefaults) {
           (field === undefined || error.fields.includes(field));
       },
     });
-    return mutation;
   }
   return mutate;
 }
