@@ -294,6 +294,41 @@ test("ORD-01–03 · form, filters, totals and a delayed owner query", async ({
   await expect(orderRow(page, "Блокнот А5")).toHaveCount(0);
 });
 
+test("ARC shows a created profile after retrying a failed first list read", async ({ page }, info) => {
+  test.skip(isReact(info));
+  const list = transport(info, "users.list");
+  const reads = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === list) reads.push(request);
+  });
+  let release;
+  const delayed = new Promise((resolve) => { release = resolve; });
+  await page.route((url) => url.pathname === list, async (route) => {
+    await delayed;
+    await route.fulfill({
+      status: 503,
+      json: { ok: false, kind: "fault", fault: { code: "UNAVAILABLE", status: 503 } },
+    });
+  }, { times: 1 });
+
+  const name = "Profile during failed read";
+  try {
+    await page.goto("/");
+    await expect(page.getByText("Оновлюємо список…")).toBeVisible();
+    const form = createUserForm(page);
+    await fillProfile(form, name, "profile-cold-read@example.com");
+    await form.getByRole("button", { name: /Додати користувача/ }).click();
+    await expect(form.locator('[name="name"]')).toHaveValue("");
+    await expect(userRow(page, name)).toHaveCount(0);
+    expect(reads).toHaveLength(1);
+  } finally {
+    release();
+  }
+  await expect(userRow(page, name)).toHaveAttribute("aria-pressed", "true");
+  await expect(userRow(page, "Demo User")).toHaveCount(1);
+  expect(reads).toHaveLength(2);
+});
+
 for (const listIncludesOrder of [false, true]) {
   test(`ARC create during the first list read (row already in response: ${listIncludesOrder})`, async ({
     page,
