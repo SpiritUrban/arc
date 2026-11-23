@@ -9,7 +9,7 @@ import { activeUser, selectedUser, users } from "../user-selection.ts";
 // CreateUser — спільний контракт. На сервері його виконує createUser у ./server.ts.
 export const addUser = mutation(CreateUser, {
   needs: selectedUser,
-  refresh: users,
+  update: users.insertBy("id"),
   onSuccess(user, ctx) {
     ctx.set(selectedUser, user.id);
   },
@@ -102,7 +102,7 @@ export const UsersPage = view({
     }));
 
     return (
-      <section class="panel users-panel">
+      <section id="users" class="panel users-panel">
         <div class="panel-heading">
           <div>
             <span class="eyebrow">КОМАНДА</span>

@@ -64,7 +64,7 @@ export const OrdersPage = view({
     }));
 
     return (
-      <section class="orders-panel">
+      <section id="orders" class="orders-panel">
         <div class="summary-grid">
           <div class="summary-card">
             <span class="muted">Замовлень користувача</span>

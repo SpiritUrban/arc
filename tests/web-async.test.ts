@@ -160,6 +160,44 @@ test("a confirmed resource update survives an older refresh", async () => {
   resource.dispose();
 });
 
+test("a confirmed insertion retries a failed first read once", async () => {
+  const first = deferred<void>();
+  const retried = deferred<BrowserEvent>();
+  const row = { id: "created" };
+  let reads = 0;
+  const resource = webResource({
+    id: "users",
+    async load() {
+      if (++reads === 1) {
+        await first.promise;
+        throw new Error("Initial list unavailable");
+      }
+      return [row];
+    },
+  });
+  try {
+    resource.activate({
+      emit(event) {
+        if (event.type === "resource.finished" && event.traceId === "create-user")
+          retried.resolve(event);
+      },
+    });
+    resource[captureResourceUpdate]!({ refreshWhenMissing: true })(
+      (rows) => [...rows, row],
+      { traceId: "create-user" },
+    );
+    assert.equal(reads, 1);
+    first.resolve();
+    const result = await retried.promise;
+    assert.equal(reads, 2);
+    assert.deepEqual(resource.data(), [row]);
+    assert.equal(resource.error(), undefined);
+    assert.equal(result.outcome, "ok");
+  } finally {
+    resource.dispose();
+  }
+});
+
 test("resource update telemetry reports materialized changes under the mutation trace", async () => {
   const events: BrowserEvent[] = [];
   const loadInitial = deferred<number>();

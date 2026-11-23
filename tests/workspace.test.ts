@@ -247,7 +247,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       e.from === "orders.cancel.submit" && e.to === "orders.list.query" && e.kind === "UPDATES",
     ));
     assert.ok(edges.some((e) =>
-      e.from === "users.create.submit" && e.to === "users.list.query" && e.kind === "INVALIDATES",
+      e.from === "users.create.submit" && e.to === "users.list.query" && e.kind === "UPDATES",
     ));
     assert.ok(edges.some((e) =>
       e.from === "users.list.query" && e.to === "users.list" && e.kind === "REMOTE_CALLS",
@@ -309,10 +309,12 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     let createOrderRequests = 0;
     let cancelOrderRequests = 0;
     let listOrderRequests = 0;
+    let listUserRequests = 0;
     const fetcher: typeof fetch = (input, init) => {
       const url = new URL(String(input), origin);
       if (url.pathname === "/_arc/call/orders.create") createOrderRequests++;
       if (url.pathname === "/_arc/call/orders.list") listOrderRequests++;
+      if (url.pathname === "/_arc/call/users.list") listUserRequests++;
       let ready = heldRequests.get(url.pathname) ?? Promise.resolve();
       if (url.pathname === "/_arc/call/orders.list" &&
           returningOrders && new Headers(init?.headers).get("authorization") === `Bearer ${returningOrders.owner}`) {
@@ -428,10 +430,12 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     input("[data-email]", "new@example.com");
     const addButton = document.querySelector<HTMLButtonElement>("#users button[type=submit]")!;
     const releaseUser = holdRequest("/_arc/call/users.create");
+    const userReadsBeforeCreate = listUserRequests;
     submit("#users form");
     await waitFor(() => addButton.disabled, "add user button disabled while submitting");
     releaseUser();
     await waitFor(() => document.querySelectorAll("[data-user]").length === 2);
+    assert.equal(listUserRequests, userReadsBeforeCreate);
     assert.equal(addButton.disabled, false);
     assert.match(document.querySelector("#users [data-status]")!.textContent!, /^2 /);
     assert.deepEqual(userFields.map((field) => field.value), ["", ""]);

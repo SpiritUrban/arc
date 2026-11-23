@@ -104,7 +104,11 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
     }
   }
   let snapshotKey: string | number | undefined;
-  let pendingRead: { key: typeof snapshotKey; updates: ((data: T) => T)[] } | undefined;
+  let pendingRead: {
+    key: typeof snapshotKey;
+    updates: ((data: T) => T)[];
+    retryAfterFailure?: TraceToken;
+  } | undefined;
   if (key) {
     const switching = { ...initial, loading: true };
     value.get = () => {
@@ -171,7 +175,10 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
           browserEvent(telemetry, def.id, "resource.updated", trace, {
             data: { snapshot: snapshotChanged, cache: cacheChanged },
           });
-        if (pendingRead && Object.is(pendingRead.key, targetKey))
+        const needsRead = refreshWhenMissing && active && Object.is(key?.(), targetKey) &&
+          (targetKey === undefined || cache?.get(targetKey)?.data === undefined) &&
+          (!Object.is(snapshotKey, targetKey) || readSnapshot().data === undefined);
+        if (pendingRead && Object.is(pendingRead.key, targetKey)) {
           pendingRead.updates.push((data) => {
             const next = update(data);
             if (!snapshotChanged && !cacheChanged && !Object.is(next, data))
@@ -180,12 +187,10 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
               });
             return next;
           });
-        else if (
-          refreshWhenMissing && active && Object.is(key?.(), targetKey) &&
-          (targetKey === undefined || cache?.get(targetKey)?.data === undefined) &&
-          (!Object.is(snapshotKey, targetKey) || readSnapshot().data === undefined)
-        )
+          if (needsRead) pendingRead.retryAfterFailure = trace;
+        } else if (needsRead) {
           void resource.refresh(trace);
+        }
       };
     },
     async refresh(trace: TraceToken = { traceId: identity() }) {
@@ -270,13 +275,17 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
             trace,
           );
       } finally {
-        if (pendingRead?.updates === updates) pendingRead = undefined;
+        const finished = pendingRead?.updates === updates ? pendingRead : undefined;
+        if (finished) pendingRead = undefined;
         if (signal.aborted) outcome = "cancelled";
         browserEvent(telemetry, def.id, "resource.finished", trace, {
           spanId,
           duration: performance.now() - start,
           outcome,
         });
+        if (finished?.retryAfterFailure && (outcome === "fault" || outcome === "business_error") &&
+            currentRequest())
+          void resource.refresh(finished.retryAfterFailure);
       }
     },
     invalidate(trace?: TraceToken) {

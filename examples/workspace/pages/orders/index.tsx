@@ -8,8 +8,8 @@ export default function OrdersScreen() {
     <section>
       <h1>Замовлення</h1>
       <div class="content-grid">
-        <div id="users"><UsersPage /></div>
-        <div id="orders"><OrdersPage /></div>
+        <UsersPage />
+        <OrdersPage />
       </div>
     </section>
   );

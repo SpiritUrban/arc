@@ -51,7 +51,7 @@ npm test
 Форма створення користувача (onSubmit)
   → users.create.submit [action]
     → users.create.submit.remote → users.create [server] → users.repository
-    INVALIDATES → users.list.query → users.list [server]
+    UPDATES → users.list.query → users.list [server]
 workspace.selected-user
   → orders.list.query → orders.list [server] → auth.currentUser / orders.repository
 orders.create.submit.fields.product / orders.create.submit.fields.quantity
@@ -65,6 +65,8 @@ page:orders/[id] → orders.detail-cancel.submit → orders.detail-cancel.submit
   UPDATES → orders.get.query + orders.list.query
 orders.list.query → orders.visible → DOM bindings підсумку
 ```
+
+Після створення профілю ARC додає підтверджений запис до завантаженого списку. Якщо перше читання ще триває, ARC застосовує вставку до його результату або один раз повторює читання після помилки.
 
 Запити замовлень використовують заголовок `Authorization` поточного користувача. `query` бере ID користувача як ключ. Після перемикання запит відкидає запізнілі відповіді попереднього ключа. При поверненні до вже відкритого користувача ARC показує його кешований список і оновлює його у фоні.
 

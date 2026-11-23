@@ -1,10 +1,8 @@
-import { view } from "@arc/framework/web";
 import { UsersPage } from "../users/page.tsx";
 import { OrdersPage } from "../orders/page.tsx";
 
-export default view({
-  id: "workspace.page",
-  template: (
+export default function WorkspacePage() {
+  return (
     <section id="overview">
       <div class="page-heading">
         <div>
@@ -25,11 +23,9 @@ export default view({
         </p>
       </div>
       <div class="content-grid">
-        <>
-          <div id="users"><UsersPage /></div>
-          <div id="orders"><OrdersPage /></div>
-        </>
+        <UsersPage />
+        <OrdersPage />
       </div>
     </section>
-  ),
-});
+  );
+}
