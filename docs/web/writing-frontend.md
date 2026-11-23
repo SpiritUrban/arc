@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | Стан екземпляра сторінки | `view.state` | `search` |
 | Спільний вибір | `state` | `selectedUser` |
-| Похідні дані | функція або `derive` | `visible()`, `visibleOrders` |
+| Похідні дані | функція або `derive` | `users.page.visible`, `orders.visible` |
 | Читання з сервера | `query` | `users`, `ordersData` |
 | Запис на сервер | `mutation` | `addUser`, `createOrder` |
 
