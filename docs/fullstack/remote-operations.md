@@ -130,14 +130,17 @@ const cancelOrder = orderClient.mutation(CancelOrder, { refresh: orders });
 
 `cancelOrder.failed("ORDER_ALREADY_CANCELLED", order.id)` перевіряє бізнес-помилку конкретного рядка. `cancelOrder.outcome(order.id)` повертає його останній результат і помилку або `undefined` до завершення виклику. Новий запуск очищає попередній результат лише для свого ключа.
 
+Якщо один рядок використовує дію в кількох прив’язках, передайте вхід один раз через `for(input)`. `run`, `pending`, `failed` та `error` працюють зі станом тієї ж мутації для ключа цього входу.
+
 ```tsx
-<button
-  type="button"
-  disabled={cancelOrder.pending(order.id)}
-  onClick={() => cancelOrder.run({ id: order.id })}
->
-  {cancelOrder.pending(order.id) ? "Скасовуємо…" : "Скасувати"}
-</button>
+const cancel = cancelOrder.for({ id: order.id });
+const { pending } = cancel;
+
+return (
+  <button type="button" disabled={pending()} onClick={cancel.run}>
+    {pending() ? "Скасовуємо…" : "Скасувати"}
+  </button>
+);
 ```
 
 ## Оновлення query з відповіді

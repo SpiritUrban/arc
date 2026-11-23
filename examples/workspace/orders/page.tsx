@@ -1,11 +1,38 @@
 // Браузерна частина замовлень. Зміна користувача оновлює список,
 // а надсилання форми викликає серверну операцію створення.
 import { derive, view, type Signal, type ViewTemplateContext } from "@arc/framework/web";
-import { ListOrders, CreateOrder, CancelOrder } from "./contracts.ts";
+import { ListOrders, CreateOrder, CancelOrder, type Order } from "./contracts.ts";
 import { activeUser } from "../user-selection.ts";
 import { orderClient } from "./client.ts";
 import { OrderFields } from "./fields.tsx";
 import { money, failureMessage } from "../ui.ts";
+
+function CancelOrderControl({ order }: { order: ReturnType<typeof Order.parse> }) {
+  const cancel = cancelOrder.for({ id: order.id });
+  const { pending, error } = cancel;
+  return (
+    <>
+      {!order.cancelled && (
+        <button
+          class="button secondary"
+          type="button"
+          data-cancel-order
+          disabled={pending()}
+          onClick={cancel.run}
+        >
+          {pending() ? "Скасовуємо…" : "Скасувати"}
+        </button>
+      )}
+      <p class="error" role="alert" data-cancel-error>
+        {cancel.failed("ORDER_ALREADY_CANCELLED")
+          ? "Це замовлення вже скасовано."
+          : cancel.failed("ORDER_NOT_FOUND")
+            ? "Замовлення не знайдено."
+            : failureMessage(error())}
+      </p>
+    </>
+  );
+}
 
 function renderOrdersPage(
   { quantity, search, status }: Record<"quantity" | "search" | "status", Signal<string>>,
@@ -131,24 +158,7 @@ function renderOrdersPage(
                       <span class="order-status">
                         {order.cancelled ? "Скасовано" : "Створено"}
                       </span>
-                      {!order.cancelled && (
-                        <button
-                          class="button secondary"
-                          type="button"
-                          data-cancel-order
-                          disabled={cancelOrder.pending(order.id)}
-                          onClick={() => cancelOrder.run({ id: order.id })}
-                        >
-                          {cancelOrder.pending(order.id) ? "Скасовуємо…" : "Скасувати"}
-                        </button>
-                      )}
-                      <p class="error" role="alert" data-cancel-error>
-                        {cancelOrder.failed("ORDER_ALREADY_CANCELLED", order.id)
-                          ? "Це замовлення вже скасовано."
-                          : cancelOrder.failed("ORDER_NOT_FOUND", order.id)
-                            ? "Замовлення не знайдено."
-                            : failureMessage(cancelOrder.outcome(order.id)?.error)}
-                      </p>
+                      <CancelOrderControl order={order} />
                     </td>
                   </tr>
               ))}
