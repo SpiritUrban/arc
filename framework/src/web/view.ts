@@ -31,7 +31,7 @@ import {
   type TemplateChild,
   type TemplateElement,
 } from "./jsx-runtime.js";
-import { derive, graphNeeds, Scope, signal, trackReads, withWriteTrace, type GraphNeeds, type Readable, type Signal, type Writable } from "./reactive.js";
+import { graphNeeds, Scope, signal, trackReads, withWriteTrace, type GraphNeeds, type Readable, type Signal, type Writable } from "./reactive.js";
 
 const projection = Symbol("ARC binding projection");
 const instantiateView = Symbol("ARC view instance");
@@ -571,15 +571,10 @@ type LocalState<Initial extends Record<string, unknown>> = {
   [Key in keyof Initial]: Signal<Initial[Key]>;
 };
 
-export interface ViewTemplateContext extends Pick<PageContext, "own"> {
-  /** Derive a value owned by this view. Its id is relative to the view id. */
-  derive: typeof derive;
-}
-
 type LocalViewBase<Initial extends Record<string, unknown>> = Omit<
   ViewOptions, "template" | "bindings" | "setup"
 > & {
-  template(local: LocalState<Initial>, context: ViewTemplateContext): TemplateElement;
+  template(local: LocalState<Initial>, context: Pick<PageContext, "own">): TemplateElement;
   bindings?: never;
   setup?: never;
 };
@@ -591,7 +586,7 @@ type ScalarLocalViewOptions<Initial extends PrimitiveInitial> = Omit<
   ViewOptions, "template" | "bindings" | "setup"
 > & {
   state: Initial | (() => Initial);
-  template(value: Signal<Initial>, context: ViewTemplateContext): TemplateElement;
+  template(value: Signal<Initial>, context: Pick<PageContext, "own">): TemplateElement;
   bindings?: never;
   setup?: never;
 };
@@ -622,24 +617,16 @@ export function view<Initial extends Record<string, unknown>>(
 
   const { state: initialize, template, ...def } = options;
   return scopedView(def, ({ local, own }) => {
-    const context: ViewTemplateContext = {
-      own,
-      derive: ({ id, from, compute }) => own(derive({
-        id: `${def.id}.${id}`,
-        from,
-        compute,
-      })),
-    };
     const initial = typeof initialize === "function" ? initialize() : initialize;
     if (initial === null || typeof initial !== "object")
       return (template as ScalarLocalViewOptions<PrimitiveInitial>["template"])(
         local(initial as PrimitiveInitial, "value"),
-        context,
+        { own },
       );
     const fields = Object.fromEntries(
       Object.entries(initial).map(([key, value]) => [key, local(value, key)]),
     ) as LocalState<Initial>;
-    return (template as LocalViewBase<Initial>["template"])(fields, context);
+    return (template as LocalViewBase<Initial>["template"])(fields, { own });
   });
 }
 
@@ -662,11 +649,6 @@ function ownedNodes(owned?: OwnedNodes): OwnedNode[] {
   return Array.isArray(owned) ? owned : [owned as OwnedNode];
 }
 
-type PageRemoteClient = {
-  query(...args: any[]): OwnedNode;
-  mutation(...args: any[]): OwnedNode;
-};
-
 export interface PageContext<Param extends string = string> {
   params: Readonly<Record<Param, string>>;
   local<T>(initial: T, name?: string): Signal<T>;
@@ -679,8 +661,6 @@ export interface PageContext<Param extends string = string> {
     client: { query(...args: Args): T },
     ...args: Args
   ): T;
-  /** Scope a remote client's queries and mutations to this page. */
-  client<T extends PageRemoteClient>(client: T): Pick<T, "query" | "mutation">;
 }
 
 export interface PageLayoutContext<Param extends string = string> extends PageContext<Param> {
@@ -709,7 +689,7 @@ type LocalFactory = <T>(initial: T, name?: string) => Signal<T>;
 
 function scopedView(
   def: Omit<LocalViewOptions<Record<string, unknown>>, "state" | "template">,
-  template: (context: Pick<PageContext, "local" | "own" | "query" | "client">) => TemplateElement,
+  template: (context: Pick<PageContext, "local" | "own" | "query">) => TemplateElement,
 ): View {
   function create(scope?: Scope) {
     const fields = new Map<string, GraphDefinition>();
@@ -732,12 +712,8 @@ function scopedView(
     };
     const query: PageContext["query"] = (client: { query(...args: any[]): OwnedNode }, ...args: any[]) =>
       own(client.query(...args));
-    const client: PageContext["client"] = <T extends PageRemoteClient>(remote: T) => ({
-      query: (...args: any[]) => own(remote.query(...args)),
-      mutation: (...args: any[]) => own(remote.mutation(...args)),
-    }) as Pick<T, "query" | "mutation">;
     try {
-      const instance = buildView({ ...def, owned, template: () => template({ local, own, query, client }) });
+      const instance = buildView({ ...def, owned, template: () => template({ local, own, query }) });
       instance.dependencies = [...(instance.dependencies ?? []), ...fields.values()];
       return instance;
     } catch (error) {
