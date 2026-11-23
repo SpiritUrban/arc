@@ -42,7 +42,7 @@ async function fixture(request, info, prefix, products) {
 
 function transport(info, operation) {
   if (!isReact(info)) return `/_arc/call/${operation}`;
-  if (operation === "users.create") return "/api/users";
+  if (operation === "users.create" || operation === "users.list") return "/api/users";
   if (operation === "orders.cancel") return "/api/orders/cancel";
   return "/api/orders";
 }
@@ -159,6 +159,14 @@ test("USR-01–03 · search, create, select and edit a profile", async ({
   }
 
   await fillProfile(create, "Olena Parity", "olena.parity@example.com");
+  const list = transport(info, "users.list");
+  const readMethod = isReact(info) ? "GET" : "POST";
+  const reads = [];
+  const countRead = (request) => {
+    if (request.method() === readMethod && new URL(request.url()).pathname === list)
+      reads.push(request);
+  };
+  page.on("request", countRead);
   const pending = await hold(
     page,
     transport(info, "users.create"),
@@ -175,6 +183,8 @@ test("USR-01–03 · search, create, select and edit a profile", async ({
   const olena = userRow(page, "Olena Parity");
   await expect(olena).toHaveAttribute("aria-pressed", "true");
   await expect(create.locator('[name="name"]')).toHaveValue("");
+  page.off("request", countRead);
+  expect(reads).toHaveLength(isReact(info) ? 1 : 0);
   const search = page.locator('#users input[type="search"]');
   for (const term of ["OLENA", "olena.parity@example.com"]) {
     await search.fill(term);
