@@ -11,15 +11,14 @@ export const title = "Деталі замовлення — ARC Workspace";
 export default function OrderDetail({ own, params, query }: PageContext<"id">) {
   const order = query(orderClient, GetOrder);
   const { data, loading, error } = order;
-  const orderUpdates = [order.replace(), ordersData.replaceBy("id")];
-  const updateOrder = own(orderClient.mutation(UpdateOrder, {
+  const mutationOptions = {
     params,
-    update: orderUpdates,
-  }));
+    update: [order.replace(), ordersData.replaceBy("id")],
+  };
+  const updateOrder = own(orderClient.mutation(UpdateOrder, mutationOptions));
   const cancelOrder = own(orderClient.mutation(CancelOrder, {
+    ...mutationOptions,
     id: "orders.detail-cancel.submit",
-    params,
-    update: orderUpdates,
     updateOnError: "ORDER_ALREADY_CANCELLED",
   }));
 
