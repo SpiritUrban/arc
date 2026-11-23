@@ -199,6 +199,8 @@ test("USR-01–03 · search, create, select and edit a profile", async ({
   const edit = editUserForm(page);
   await fillProfile(edit, "Olena Updated", "olena.updated@example.com");
   const save = edit.getByRole("button", { name: "Зберегти користувача" });
+  reads.length = 0;
+  page.on("request", countRead);
   if (isReact(info)) {
     await save.click();
     await expect(userRow(page, "Olena Updated")).toHaveAttribute("aria-pressed", "true");
@@ -218,6 +220,11 @@ test("USR-01–03 · search, create, select and edit a profile", async ({
     await expect(edit.locator('[name="email"]')).toHaveValue("demo@example.com");
     await userRow(page, "Olena Updated").click();
   }
+  await expect(userRow(page, "Olena Updated")).toContainText(
+    "olena.updated@example.com",
+  );
+  page.off("request", countRead);
+  expect(reads).toHaveLength(0);
   await fillProfile(edit, "Olena Updated", "demo@example.com");
   await edit.getByRole("button", { name: "Зберегти користувача" }).click();
   await expect(
