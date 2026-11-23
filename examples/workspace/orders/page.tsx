@@ -96,7 +96,7 @@ export const OrdersPage = view({
           <form class="order-form" data-form novalidate onSubmit={createOrder}>
             <OrderFields mutation={createOrder} quantity={quantity} />
             <button class="button primary" type="submit">
-              {createOrder().running ? "Створюємо…" : <>Створити <span>→</span></>}
+              {createOrder.running() ? "Створюємо…" : <>Створити <span>→</span></>}
             </button>
           </form>
           <div class="form-footer">
@@ -108,7 +108,7 @@ export const OrdersPage = view({
           </div>
           <p class="error" role="alert" data-error>
             {failureMessage(
-              (createOrder.invalid() ? undefined : createOrder().error) ??
+              (createOrder.invalid() ? undefined : createOrder.error()) ??
                 ordersData.error(),
             )}
           </p>

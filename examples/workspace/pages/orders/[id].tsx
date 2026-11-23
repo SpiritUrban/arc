@@ -8,18 +8,15 @@ import { money } from "../../ui.ts";
 
 export const title = "Деталі замовлення — ARC Workspace";
 
-export default function OrderDetail({ own, params, query }: PageContext<"id">) {
+export default function OrderDetail({ mutation, query }: PageContext<"id">) {
   const order = query(orderClient, GetOrder);
-  const mutationOptions = {
-    params,
-    update: [order.replace(), ordersData.replaceBy("id")],
-  };
-  const updateOrder = own(orderClient.mutation(UpdateOrder, mutationOptions));
-  const cancelOrder = own(orderClient.mutation(CancelOrder, {
-    ...mutationOptions,
+  const update = [order.replace(), ordersData.replaceBy("id")];
+  const updateOrder = mutation(orderClient, UpdateOrder, { update });
+  const cancelOrder = mutation(orderClient, CancelOrder, {
     id: "orders.detail-cancel.submit",
+    update,
     updateOnError: "ORDER_ALREADY_CANCELLED",
-  }));
+  });
 
   function renderSummary(saved: ReturnType<typeof order.data>) {
     if (!saved) return null;
@@ -32,7 +29,7 @@ export default function OrderDetail({ own, params, query }: PageContext<"id">) {
         {!saved.cancelled && (
           <form onSubmit={cancelOrder}>
             <button class="button secondary" type="submit">
-              {cancelOrder().running ? "Скасовуємо…" : "Скасувати замовлення"}
+              {cancelOrder.running() ? "Скасовуємо…" : "Скасувати замовлення"}
             </button>
           </form>
         )}
@@ -55,7 +52,7 @@ export default function OrderDetail({ own, params, query }: PageContext<"id">) {
               ? "Замовлення вже скасовано."
               : cancelOrder.failed("ORDER_NOT_FOUND")
                 ? "Замовлення не знайдено."
-                : cancelOrder().error
+                : cancelOrder.error()
                   ? "Не вдалося скасувати замовлення."
                   : ""}
           </p>
@@ -64,14 +61,14 @@ export default function OrderDetail({ own, params, query }: PageContext<"id">) {
               <h2>Редагувати замовлення</h2>
               <OrderFields mutation={updateOrder} order={order.data} />
               <button class="button primary" type="submit">
-                {updateOrder().running ? "Зберігаємо…" : "Зберегти зміни"}
+                {updateOrder.running() ? "Зберігаємо…" : "Зберегти зміни"}
               </button>
               <p class="error" role="alert">
                 {updateOrder.failed("ORDER_ALREADY_CANCELLED")
                   ? "Скасоване замовлення не можна редагувати."
                   : updateOrder.failed("ORDER_NOT_FOUND")
                     ? "Замовлення не знайдено."
-                    : updateOrder().error && !updateOrder.invalid()
+                    : updateOrder.error() && !updateOrder.invalid()
                       ? "Не вдалося зберегти замовлення."
                       : ""}
               </p>

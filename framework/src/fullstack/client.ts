@@ -370,6 +370,9 @@ type KeyedMutationOptions<C extends OperationContract, Key extends MutationKey> 
   key?: (input: Infer<C["input"]>) => Key;
 };
 
+export type NamedMutationOptions<C extends OperationContract, Key extends MutationKey> =
+  NamedFormOptions<C> & KeyedMutationOptions<C, Key>;
+
 export type Mutation<
   C extends OperationContract,
   Field extends string = never,
@@ -566,7 +569,7 @@ function bindRemoteForm(defaults: RemoteFormDefaults) {
 
 function bindMutation(defaults: RemoteFormDefaults) {
   function mutate<C extends OperationContract, Key extends MutationKey = MutationKey>(
-    contract: C, options?: NamedFormOptions<C> & KeyedMutationOptions<C, Key>,
+    contract: C, options?: NamedMutationOptions<C, Key>,
   ): Mutation<C, never, Key>;
   function mutate<C extends OperationContract, Key extends MutationKey = MutationKey>(
     contract: C, options: ReactiveFormOptions<C> & KeyedMutationOptions<C, Key>,

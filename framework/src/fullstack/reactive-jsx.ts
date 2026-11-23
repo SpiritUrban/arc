@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import type * as TS from "typescript";
 
 const require = createRequire(import.meta.url);
-const queryProjectionNames = new Set(["data", "loading", "error", "stale"]);
+const projectionNames = new Set(["data", "loading", "error", "stale", "running", "result"]);
 
 export function compileReactiveJsx(
   source: string,
@@ -203,13 +203,14 @@ export function compileReactiveJsx(
                   if (
                     child.arguments.length === 0 &&
                     ts.isIdentifier(callee.expression) &&
-                    queryProjectionNames.has(method)
+                    projectionNames.has(method)
                   ) {
                     reference = callee;
                   } else if (
                     (method === "get" && child.arguments.length === 0) ||
                     (method === "failed" && (child.arguments.length === 1 || child.arguments.length === 2)) ||
-                    ((method === "invalid" || method === "pending" || method === "outcome") &&
+                    (method === "invalid" && child.arguments.length <= 1) ||
+                    ((method === "pending" || method === "outcome") &&
                       child.arguments.length === 1)
                   ) {
                     reference = callee.expression;

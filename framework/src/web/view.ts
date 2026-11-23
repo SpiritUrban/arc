@@ -1,4 +1,6 @@
 import { compileArchitecture, type GraphDefinition } from "../neutral/graph.js";
+import type { OperationContract } from "../neutral/contracts.js";
+import type { Mutation, NamedMutationOptions } from "../fullstack/client.js";
 import {
   browserEvent,
   identity,
@@ -662,6 +664,15 @@ export interface PageContext<Param extends string = string> {
     client: { query(...args: Args): T },
     ...args: Args
   ): T;
+  mutation<C extends OperationContract, Key extends string | number = string | number>(
+    client: {
+      mutation<Contract extends OperationContract, K extends string | number>(
+        contract: Contract, options?: NamedMutationOptions<Contract, K>,
+      ): Mutation<Contract, never, K>;
+    },
+    contract: C,
+    options?: NamedMutationOptions<NoInfer<C>, Key>,
+  ): Mutation<C, never, Key>;
 }
 
 export interface PageLayoutContext<Param extends string = string> extends PageContext<Param> {
@@ -683,6 +694,11 @@ export function pageView(
         : { ...(args[1] as object), params: (args[1] as { params?: unknown } | undefined)?.params ?? params };
       return context.query(client, args[0], options);
     }) as PageContext["query"],
+    mutation: (client, contract, options) =>
+      context.own(client.mutation(contract, {
+        ...options,
+        params: options?.params ?? params as NonNullable<typeof options>["params"],
+      })),
   }));
 }
 

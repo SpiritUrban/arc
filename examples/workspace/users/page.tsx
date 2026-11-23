@@ -21,7 +21,6 @@ const updateUser = mutation(UpdateUser, {
 function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
   const editing = user !== undefined;
   const form = editing ? updateUser : addUser;
-  const { running, error } = form;
   const title = editing ? "Редагувати вибраного користувача" : "Новий користувач";
   const submitLabel = editing ? "Зберегти користувача" : "＋ Додати користувача";
   const pendingLabel = editing ? "Зберігаємо…" : "Додаємо…";
@@ -29,9 +28,9 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
 
   function message() {
     if (!editing)
-      return failureMessage((duplicate() ? undefined : error()) ?? users.error());
+      return failureMessage((duplicate() ? undefined : form.error()) ?? users.error());
     if (updateUser.failed("USER_NOT_FOUND")) return "Користувача не знайдено.";
-    return duplicate() || form.invalid() ? "" : failureMessage(error());
+    return duplicate() || form.invalid() ? "" : failureMessage(form.error());
   }
 
   return (
@@ -78,7 +77,7 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
             : editing && form.invalid("email") && "Перевірте адресу email."}
         </p>
         <button class="button secondary" type="submit">
-          {running() ? pendingLabel : submitLabel}
+          {form.running() ? pendingLabel : submitLabel}
         </button>
         <p class="error" role="alert" data-error>{message()}</p>
       </form>

@@ -183,6 +183,9 @@ test("Workspace order update has consistent identities and impact in build and S
     assert.ok(graph.edges.some(({ from, to, kind }) =>
       from === mutation && to.startsWith("page:pages/orders/[id].dom.") && kind === "BINDS",
     ));
+    assert.ok(graph.edges.some(({ from, to, kind }) =>
+      from === "orders.create.submit.running" && to.startsWith("orders.page.dom.") && kind === "BINDS",
+    ));
     assert.ok(affected);
     for (const consumer of [mutation, "http:PUT:/orders/:id", "orders.get.query", "orders.list.query"]) {
       assert.ok(affected.includes(consumer), consumer);
