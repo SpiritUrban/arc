@@ -48,30 +48,23 @@ const cancelOrder = orderClient.mutation(CancelOrder, {
   updateOnError: "ORDER_ALREADY_CANCELLED",
 });
 
-export const visibleOrders = derive({
-  id: "orders.visible",
-  from: ordersData.data,
-  compute: (orders) => orders ?? [],
-});
+export const visibleOrders = derive("orders.visible", ordersData.data, (orders) => orders ?? []);
 
 export const OrdersPage = view({
   id: "orders.page",
   needs: cancelOrder,
   state: { quantity: "1", search: "", status: "all" },
   template({ quantity, search, status }, { own }) {
-    const history = own(derive({
-      id: "orders.page.history",
-      from: [visibleOrders, search, status],
-      compute(orders, search, status) {
-        const term = search.trim().toLowerCase();
-        return {
-          filtering: Boolean(term) || status !== "all",
-          rows: orders.filter((order) =>
-            order.product.toLowerCase().includes(term) &&
-            (status === "all" || order.cancelled === (status === "cancelled")),
-          ),
-        };
-      },
+    const { loading, error } = ordersData;
+    const history = own(derive("orders.page.history", [visibleOrders, search, status], (orders, search, status) => {
+      const term = search.trim().toLowerCase();
+      return {
+        filtering: Boolean(term) || status !== "all",
+        rows: orders.filter((order) =>
+          order.product.toLowerCase().includes(term) &&
+          (status === "all" || order.cancelled === (status === "cancelled")),
+        ),
+      };
     }));
 
     return (
@@ -117,7 +110,7 @@ export const OrdersPage = view({
           <p class="error" role="alert" data-error>
             {failureMessage(
               (createOrder.invalid() ? undefined : createOrder().error) ??
-                ordersData().error,
+                error(),
             )}
           </p>
         </div>
@@ -135,7 +128,7 @@ export const OrdersPage = view({
               class="muted"
               data-loading
               role="status"
-            >{ordersData().loading ? "Завантажуємо замовлення…" : ""}</span>
+            >{loading() ? "Завантажуємо замовлення…" : ""}</span>
           </div>
           <div class="order-filters">
             <label class="search-label">
@@ -186,7 +179,7 @@ export const OrdersPage = view({
               </tbody>
             </table>
           </div>
-          {history().rows.length === 0 && !ordersData().loading && (
+          {history().rows.length === 0 && !loading() && (
             <div class="empty order-empty" data-empty>
               <span class="empty-symbol">▤</span>
               <strong>

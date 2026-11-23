@@ -11,8 +11,6 @@ export const selectedUser = state({
 
 export const users = query(ListUsers);
 
-export const activeUser = derive({
-  id: "users.active",
-  from: [users.data, selectedUser],
-  compute: (users, id) => users?.find((user) => user.id === id),
-});
+export const activeUser = derive("users.active", [users.data, selectedUser],
+  (users, id) => users?.find((user) => user.id === id),
+);

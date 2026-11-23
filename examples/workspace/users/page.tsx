@@ -6,6 +6,8 @@ import { CreateUser, UpdateUser, type User } from "./contracts.ts";
 import { failureMessage } from "../ui.ts";
 import { activeUser, selectedUser, users } from "../user-selection.ts";
 
+const { data, loading, error: loadError } = users;
+
 // CreateUser — спільний контракт. На сервері його виконує createUser у ./server.ts.
 export const addUser = mutation(CreateUser, {
   needs: selectedUser,
@@ -29,7 +31,7 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
 
   function message() {
     if (!editing)
-      return failureMessage(duplicate() ? users().error : error() ?? users().error);
+      return failureMessage((duplicate() ? undefined : error()) ?? loadError());
     if (updateUser.failed("USER_NOT_FOUND")) return "Користувача не знайдено.";
     return duplicate() || form.invalid() ? "" : failureMessage(error());
   }
@@ -95,15 +97,11 @@ export const UsersPage = view({
   needs: [addUser, updateUser],
   state: { search: "" },
   template({ search }, { own }) {
-    const visible = own(derive({
-      id: "users.page.visible",
-      from: [users.data, search],
-      compute(users, search) {
-        const term = search.toLowerCase();
-        return (users ?? []).filter((user) =>
-          `${user.name} ${user.email}`.toLowerCase().includes(term),
-        );
-      },
+    const visible = own(derive("users.page.visible", [data, search], (users, search) => {
+      const term = search.toLowerCase();
+      return (users ?? []).filter((user) =>
+        `${user.name} ${user.email}`.toLowerCase().includes(term),
+      );
     }));
 
     return (
@@ -116,9 +114,9 @@ export const UsersPage = view({
           <span class="badge">LIVE</span>
         </div>
         <p class="muted" data-status>
-          {users().loading
+          {loading()
             ? "Оновлюємо список…"
-            : `${users().data?.length ?? 0} у вашому просторі`}
+            : `${data()?.length ?? 0} у вашому просторі`}
         </p>
         <label class="search-label">
           <span>Пошук</span>
@@ -135,9 +133,7 @@ export const UsersPage = view({
             <button
               key={user.id}
               type="button"
-              class={
-                selectedUser() === user.id ? "user-row selected" : "user-row"
-              }
+              class="user-row"
               data-user={user.id}
               aria-pressed={selectedUser() === user.id}
               onClick={() => selectedUser.set(user.id)}
@@ -147,9 +143,7 @@ export const UsersPage = view({
                 <strong>{user.name}</strong>
                 <small>{user.email}</small>
               </span>
-              <span class="select-mark">
-                {selectedUser() === user.id ? "✓" : "→"}
-              </span>
+              <span class="select-mark" aria-hidden="true"></span>
             </button>
           ))}
         </div>

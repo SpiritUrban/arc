@@ -191,11 +191,24 @@ type DerivedValues<From extends DerivedFrom> = From extends Readable<infer Value
     ? { [K in keyof From]: From[K] extends Readable<infer Value> ? Value : never }
     : never;
 
-export function derive<const From extends DerivedFrom, T>(def: {
+type DeriveOptions<From extends DerivedFrom, T> = {
   id: string;
   from: From;
   compute: (...values: DerivedValues<From>) => T;
-}): Computed<T> {
+};
+
+export function derive<const From extends DerivedFrom, T>(
+  id: string, from: From, compute: DeriveOptions<From, T>["compute"],
+): Computed<T>;
+export function derive<const From extends DerivedFrom, T>(
+  options: DeriveOptions<From, T>,
+): Computed<T>;
+export function derive<const From extends DerivedFrom, T>(
+  ...args: [DeriveOptions<From, T>] | [string, From, DeriveOptions<From, T>["compute"]]
+): Computed<T> {
+  const def = args.length === 1
+    ? args[0]
+    : { id: args[0], from: args[1], compute: args[2] };
   const sources: readonly Readable<any>[] = Array.isArray(def.from)
     ? def.from
     : [def.from as Readable<any>];

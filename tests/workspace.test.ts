@@ -249,12 +249,14 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     assert.ok(edges.some((e) =>
       e.from === "users.list.query" && e.to === "users.list" && e.kind === "REMOTE_CALLS",
     ));
-    assert.ok(edges.some((e) =>
-      e.from === "users.list.query" &&
-      e.to.startsWith("users.page.dom.") &&
-      e.to.endsWith(".render") &&
-      e.kind === "BINDS",
-    ));
+    for (const from of ["users.list.query.loading", "users.list.query.data"]) {
+      assert.ok(edges.some((edge) =>
+        edge.from === from &&
+        edge.to.startsWith("users.page.dom.") &&
+        edge.to.endsWith(".render") &&
+        edge.kind === "BINDS",
+      ), from);
+    }
     for (const from of ["orders.list.query", "orders.create.submit"]) {
       assert.ok(edges.some((edge) =>
         edge.from === from &&
@@ -432,11 +434,11 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     assert.deepEqual(userFields.map((field) => field.value), ["", ""]);
     await waitFor(() =>
       document
-        .querySelector("[data-user].selected")!
+        .querySelector('[data-user][aria-pressed="true"]')!
         .textContent!.includes("<New User>"),
     );
     assert.equal(
-      document.querySelector("[data-user].selected")!.querySelector("new"),
+      document.querySelector('[data-user][aria-pressed="true"]')!.querySelector("new"),
       null,
       "user markup must be escaped",
     );
@@ -466,7 +468,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       document.querySelector("[data-rows] strong")!.textContent,
       "ARC Notebook",
     );
-    const userId = document.querySelector("[data-user].selected")!.getAttribute("data-user");
+    const userId = document.querySelector('[data-user][aria-pressed="true"]')!.getAttribute("data-user");
     const ordersResponse = await handler(app)(
       new Request("http://localhost/orders", {
         headers: { authorization: `Bearer ${userId}` },
@@ -520,7 +522,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       "Duplicate User",
     );
     assert.match(
-      document.querySelector("[data-user].selected")!.textContent!,
+      document.querySelector('[data-user][aria-pressed="true"]')!.textContent!,
       /New User/,
     );
     input("[data-name]", "x");
@@ -531,17 +533,17 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     assert.equal(document.querySelector("[data-email]")!.getAttribute("aria-invalid"), "false");
     assert.equal(document.querySelector("#users [data-email-error]")!.textContent, "");
     assert.equal(document.querySelectorAll("[data-user]").length, 2);
-    const newUserRow = document.querySelector("[data-user].selected")!;
+    const newUserRow = document.querySelector('[data-user][aria-pressed="true"]')!;
     const demoUserRow = document.querySelector(
       '[data-user="00000000-0000-4000-8000-000000000001"]',
     )!;
     demoUserRow.dispatchEvent(new window.Event("click", { bubbles: true }));
     await waitFor(() =>
       document
-        .querySelector("[data-user].selected")!
+        .querySelector('[data-user][aria-pressed="true"]')!
         .textContent!.includes("Demo User"),
     );
-    assert.equal(document.querySelector("[data-user].selected"), demoUserRow);
+    assert.equal(document.querySelector('[data-user][aria-pressed="true"]'), demoUserRow);
     assert.equal(demoUserRow.getAttribute("aria-pressed"), "true");
     assert.equal(newUserRow.getAttribute("aria-pressed"), "false");
     await waitFor(
