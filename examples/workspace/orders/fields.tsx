@@ -6,7 +6,7 @@ type OrderInput = Infer<typeof CreateOrder.input>;
 
 interface OrderFieldsProps {
   mutation: { invalid(field: keyof OrderInput): boolean };
-  order?: () => { data?: OrderInput };
+  order?: () => OrderInput | undefined;
   quantity?: Signal<string>;
 }
 
@@ -22,7 +22,7 @@ export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
           maxlength="100"
           placeholder="Наприклад, блокнот ARC"
           name="product"
-          value={order?.().data?.product}
+          value={order?.()?.product}
           aria-invalid={mutation.invalid("product")}
         />
         <span class="error" role="alert" data-product-error>
@@ -40,7 +40,7 @@ export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
             min="1"
             max="100"
             step="1"
-            value={order?.().data && String(order().data?.quantity)}
+            value={order?.()?.quantity}
             aria-invalid={mutation.invalid("quantity")}
             {...quantityBinding}
           />

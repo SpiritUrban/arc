@@ -2,7 +2,7 @@ import {
   type OperationContract,
   type BusinessError,
 } from "../neutral/contracts.js";
-import { ValidationError, type Infer } from "../schema.js";
+import { ValidationError, type Infer, type Schema } from "../schema.js";
 import { formValue } from "../web/form-value.js";
 import {
   browserEvent,
@@ -161,6 +161,12 @@ export function integerField(initial: number) {
   return { initial: String(initial), parse: Number };
 }
 
+type UpdateErrorCode<C extends OperationContract> = {
+  [Code in keyof C["errors"] & string]: C["errors"][Code] extends {
+    details: Schema<infer Details>;
+  } ? [Details] extends [Infer<C["output"]>] ? Code : never : never;
+}[keyof C["errors"] & string];
+
 type RemoteFormOptions<C extends OperationContract> = {
   id?: string;
   needs?: GraphNeeds;
@@ -171,6 +177,8 @@ type RemoteFormOptions<C extends OperationContract> = {
   /** Apply local state changes after a successful response, before refreshing resources. */
   onSuccess?: (value: Infer<C["output"]>, ctx: ActionContext) => void;
   update?: QueryUpdate<Infer<C["output"]>> | readonly QueryUpdate<Infer<C["output"]>>[];
+  /** Also apply update using the typed details of these business errors. */
+  updateOnError?: UpdateErrorCode<NoInfer<C>> | readonly UpdateErrorCode<NoInfer<C>>[];
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
 };
@@ -330,7 +338,12 @@ type RemoteFormDefaults = {
 };
 
 type NamedFormOptions<C extends OperationContract> =
-  RemoteFormOptions<C> & { fields?: never; input?: never };
+  RemoteFormOptions<C> & {
+    fields?: never;
+    input?: never;
+    /** Supply contract fields from context, such as an ID from the page route. */
+    params?: Partial<NoInfer<Infer<C["input"]>>>;
+  };
 
 type ReactiveFormOptions<C extends OperationContract> = RemoteFormOptions<C> & {
   fields: Infer<C["input"]> extends Record<string, unknown>
@@ -347,6 +360,7 @@ type MappedFormOptions<C extends OperationContract, Field extends string> =
 
 type FormOptions<C extends OperationContract, Field extends string> =
   RemoteFormOptions<C> & {
+    params?: Partial<Infer<C["input"]>>;
     fields?: Readonly<Record<Field, FormField<unknown>>>;
     input?: (values: Readonly<Record<Field, string>>) => Infer<C["input"]>;
   };
@@ -400,7 +414,9 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     baseUrl = defaults.baseUrl,
     fetch = defaults.fetch,
     input,
+    params,
     onSuccess,
+    updateOnError,
   } = options;
   const refreshOption = options.refresh ?? options.invalidates;
   const refresh: readonly WebResource<any, any>[] = refreshOption === undefined
@@ -413,6 +429,9 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     : Array.isArray(options.update)
       ? options.update
       : [options.update as QueryUpdate<Infer<C["output"]>>];
+  const updateErrors = new Set<string>(
+    typeof updateOnError === "string" ? [updateOnError] : updateOnError,
+  );
   const fieldOptions = options.fields;
   const properties = callable && !fieldOptions ? contract.input.json.properties : undefined;
   const numericFields = new Set(
@@ -463,13 +482,26 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     invalidates: refresh,
     async run(request, ctx) {
       const apply = updates.map((update) => update.capture());
-      if (request && directInput in request) {
-        const result = await client.call(contract.input.parse(request[directInput]), ctx);
-        if (result.ok && !ctx.signal.aborted) batch(() => {
-          for (const applyUpdate of apply) applyUpdate(result.value, ctx.trace);
-          onSuccess?.(result.value, ctx);
-        });
+      async function execute(input: Infer<C["input"]>, reset?: () => void) {
+        const result = await client.call(input, ctx);
+        if (ctx.signal.aborted) return result;
+        if (result.ok) {
+          batch(() => {
+            reset?.();
+            for (const update of apply) update(result.value, ctx.trace);
+            onSuccess?.(result.value, ctx);
+          });
+        } else if (result.kind === "business_error" && updateErrors.has(result.error)) {
+          // The selected error codes declare details compatible with the output.
+          const value = result.details as Infer<C["output"]>;
+          batch(() => {
+            for (const update of apply) update(value, ctx.trace);
+          });
+        }
         return result;
+      }
+      if (request && directInput in request) {
+        return execute(contract.input.parse(request[directInput]));
       }
       const submission = request &&
         readNamedSubmission(request, numericFields, booleanFields, arrayFields);
@@ -479,7 +511,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
       if (!fieldOptions && !submission)
         throw new TypeError("Named-field forms must be submitted from an HTML form");
       const payload = submission
-        ? submission.values
+        ? { ...submission.values, ...params }
         : input
         ? input(values)
         : (Object.fromEntries(
@@ -489,19 +521,13 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
             ]),
           ) as Infer<C["input"]>);
       const validated = submission || callable ? contract.input.parse(payload) : payload;
-      const result = await client.call(validated, ctx);
-      if (result.ok && !ctx.signal.aborted) {
-        batch(() => {
-          for (const { name, initial } of definitions) {
-            if (fields[name].get() === values[name])
-              ctx.set(fields[name], initial);
-          }
-          submission?.reset(ctx);
-          for (const applyUpdate of apply) applyUpdate(result.value, ctx.trace);
-          onSuccess?.(result.value, ctx);
-        });
-      }
-      return result;
+      return execute(validated, () => {
+        for (const { name, initial } of definitions) {
+          if (fields[name].get() === values[name])
+            ctx.set(fields[name], initial);
+        }
+        submission?.reset(ctx);
+      });
     },
   };
   const submit = callable ? action({ ...definition, callable: true }) : action(definition);

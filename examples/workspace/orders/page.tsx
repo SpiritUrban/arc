@@ -3,7 +3,7 @@
 import { derive, view, type Signal } from "@arc/framework/web";
 import { ListOrders, CreateOrder, CancelOrder } from "./contracts.ts";
 import { activeUser } from "../user-selection.ts";
-import { cancelAndReconcile, orderClient } from "./client.ts";
+import { orderClient } from "./client.ts";
 import { OrderFields } from "./fields.tsx";
 import { money, failureMessage } from "../ui.ts";
 
@@ -50,11 +50,7 @@ function renderOrdersPage(
         {/* ARC перехоплює submit, викликає createOrder і залишає користувача на цій сторінці. */}
         <form class="order-form" data-form novalidate onSubmit={createOrder}>
           <OrderFields mutation={createOrder} quantity={quantity} />
-          <button
-            class="button primary"
-            type="submit"
-            disabled={createOrder().running}
-          >
+          <button class="button primary" type="submit">
             {createOrder().running ? "Створюємо…" : <>Створити <span>→</span></>}
           </button>
         </form>
@@ -136,10 +132,7 @@ function renderOrdersPage(
                           type="button"
                           data-cancel-order
                           disabled={cancelOrder.pending(order.id)}
-                          onClick={() => {
-                            if (!cancelOrder.pending(order.id))
-                              return cancelAndReconcile(cancelOrder, order.id, [cancelListUpdate]);
-                          }}
+                          onClick={() => cancelOrder.run({ id: order.id })}
                         >
                           {cancelOrder.pending(order.id) ? "Скасовуємо…" : "Скасувати"}
                         </button>
@@ -187,10 +180,10 @@ export const createOrder = orderClient.mutation(CreateOrder, {
   update: ordersData.insertBy("id"),
 });
 
-const cancelListUpdate = ordersData.replaceBy("id");
 const cancelOrder = orderClient.mutation(CancelOrder, {
   key: ({ id }) => id,
-  update: cancelListUpdate,
+  update: ordersData.replaceBy("id"),
+  updateOnError: "ORDER_ALREADY_CANCELLED",
 });
 
 export const visibleOrders = derive({
