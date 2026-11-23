@@ -149,14 +149,14 @@ test("Workspace startup, submit and stale-order diagnosis", async ({
         calls.map((req) => [new URL(req.url()).pathname, req.method()]),
       ).toEqual([
         [createOrder, "POST"],
-        [listOrders, react ? "GET" : "POST"],
+        ...(react ? [[listOrders, "GET"]] : []),
       ]);
       const responses = await Promise.all(calls.map((req) => req.response()));
       expect(responses.every((res) => res?.ok())).toBe(true);
       await Promise.all(responses.map((res) => res.finished()));
       const [write, read] = calls.map((req) => req.timing());
       expect(write.responseEnd).toBeGreaterThanOrEqual(0);
-      expect(read.responseEnd).toBeGreaterThanOrEqual(0);
+      if (read) expect(read.responseEnd).toBeGreaterThanOrEqual(0);
       const [submit, rowReady] = await page.evaluate(() =>
         ["workspace-submit", "workspace-order-row"].map(
           (name) =>
@@ -168,9 +168,13 @@ test("Workspace startup, submit and stale-order diagnosis", async ({
         submitMs: rowReady - submit,
         beforeWriteMs: write.startTime - submit,
         writeMs: write.responseEnd,
-        beforeReadMs: read.startTime - (write.startTime + write.responseEnd),
-        readMs: read.responseEnd,
-        afterReadMs: rowReady - (read.startTime + read.responseEnd),
+        ...(read
+          ? {
+              beforeReadMs: read.startTime - (write.startTime + write.responseEnd),
+              readMs: read.responseEnd,
+              afterReadMs: rowReady - (read.startTime + read.responseEnd),
+            }
+          : { afterWriteMs: rowReady - (write.startTime + write.responseEnd) }),
       };
       const response = responses[0];
       const traced =
@@ -188,9 +192,6 @@ test("Workspace startup, submit and stale-order diagnosis", async ({
           ...(traced && {
             createOperationMs: traced.server.find(
               ({ operation }) => operation === "orders.create",
-            ).duration,
-            listOperationMs: traced.server.find(
-              ({ operation }) => operation === "orders.list",
             ).duration,
           }),
         });
@@ -263,14 +264,14 @@ test("Workspace startup, submit and stale-order diagnosis", async ({
     delayMs,
     readyMs: stats(samples.map(({ readyMs }) => readyMs)),
     submitMs: stats(samples.map(({ submitMs }) => submitMs)),
+    submitRequests: { writes: 1, reads: react ? 1 : 0 },
     submitPhases: Object.fromEntries(
       [
         "beforeWriteMs",
         "writeMs",
-        "beforeReadMs",
-        "readMs",
-        "afterReadMs",
-        ...(!react ? ["createOperationMs", "listOperationMs"] : []),
+        ...(react
+          ? ["beforeReadMs", "readMs", "afterReadMs"]
+          : ["afterWriteMs", "createOperationMs"]),
       ].map((key) => [key, stats(samples.map((sample) => sample[key]))]),
     ),
     clientJs: samples.map(

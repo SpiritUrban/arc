@@ -40,7 +40,8 @@ export interface WebResource<T, I = unknown> extends Readable<
   activate(telemetry?: WebTelemetry): void;
   dispose(): void;
   relations?: GraphDefinition["relations"];
-  [captureResourceUpdate]?: () => (update: (data: T) => T, trace: TraceToken) => void;
+  [captureResourceUpdate]?: (options?: { refreshWhenMissing?: boolean }) =>
+    (update: (data: T) => T, trace: TraceToken) => void;
 }
 type WebResourceOptions<T, I> = {
   id: string;
@@ -140,7 +141,7 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
     loading: projections[1] as Computed<boolean>,
     error: projections[2] as Computed<unknown>,
     stale: projections[3] as Computed<boolean>,
-    [captureResourceUpdate]() {
+    [captureResourceUpdate]({ refreshWhenMissing = false } = {}) {
       const targetKey = key?.();
       return (update: (data: T) => T, trace: TraceToken) => {
         if (disposed) return;
@@ -179,6 +180,12 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
               });
             return next;
           });
+        else if (
+          refreshWhenMissing && active && Object.is(key?.(), targetKey) &&
+          (targetKey === undefined || cache?.get(targetKey)?.data === undefined) &&
+          (!Object.is(snapshotKey, targetKey) || readSnapshot().data === undefined)
+        )
+          void resource.refresh(trace);
       };
     },
     async refresh(trace: TraceToken = { traceId: identity() }) {

@@ -81,8 +81,8 @@ async function hold(page, pathname, matches, { delayResponse = false } = {}) {
     },
     async release() {
       unblock();
-      await page.unroute(urlMatches, handler);
       await Promise.all(delayed);
+      await page.unroute(urlMatches, handler);
     },
   };
 }
@@ -277,6 +277,83 @@ test("ORD-01–03 · form, filters, totals and a delayed owner query", async ({
   }
   await expect(page.getByText("Тут з’являться замовлення")).toBeVisible();
   await expect(orderRow(page, "Блокнот А5")).toHaveCount(0);
+});
+
+for (const listIncludesOrder of [false, true]) {
+  test(`ARC create during the first list read (row already in response: ${listIncludesOrder})`, async ({
+    page,
+    request,
+  }, info) => {
+    test.skip(isReact(info));
+    const { user } = await fixture(request, info, `Cold${listIncludesOrder}`, [
+      ["Existing order", 1],
+    ]);
+    const list = transport(info, "orders.list");
+    const isOwner = (req) => req.headers().authorization === `Bearer ${user.id}`;
+    const held = await hold(page, list, isOwner, {
+      delayResponse: !listIncludesOrder,
+    });
+    const reads = [];
+    page.on("request", (req) => {
+      if (new URL(req.url()).pathname === list && isOwner(req)) reads.push(req);
+    });
+    const product = "Created during cold read";
+    try {
+      await page.goto("/orders");
+      await userRow(page, user.name).click();
+      await held.request;
+      const form = createOrderForm(page);
+      await form.locator('[name="product"]').fill(product);
+      await form.getByRole("button", { name: /Створити/ }).click();
+      await expect(form.locator('[name="product"]')).toHaveValue("");
+      await expect(history(page).locator("tbody tr")).toHaveCount(0);
+    } finally {
+      await held.release();
+    }
+    await expect(orderRow(page, "Existing order")).toHaveCount(1);
+    await expect(orderRow(page, product)).toHaveCount(1);
+    expect(reads).toHaveLength(1);
+  });
+}
+
+test("ARC late create updates the original owner's cached list", async ({
+  page,
+  request,
+}, info) => {
+  test.skip(isReact(info));
+  const { user } = await fixture(request, info, "LateCreate", [
+    ["Original order", 1],
+  ]);
+  const product = "Late confirmed order";
+  await page.goto("/orders");
+  await userRow(page, user.name).click();
+  await expect(orderRow(page, "Original order")).toBeVisible();
+  const form = createOrderForm(page);
+  const create = await hold(page, transport(info, "orders.create"), () => true);
+  try {
+    await form.locator('[name="product"]').fill(product);
+    await form.getByRole("button", { name: /Створити/ }).click();
+    await create.request;
+    await userRow(page, "Demo User").click();
+    await expect(page.getByText("Тут з’являться замовлення")).toBeVisible();
+  } finally {
+    await create.release();
+  }
+  await expect(form.locator('[name="product"]')).toHaveValue("");
+  await expect(orderRow(page, product)).toHaveCount(0);
+
+  const returning = await hold(page, transport(info, "orders.list"), (req) =>
+    req.headers().authorization === `Bearer ${user.id}`,
+  );
+  try {
+    await userRow(page, user.name).click();
+    await returning.request;
+    await expect(orderRow(page, product)).toHaveCount(1);
+  } finally {
+    await returning.release();
+  }
+  await expect(page.locator("[data-loading]")).toBeEmpty();
+  await expect(orderRow(page, product)).toHaveCount(1);
 });
 
 test("ORD-04–06 · ownership, detail update and independent cancellation", async ({

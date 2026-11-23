@@ -230,7 +230,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       e.from === "orders.create.submit.remote" && e.to === "orders.create" && e.kind === "REMOTE_CALLS",
     ));
     assert.ok(edges.some((e) =>
-      e.from === "orders.create.submit" && e.to === "orders.list.query" && e.kind === "INVALIDATES",
+      e.from === "orders.create.submit" && e.to === "orders.list.query" && e.kind === "UPDATES",
     ));
     assert.ok(edges.some((e) =>
       e.from === "orders.cancel.submit" && e.to === "orders.list.query" && e.kind === "UPDATES",
@@ -441,6 +441,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     await waitFor(() => document.querySelector("[data-preview]")!.textContent!.includes("75"));
     const orderButton = document.querySelector<HTMLButtonElement>("#orders button[type=submit]")!;
     const releaseOrder = holdRequest("/_arc/call/orders.create");
+    const readsBeforeCreate = listOrderRequests;
     submit("#orders form");
     await waitFor(() => orderButton.disabled, "create order button disabled while submitting");
     releaseOrder();
@@ -450,6 +451,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
         .textContent!.includes("ARC Notebook"),
     );
     assert.equal(orderButton.disabled, false);
+    assert.equal(listOrderRequests, readsBeforeCreate);
     assert.match(document.querySelector("[data-amount]")!.textContent!, /75/);
     assert.equal(document.querySelector("[data-count]")!.textContent, "01");
     assert.equal(

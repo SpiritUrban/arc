@@ -769,6 +769,8 @@ type QueryUpdate<Row> = {
 export type RemoteQuery<C extends OperationContract> =
   RemoteResource<C> & (() => ResourceSnapshot<Infer<C["output"]>>) & {
     replaceBy(field: RowKey<QueryItem<C>>): QueryUpdate<QueryItem<C>>;
+    /** Append a confirmed new row to a loaded list, preserving any row with the same key. */
+    insertBy(field: RowKey<QueryItem<C>>): QueryUpdate<QueryItem<C>>;
   };
 
 type RemoteResourceOptions<C extends OperationContract> = {
@@ -884,6 +886,20 @@ function createRemoteResource<C extends OperationContract>(
             const next = data.slice();
             next[index] = row;
             return next as Infer<C["output"]>;
+          }, trace);
+        },
+      };
+    },
+    insertBy(field: RowKey<QueryItem<C>>): QueryUpdate<QueryItem<C>> {
+      return {
+        target: result,
+        capture() {
+          const apply = result[captureResourceUpdate]?.({ refreshWhenMissing: true });
+          return (row, trace) => apply?.((data) => {
+            if (!Array.isArray(data) ||
+                data.some((item: QueryItem<C>) => Object.is(item[field], row[field])))
+              return data;
+            return [...data, row] as Infer<C["output"]>;
           }, trace);
         },
       };
