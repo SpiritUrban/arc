@@ -184,8 +184,8 @@ export interface Computed<T> extends Readable<T> {
   dirty: boolean;
   recompute(): void;
 }
-type DerivedFrom = Readable<any> | readonly Readable<any>[];
-type DerivedValues<From extends DerivedFrom> = From extends Readable<infer Value>
+export type DerivedFrom = Readable<any> | readonly Readable<any>[];
+export type DerivedValues<From extends DerivedFrom> = From extends Readable<infer Value>
   ? [Value]
   : From extends readonly Readable<any>[]
     ? { [K in keyof From]: From[K] extends Readable<infer Value> ? Value : never }

@@ -155,7 +155,20 @@ const SearchPage = view({
 
 Для початкових примітивних значень достатньо об’єкта `state`. Якщо початковий стан треба обчислити або містить об’єкти, використовуйте фабрику `state: () => ({ ... })`. ARC викликає її для кожного монтування, тож тримайте без побічних ефектів. Кожен екземпляр отримує власні значення. Під час демонтажу ARC очищає їхні підписки, а Stand використовує стабільний ID `search.page.state.search`.
 
-Другий аргумент шаблону зі `state` містить `own`. Через `own(derive(id, sources, compute))` можна прив’язати обчислення до екземпляра view. ARC звільняє його разом із локальним станом. `derive` також приймає об’єкт `{ id, from, compute }`. [Список замовлень Workspace](../../examples/workspace/orders/page.tsx)
+Другий аргумент шаблону зі `state` і `PageContext` надають `derive(name, sources, compute)`. Передайте один сигнал або список джерел. ARC додає до імені префікс view, створює обчислення для кожного монтування та звільняє його під час демонтажу.
+
+```tsx
+const SearchPage = view({
+  id: "search.page",
+  state: { search: "" },
+  template({ search }, { derive }) {
+    const term = derive("term", search, (value) => value.trim().toLowerCase());
+    return <output>{term()}</output>;
+  },
+});
+```
+
+У графі це обчислення має ID `search.page.derived.term`. [Список замовлень Workspace](../../examples/workspace/orders/page.tsx)
 
 У кореневій функції сторінки використовуйте `local` із `PageContext`.
 

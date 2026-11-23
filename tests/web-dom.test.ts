@@ -53,22 +53,28 @@ test("JSX references add resource dependencies without running the expression", 
   app.dispose();
 });
 
-test("view-local state has a stable graph ID and a fresh value per mount", async () => {
+test("view-local state and derived values have stable IDs and independent mounts", async () => {
   const { document, window } = parseHTML('<div id="app"></div>');
   const target = document.querySelector("#app")!;
   const page = view({
     id: "search-page",
     state: () => ({ search: "" }),
-    template: ({ search }) => jsx("section", {
-      children: [
-        jsx("input", { "bind:value": search }),
-        jsx("output", { children: search }),
-      ],
-    }),
+    template({ search }, { derive }) {
+      const result = derive("result", search, (value) => value.toUpperCase());
+      return jsx("section", {
+        children: [
+          jsx("input", { "bind:value": search }),
+          jsx("output", { children: result }),
+        ],
+      });
+    },
   });
   const graph = compileArchitecture([page]);
   assert.ok(graph.edges.some((edge) =>
     edge.kind === "BINDS" && edge.from === "search-page.state.search",
+  ));
+  assert.ok(graph.edges.some((edge) =>
+    edge.kind === "BINDS" && edge.from === "search-page.derived.result",
   ));
 
   const first = mount(page, target);
@@ -79,7 +85,7 @@ test("view-local state has a stable graph ID and a fresh value per mount", async
   await tick();
   assert.deepEqual(
     Array.from(target.querySelectorAll("output"), (node) => node.textContent),
-    ["first", ""],
+    ["FIRST", ""],
   );
   first.unmount();
   secondInput.value = "second";
@@ -88,7 +94,7 @@ test("view-local state has a stable graph ID and a fresh value per mount", async
   const third = mount(page, target);
   assert.deepEqual(
     Array.from(target.querySelectorAll("output"), (node) => node.textContent),
-    ["second", ""],
+    ["SECOND", ""],
   );
   second.unmount();
   third.unmount();

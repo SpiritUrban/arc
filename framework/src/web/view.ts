@@ -33,7 +33,21 @@ import {
   type TemplateChild,
   type TemplateElement,
 } from "./jsx-runtime.js";
-import { graphNeeds, Scope, signal, trackReads, withWriteTrace, type GraphNeeds, type Readable, type Signal, type Writable } from "./reactive.js";
+import {
+  derive,
+  graphNeeds,
+  Scope,
+  signal,
+  trackReads,
+  withWriteTrace,
+  type Computed,
+  type DerivedFrom,
+  type DerivedValues,
+  type GraphNeeds,
+  type Readable,
+  type Signal,
+  type Writable,
+} from "./reactive.js";
 
 const projection = Symbol("ARC binding projection");
 const instantiateView = Symbol("ARC view instance");
@@ -577,7 +591,7 @@ type LocalState<Initial extends Record<string, unknown>> = {
 type LocalViewBase<Initial extends Record<string, unknown>> = Omit<
   ViewOptions, "template" | "bindings" | "setup"
 > & {
-  template(local: LocalState<Initial>, context: Pick<PageContext, "own">): TemplateElement;
+  template(local: LocalState<Initial>, context: Pick<PageContext, "derive" | "own">): TemplateElement;
   bindings?: never;
   setup?: never;
 };
@@ -589,7 +603,7 @@ type ScalarLocalViewOptions<Initial extends PrimitiveInitial> = Omit<
   ViewOptions, "template" | "bindings" | "setup"
 > & {
   state: Initial | (() => Initial);
-  template(value: Signal<Initial>, context: Pick<PageContext, "own">): TemplateElement;
+  template(value: Signal<Initial>, context: Pick<PageContext, "derive" | "own">): TemplateElement;
   bindings?: never;
   setup?: never;
 };
@@ -619,17 +633,17 @@ export function view<Initial extends Record<string, unknown>>(
   if (!("state" in options)) return buildView(options);
 
   const { state: initialize, template, ...def } = options;
-  return scopedView(def, ({ local, own }) => {
+  return scopedView(def, ({ local, derive, own }) => {
     const initial = typeof initialize === "function" ? initialize() : initialize;
     if (initial === null || typeof initial !== "object")
       return (template as ScalarLocalViewOptions<PrimitiveInitial>["template"])(
         local(initial as PrimitiveInitial, "value"),
-        { own },
+        { derive, own },
       );
     const fields = Object.fromEntries(
       Object.entries(initial).map(([key, value]) => [key, local(value, key)]),
     ) as LocalState<Initial>;
-    return (template as LocalViewBase<Initial>["template"])(fields, { own });
+    return (template as LocalViewBase<Initial>["template"])(fields, { derive, own });
   });
 }
 
@@ -656,6 +670,10 @@ export interface PageContext<Param extends string = string> {
   params: Readonly<Record<Param, string>>;
   local<T>(initial: T, name?: string): Signal<T>;
   own<T extends OwnedNode>(node: T): T;
+  /** Create a derived value owned by this view instance. */
+  derive<const From extends DerivedFrom, T>(
+    name: string, from: From, compute: (...values: DerivedValues<From>) => T,
+  ): Computed<T>;
   query<T extends OwnedNode, Contract>(
     client: { query(contract: Contract, options?: { params?: Readonly<Record<Param, string>> }): T },
     contract: Contract,
@@ -696,9 +714,10 @@ export function pageView(
       params: routeInput as NonNullable<Options["params"]>,
     };
   }
-  return scopedView({ id }, ({ local, own }) => template({
+  return scopedView({ id }, ({ local, derive, own }) => template({
     params,
     local,
+    derive,
     own,
     query: ((client: { query(...args: any[]): OwnedNode }, ...args: unknown[]) =>
       own(client.query(args[0], withRouteParams(args[0], args[1] as { params?: unknown } | undefined)))
@@ -712,11 +731,12 @@ type LocalFactory = <T>(initial: T, name?: string) => Signal<T>;
 
 function scopedView(
   def: Omit<LocalViewOptions<Record<string, unknown>>, "state" | "template">,
-  template: (context: Pick<PageContext, "local" | "own">) => TemplateElement,
+  template: (context: Pick<PageContext, "local" | "derive" | "own">) => TemplateElement,
 ): View {
   function create(scope?: Scope) {
     const fields = new Map<string, GraphDefinition>();
     const owned = ownedNodes(def.owned);
+    const derivedNames = new Set<string>();
     let building = true;
     const local: LocalFactory = (initial, name = String(fields.size)) => {
       if (!building) throw new Error(`Declare local state while building ${def.id}`);
@@ -733,8 +753,17 @@ function scopedView(
       }
       return node;
     };
+    const deriveLocal: PageContext["derive"] = (name, from, compute) => {
+      if (!building) throw new Error(`Declare derived values while building ${def.id}`);
+      if (derivedNames.has(name)) throw new Error(`Duplicate derived value ${name} in ${def.id}`);
+      const node = own(derive(`${def.id}.derived.${name}`, from, compute));
+      derivedNames.add(name);
+      return node;
+    };
     try {
-      const instance = buildView({ ...def, owned, template: () => template({ local, own }) });
+      const instance = buildView({
+        ...def, owned, template: () => template({ local, derive: deriveLocal, own }),
+      });
       instance.dependencies = [...(instance.dependencies ?? []), ...fields.values()];
       return instance;
     } catch (error) {

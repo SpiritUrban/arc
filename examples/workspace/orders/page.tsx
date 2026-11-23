@@ -51,8 +51,8 @@ export const OrdersPage = view({
   id: "orders.page",
   needs: cancelOrder,
   state: { quantity: String(quantityLimits.min), search: "", status: "all" },
-  template({ quantity, search, status }, { own }) {
-    const history = own(derive("orders.page.history", [visibleOrders, search, status], (orders, search, status) => {
+  template({ quantity, search, status }, { derive }) {
+    const history = derive("history", [visibleOrders, search, status], (orders, search, status) => {
       const term = search.trim().toLowerCase();
       return {
         filtering: Boolean(term) || status !== "all",
@@ -61,7 +61,7 @@ export const OrdersPage = view({
           (status === "all" || order.cancelled === (status === "cancelled")),
         ),
       };
-    }));
+    });
 
     return (
       <section id="orders" class="orders-panel">

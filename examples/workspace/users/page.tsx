@@ -1,6 +1,6 @@
 // Браузерна частина користувачів. Мережевий ресурс завантажує записи,
 // локальний пошук фільтрує їх, а вибір рядка змінює список замовлень.
-import { derive, view } from "@arc/framework/web";
+import { view } from "@arc/framework/web";
 import { mutation } from "@arc/framework/fullstack";
 import { CreateUser, UpdateUser, type User } from "./contracts.ts";
 import { failureMessage } from "../ui.ts";
@@ -93,13 +93,13 @@ export const UsersPage = view({
   id: "users.page",
   needs: [addUser, updateUser],
   state: { search: "" },
-  template({ search }, { own }) {
-    const visible = own(derive("users.page.visible", [users.data, search], (users, search) => {
+  template({ search }, { derive }) {
+    const visible = derive("visible", [users.data, search], (users, search) => {
       const term = search.toLowerCase();
       return (users ?? []).filter((user) =>
         `${user.name} ${user.email}`.toLowerCase().includes(term),
       );
-    }));
+    });
 
     return (
       <section id="users" class="panel users-panel">
