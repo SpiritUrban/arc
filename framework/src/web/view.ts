@@ -1,6 +1,12 @@
 import { compileArchitecture, type GraphDefinition } from "../neutral/graph.js";
 import type { OperationContract } from "../neutral/contracts.js";
-import type { Mutation, NamedMutationOptions } from "../fullstack/client.js";
+import type {
+  FieldKeyMutationOptions,
+  Mutation,
+  MutationFieldKey,
+  MutationKeyField,
+  NamedMutationOptions,
+} from "../fullstack/client.js";
 import {
   browserEvent,
   identity,
@@ -687,6 +693,15 @@ export interface PageContext<Param extends string = string> {
     client: { query(...args: Args): T },
     ...args: Args
   ): T;
+  mutation<C extends OperationContract, Field extends MutationKeyField<NoInfer<C>>>(
+    client: {
+      mutation<Contract extends OperationContract, K extends MutationKeyField<NoInfer<Contract>>>(
+        contract: Contract, options: FieldKeyMutationOptions<NoInfer<Contract>, K>,
+      ): Mutation<Contract, never, MutationFieldKey<Contract, K>>;
+    },
+    contract: C,
+    options: FieldKeyMutationOptions<NoInfer<C>, Field>,
+  ): Mutation<C, never, MutationFieldKey<C, Field>>;
   mutation<C extends OperationContract, Key extends string | number = string | number>(
     client: {
       mutation<Contract extends OperationContract, K extends string | number>(
@@ -727,8 +742,15 @@ export function pageView(
     query: ((client: { query(...args: any[]): OwnedNode }, ...args: unknown[]) =>
       own(client.query(args[0], withRouteParams(args[0], args[1] as { params?: unknown } | undefined)))
     ) as PageContext["query"],
-    mutation: (client, contract, options) =>
-      own(client.mutation(contract, withRouteParams(contract, options))),
+    mutation: <
+      Contract extends OperationContract,
+      Options extends { params?: unknown },
+      Result extends OwnedNode,
+    >(
+      client: { mutation(contract: Contract, options?: Options): Result },
+      contract: Contract,
+      options?: Options,
+    ) => own(client.mutation(contract, withRouteParams(contract, options) as Options)),
   }));
 }
 

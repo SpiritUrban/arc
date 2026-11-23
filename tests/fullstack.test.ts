@@ -37,7 +37,12 @@ test("page operations use only route parameters declared by the contract", () =>
   });
   const page = pageView("route.page", ({ query, mutation }) => {
     query(client, read);
-    mutation(client, write, { id: "route.write.default" });
+    const keyed = mutation(client, write, { id: "route.write.default", key: "id" });
+    assert.equal(keyed.pending("route"), false);
+    if (false) {
+      // @ts-expect-error The selected input field contains a string key.
+      keyed.pending(1);
+    }
     mutation(client, write, { params: { id: "explicit" } });
     return jsx("div", {});
   }, { owner: "workspace", id: "route" });

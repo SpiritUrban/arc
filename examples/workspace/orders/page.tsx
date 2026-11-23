@@ -40,7 +40,7 @@ export const createOrder = orderClient.mutation(CreateOrder, {
 });
 
 const cancelOrder = orderClient.mutation(CancelOrder, {
-  key: ({ id }) => id,
+  key: "id",
   update: ordersData.replaceBy("id"),
   updateOnError: "ORDER_ALREADY_CANCELLED",
 });

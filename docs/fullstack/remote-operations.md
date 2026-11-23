@@ -128,7 +128,7 @@ const cancelOrder = orderClient.mutation(CancelOrder, { refresh: orders });
 
 `run(input)` приймає вхід із контракту й перевіряє його перед запитом. Стан дії, бізнес-помилки, `onSuccess` і `refresh` працюють так само, як у формі. Прямий виклик із `onClick` продовжує трасу кліку у Stand.
 
-Для дій над рядками задайте ключ через `key: ({ id }) => id`. Тоді `cancelOrder.pending(order.id)` показує, чи триває виклик для цього рядка, включно з оновленням запитів із `refresh`. Повторний `run` із тим самим ключем повертає той самий Promise, а інші ключі можуть виконуватися паралельно.
+Для дій над рядками вкажіть поле входу через `key: "id"`. ARC виводить тип ключа з контракту. Поле має бути обов’язковим і містити рядок або число. Для обчислюваного ключа передайте функцію. Тоді `cancelOrder.pending(order.id)` показує, чи триває виклик для цього рядка, включно з оновленням запитів із `refresh`. Повторний `run` із тим самим ключем повертає той самий Promise, а інші ключі можуть виконуватися паралельно.
 
 `cancelOrder.failed("ORDER_ALREADY_CANCELLED", order.id)` перевіряє бізнес-помилку конкретного рядка. `cancelOrder.outcome(order.id)` повертає його останній результат і помилку або `undefined` до завершення виклику. Новий запуск очищає попередній результат лише для свого ключа.
 
@@ -157,7 +157,7 @@ const updateOrder = orderClient.mutation(UpdateOrder, {
 
 ```ts
 const cancelOrder = orderClient.mutation(CancelOrder, {
-  key: ({ id }) => id,
+  key: "id",
   update: orders.replaceBy("id"),
 });
 ```
@@ -168,7 +168,7 @@ const cancelOrder = orderClient.mutation(CancelOrder, {
 
 ```ts
 const cancelOrder = orderClient.mutation(CancelOrder, {
-  key: ({ id }) => id,
+  key: "id",
   update: ordersData.replaceBy("id"),
   updateOnError: "ORDER_ALREADY_CANCELLED",
 });

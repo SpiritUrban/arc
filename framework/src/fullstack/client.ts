@@ -375,6 +375,14 @@ type KeyedMutationOptions<C extends OperationContract, Key extends MutationKey> 
 export type NamedMutationOptions<C extends OperationContract, Key extends MutationKey> =
   NamedFormOptions<C> & KeyedMutationOptions<C, Key>;
 
+type MutationInput<C extends OperationContract> = Infer<C["input"]>;
+export type MutationKeyField<C extends OperationContract> = RowKey<MutationInput<C>>;
+export type MutationFieldKey<C extends OperationContract, Field extends MutationKeyField<C>> =
+  Extract<MutationInput<C>[Field], MutationKey>;
+
+export type FieldKeyMutationOptions<C extends OperationContract, Field extends MutationKeyField<C>> =
+  NamedFormOptions<C> & { key: Field };
+
 export type Mutation<
   C extends OperationContract,
   Field extends string = never,
@@ -578,6 +586,15 @@ function bindRemoteForm(defaults: RemoteFormDefaults) {
 }
 
 function bindMutation(defaults: RemoteFormDefaults) {
+  function mutate<C extends OperationContract, Field extends MutationKeyField<NoInfer<C>>>(
+    contract: C, options: FieldKeyMutationOptions<NoInfer<C>, Field>,
+  ): Mutation<C, never, MutationFieldKey<C, Field>>;
+  function mutate<C extends OperationContract, Field extends MutationKeyField<NoInfer<C>>>(
+    contract: C, options: ReactiveFormOptions<C> & { key: Field },
+  ): Mutation<C, Extract<keyof MutationInput<C>, string>, MutationFieldKey<C, Field>>;
+  function mutate<C extends OperationContract, Field extends string, Name extends MutationKeyField<NoInfer<C>>>(
+    contract: C, options: MappedFormOptions<C, Field> & { key: Name },
+  ): Mutation<C, Field, MutationFieldKey<C, Name>>;
   function mutate<C extends OperationContract, Key extends MutationKey = MutationKey>(
     contract: C, options?: NamedMutationOptions<C, Key>,
   ): Mutation<C, never, Key>;
@@ -588,10 +605,11 @@ function bindMutation(defaults: RemoteFormDefaults) {
     contract: C, options: MappedFormOptions<C, Field> & KeyedMutationOptions<C, Key>,
   ): Mutation<C, Field, Key>;
   function mutate<C extends OperationContract, Field extends string, Key extends MutationKey>(
-    contract: C, options: FormOptions<C, Field> & KeyedMutationOptions<C, Key> = {},
+    contract: C, options: FormOptions<C, Field> & { key?: ((input: MutationInput<C>) => Key) | MutationKeyField<C> } = {},
   ): Mutation<C, Field, Key> {
     const { fields, submit } = buildRemoteForm(contract, options, defaults, true);
-    const keyOf = options.key;
+    const key = options.key;
+    const keyOf = typeof key === "string" ? (input: MutationInput<C>) => input[key] as Key : key;
     const requests = new Map<Key, Promise<RemoteResult<C>>>();
     const outcomes = new Map<Key, MutationOutcome<C>>();
     const revision = keyOf && state({ id: `${submit.id}.pending`, initial: 0 });
