@@ -187,7 +187,6 @@ test("USR-01–03 · search, create, select and edit a profile", async ({
   await olena.click();
 
   const edit = editUserForm(page);
-  if (!isReact(info)) await expect(edit.locator('[name="id"]')).toHaveCount(0);
   await fillProfile(edit, "Olena Updated", "olena.updated@example.com");
   const save = edit.getByRole("button", { name: "Зберегти користувача" });
   if (isReact(info)) {

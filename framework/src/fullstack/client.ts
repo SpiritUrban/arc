@@ -337,14 +337,12 @@ type RemoteFormDefaults = {
   fetch?: typeof globalThis.fetch;
 };
 
-type FormParams<Input> = Partial<Input> | (() => Partial<Input>);
-
 type NamedFormOptions<C extends OperationContract> =
   RemoteFormOptions<C> & {
     fields?: never;
     input?: never;
-    /** Supply contract fields from context. A function is read at submit time. */
-    params?: FormParams<NoInfer<Infer<C["input"]>>>;
+    /** Supply contract fields from context, such as an ID from the page route. */
+    params?: Partial<NoInfer<Infer<C["input"]>>>;
   };
 
 type ReactiveFormOptions<C extends OperationContract> = RemoteFormOptions<C> & {
@@ -362,7 +360,7 @@ type MappedFormOptions<C extends OperationContract, Field extends string> =
 
 type FormOptions<C extends OperationContract, Field extends string> =
   RemoteFormOptions<C> & {
-    params?: FormParams<Infer<C["input"]>>;
+    params?: Partial<Infer<C["input"]>>;
     fields?: Readonly<Record<Field, FormField<unknown>>>;
     input?: (values: Readonly<Record<Field, string>>) => Infer<C["input"]>;
   };
@@ -520,7 +518,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
       if (!fieldOptions && !submission)
         throw new TypeError("Named-field forms must be submitted from an HTML form");
       const payload = submission
-        ? { ...submission.values, ...(typeof params === "function" ? params() : params) }
+        ? { ...submission.values, ...params }
         : input
         ? input(values)
         : (Object.fromEntries(
