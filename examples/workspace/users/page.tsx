@@ -19,27 +19,26 @@ const updateUser = mutation(UpdateUser, {
 });
 
 function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
-  const form = user ? updateUser : addUser;
+  const editing = user !== undefined;
+  const form = editing ? updateUser : addUser;
   const { running, error } = form;
-  const title = user ? "Редагувати вибраного користувача" : "Новий користувач";
-  const submitLabel = user ? "Зберегти користувача" : "＋ Додати користувача";
-  const pendingLabel = user ? "Зберігаємо…" : "Додаємо…";
+  const title = editing ? "Редагувати вибраного користувача" : "Новий користувач";
+  const submitLabel = editing ? "Зберегти користувача" : "＋ Додати користувача";
+  const pendingLabel = editing ? "Зберігаємо…" : "Додаємо…";
   const duplicate = () => form.failed("EMAIL_EXISTS");
-  const invalidName = () => user ? form.invalid("name") : undefined;
-  const invalidEmail = () => Boolean(user) && form.invalid("email");
 
   function message() {
-    if (duplicate()) return user ? "" : failureMessage(users().error);
-    if (!user) return failureMessage(error() ?? users().error);
+    if (!editing)
+      return failureMessage(duplicate() ? users().error : error() ?? users().error);
     if (updateUser.failed("USER_NOT_FOUND")) return "Користувача не знайдено.";
-    return updateUser.invalid() ? "" : failureMessage(error());
+    return duplicate() || form.invalid() ? "" : failureMessage(error());
   }
 
   return (
     <>
       <div class="panel-divider"></div>
       <h3>{title}</h3>
-      <form data-form={!user || undefined} data-edit-user={!!user || undefined} onSubmit={form}>
+      <form data-form={!editing || undefined} data-edit-user={editing || undefined} onSubmit={form}>
         {user && <input type="hidden" name="id" value={user.id} />}
         <label>
           Ім’я
@@ -49,13 +48,17 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
             required
             minlength="2"
             maxlength="100"
-            placeholder={user ? undefined : "Олена Коваль"}
+            placeholder={editing ? undefined : "Олена Коваль"}
             autocomplete="name"
             value={user?.name}
-            aria-invalid={invalidName()}
+            aria-invalid={editing ? form.invalid("name") : undefined}
           />
         </label>
-        {user && <p class="error" role="alert">{invalidName() && "Перевірте ім’я користувача."}</p>}
+        {editing && (
+          <p class="error" role="alert">
+            {form.invalid("name") && "Перевірте ім’я користувача."}
+          </p>
+        )}
         <label>
           Email
           <input
@@ -63,14 +66,16 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
             name="email"
             required
             type="email"
-            placeholder={user ? undefined : "olena@example.com"}
+            placeholder={editing ? undefined : "olena@example.com"}
             autocomplete="email"
             value={user?.email}
-            aria-invalid={duplicate() || invalidEmail()}
+            aria-invalid={duplicate() || (editing && form.invalid("email"))}
           />
         </label>
         <p class="error" role="alert" data-email-error>
-          {duplicate() ? "Користувач із такою поштою вже існує." : invalidEmail() && "Перевірте адресу email."}
+          {duplicate()
+            ? "Користувач із такою поштою вже існує."
+            : editing && form.invalid("email") && "Перевірте адресу email."}
         </p>
         <button class="button secondary" type="submit">
           {running() ? pendingLabel : submitLabel}
