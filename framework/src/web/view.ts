@@ -685,20 +685,21 @@ export function pageView(
   template: (context: PageContext) => TemplateElement,
   params: Readonly<Record<string, string>> = {},
 ): View {
-  return scopedView({ id }, (context) => template({
+  function withRouteParams<Options extends { params?: unknown }>(options?: Options) {
+    return {
+      ...options,
+      params: (options?.params ?? params) as NonNullable<Options["params"]>,
+    };
+  }
+  return scopedView({ id }, ({ local, own }) => template({
     params,
-    ...context,
-    query: ((client: { query(...args: any[]): OwnedNode }, ...args: unknown[]) => {
-      const options = args.length === 1
-        ? { params }
-        : { ...(args[1] as object), params: (args[1] as { params?: unknown } | undefined)?.params ?? params };
-      return context.query(client, args[0], options);
-    }) as PageContext["query"],
+    local,
+    own,
+    query: ((client: { query(...args: any[]): OwnedNode }, ...args: unknown[]) =>
+      own(client.query(args[0], withRouteParams(args[1] as { params?: unknown } | undefined)))
+    ) as PageContext["query"],
     mutation: (client, contract, options) =>
-      context.own(client.mutation(contract, {
-        ...options,
-        params: options?.params ?? params as NonNullable<typeof options>["params"],
-      })),
+      own(client.mutation(contract, withRouteParams(options))),
   }));
 }
 
@@ -706,7 +707,7 @@ type LocalFactory = <T>(initial: T, name?: string) => Signal<T>;
 
 function scopedView(
   def: Omit<LocalViewOptions<Record<string, unknown>>, "state" | "template">,
-  template: (context: Pick<PageContext, "local" | "own" | "query">) => TemplateElement,
+  template: (context: Pick<PageContext, "local" | "own">) => TemplateElement,
 ): View {
   function create(scope?: Scope) {
     const fields = new Map<string, GraphDefinition>();
@@ -727,10 +728,8 @@ function scopedView(
       }
       return node;
     };
-    const query: PageContext["query"] = (client: { query(...args: any[]): OwnedNode }, ...args: any[]) =>
-      own(client.query(...args));
     try {
-      const instance = buildView({ ...def, owned, template: () => template({ local, own, query }) });
+      const instance = buildView({ ...def, owned, template: () => template({ local, own }) });
       instance.dependencies = [...(instance.dependencies ?? []), ...fields.values()];
       return instance;
     } catch (error) {
