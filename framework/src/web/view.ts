@@ -31,7 +31,7 @@ import {
   type TemplateChild,
   type TemplateElement,
 } from "./jsx-runtime.js";
-import { graphNeeds, Scope, signal, trackReads, withWriteTrace, type GraphNeeds, type Readable, type Signal, type Writable } from "./reactive.js";
+import { derive, graphNeeds, Scope, signal, trackReads, withWriteTrace, type GraphNeeds, type Readable, type Signal, type Writable } from "./reactive.js";
 
 const projection = Symbol("ARC binding projection");
 const instantiateView = Symbol("ARC view instance");
@@ -571,10 +571,15 @@ type LocalState<Initial extends Record<string, unknown>> = {
   [Key in keyof Initial]: Signal<Initial[Key]>;
 };
 
+export interface ViewTemplateContext extends Pick<PageContext, "own"> {
+  /** Derive a value owned by this view. Its id is relative to the view id. */
+  derive: typeof derive;
+}
+
 type LocalViewBase<Initial extends Record<string, unknown>> = Omit<
   ViewOptions, "template" | "bindings" | "setup"
 > & {
-  template(local: LocalState<Initial>): TemplateElement;
+  template(local: LocalState<Initial>, context: ViewTemplateContext): TemplateElement;
   bindings?: never;
   setup?: never;
 };
@@ -586,7 +591,7 @@ type ScalarLocalViewOptions<Initial extends PrimitiveInitial> = Omit<
   ViewOptions, "template" | "bindings" | "setup"
 > & {
   state: Initial | (() => Initial);
-  template(value: Signal<Initial>): TemplateElement;
+  template(value: Signal<Initial>, context: ViewTemplateContext): TemplateElement;
   bindings?: never;
   setup?: never;
 };
@@ -616,16 +621,25 @@ export function view<Initial extends Record<string, unknown>>(
   if (!("state" in options)) return buildView(options);
 
   const { state: initialize, template, ...def } = options;
-  return scopedView(def, ({ local }) => {
+  return scopedView(def, ({ local, own }) => {
+    const context: ViewTemplateContext = {
+      own,
+      derive: ({ id, from, compute }) => own(derive({
+        id: `${def.id}.${id}`,
+        from,
+        compute,
+      })),
+    };
     const initial = typeof initialize === "function" ? initialize() : initialize;
     if (initial === null || typeof initial !== "object")
-      return (template as (value: Signal<PrimitiveInitial>) => TemplateElement)(
+      return (template as ScalarLocalViewOptions<PrimitiveInitial>["template"])(
         local(initial as PrimitiveInitial, "value"),
+        context,
       );
     const fields = Object.fromEntries(
       Object.entries(initial).map(([key, value]) => [key, local(value, key)]),
     ) as LocalState<Initial>;
-    return (template as (fields: LocalState<Initial>) => TemplateElement)(fields);
+    return (template as LocalViewBase<Initial>["template"])(fields, context);
   });
 }
 

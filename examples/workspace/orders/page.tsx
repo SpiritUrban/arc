@@ -1,6 +1,6 @@
 // Браузерна частина замовлень. Зміна користувача оновлює список,
 // а надсилання форми викликає серверну операцію створення.
-import { derive, view, type Signal } from "@arc/framework/web";
+import { derive, view, type Signal, type ViewTemplateContext } from "@arc/framework/web";
 import { ListOrders, CreateOrder, CancelOrder } from "./contracts.ts";
 import { activeUser } from "../user-selection.ts";
 import { orderClient } from "./client.ts";
@@ -8,18 +8,23 @@ import { OrderFields } from "./fields.tsx";
 import { money, failureMessage } from "../ui.ts";
 
 function renderOrdersPage(
-  quantity: Signal<string>,
-  search: Signal<string>,
-  status: Signal<string>,
+  { quantity, search, status }: Record<"quantity" | "search" | "status", Signal<string>>,
+  { derive }: ViewTemplateContext,
 ) {
-  function filteredOrders() {
-    const term = search().trim().toLowerCase();
-    const selectedStatus = status();
-    return visibleOrders().filter((order) =>
-      (!term || order.product.toLowerCase().includes(term)) &&
-      (selectedStatus === "all" || (selectedStatus === "cancelled") === order.cancelled),
-    );
-  }
+  const history = derive({
+    id: "history",
+    from: [visibleOrders, search, status],
+    compute(orders, search, status) {
+      const term = search.trim().toLowerCase();
+      return {
+        filtering: Boolean(term) || status !== "all",
+        rows: orders.filter((order) =>
+          order.product.toLowerCase().includes(term) &&
+          (status === "all" || order.cancelled === (status === "cancelled")),
+        ),
+      };
+    },
+  });
 
   return (
     <section class="orders-panel">
@@ -114,7 +119,7 @@ function renderOrdersPage(
               </tr>
             </thead>
             <tbody data-rows>
-              {filteredOrders().map((order) => (
+              {history().rows.map((order) => (
                   <tr key={order.id} data-order={order.id}>
                     <td>
                       <strong><a href={`/orders/${order.id}`}>{order.product}</a></strong>
@@ -150,16 +155,16 @@ function renderOrdersPage(
             </tbody>
           </table>
         </div>
-        {filteredOrders().length === 0 && !ordersData().loading && (
+        {history().rows.length === 0 && !ordersData().loading && (
           <div class="empty order-empty" data-empty>
             <span class="empty-symbol">▤</span>
             <strong>
-              {search().trim() || status() !== "all"
+              {history().filtering
                 ? "Замовлень не знайдено"
                 : "Тут з’являться замовлення"}
             </strong>
             <p>
-              {search().trim() || status() !== "all"
+              {history().filtering
                 ? "Змініть пошук або статус замовлення."
                 : "Створіть перше замовлення для цього користувача."}
             </p>
@@ -196,5 +201,5 @@ export const OrdersPage = view({
   id: "orders.page",
   needs: cancelOrder,
   state: { quantity: "1", search: "", status: "all" },
-  template: ({ quantity, search, status }) => renderOrdersPage(quantity, search, status),
+  template: renderOrdersPage,
 });
