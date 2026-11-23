@@ -277,7 +277,12 @@ export function derive<const From extends DerivedFrom, T>(
       throw new Error(`ARC-WEB-202 invalid reactive dependency: ${def.id}`);
     dep._children.add(node);
   }
-  node.recompute();
+  try {
+    node.recompute();
+  } catch (error) {
+    node.dispose();
+    throw error;
+  }
   return node;
 }
 export class Scope {

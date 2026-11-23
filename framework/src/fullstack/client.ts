@@ -865,6 +865,8 @@ export function setFrom<Output, Value>(
 
 export type RemoteQuery<C extends OperationContract> =
   RemoteResource<C> & (() => ResourceSnapshot<Infer<C["output"]>>) & {
+    /** Derive a value from the current query data, including when it is absent. */
+    select<T>(name: string, compute: (data: Infer<C["output"]> | undefined) => T): Computed<T>;
     replaceBy(field: RowKey<QueryItem<C>>): MutationUpdate<QueryItem<C>>;
     /** Append a confirmed new row to a loaded list, preserving any row with the same key. */
     insertBy(field: RowKey<QueryItem<C>>): MutationUpdate<QueryItem<C>>;
@@ -955,13 +957,25 @@ function createRemoteResource<C extends OperationContract>(
           } as RemoteResult<C>)
         : (snapshot.error as RemoteResult<C> | undefined),
   });
+  const selections = new Map<string, Computed<unknown>>();
+  let disposed = false;
   const dispose = result.dispose.bind(result);
   result.dispose = () => {
+    disposed = true;
+    for (const selection of selections.values()) selection.dispose();
+    selections.clear();
     projection.dispose();
     dispose();
   };
   return Object.assign(result, {
     result: projection,
+    select<T>(name: string, compute: (data: Infer<C["output"]> | undefined) => T): Computed<T> {
+      if (disposed) throw new Error(`Disposed query: ${result.id}`);
+      if (selections.has(name)) throw new Error(`Duplicate query selection ${name} in ${result.id}`);
+      const selection = derive(`${result.id}.select.${name}`, result.data, compute);
+      selections.set(name, selection);
+      return selection;
+    },
     replace(): MutationUpdate<Infer<C["output"]>> {
       return {
         target: result,

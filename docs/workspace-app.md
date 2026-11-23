@@ -63,7 +63,7 @@ page:orders/[id] → orders.update.submit → orders.update.submit.remote → or
   UPDATES → orders.get.query + orders.list.query
 page:orders/[id] → orders.detail-cancel.submit → orders.detail-cancel.submit.remote → orders.cancel [server]
   UPDATES → orders.get.query + orders.list.query
-orders.list.query → orders.visible → DOM bindings підсумку
+orders.list.query → orders.list.query.data → orders.list.query.select.visible → DOM bindings підсумку
 ```
 
 Після створення профілю ARC додає підтверджений запис до завантаженого списку. Якщо перше читання ще триває, ARC застосовує вставку до його результату або один раз повторює читання після помилки.

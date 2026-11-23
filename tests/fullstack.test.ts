@@ -10,6 +10,7 @@ import {
 import { internalTransport } from "../framework/src/fullstack/server.ts";
 import {
   mutation,
+  query,
   remoteClient,
   remoteCall,
   remoteApi,
@@ -52,6 +53,34 @@ test("page operations use only route parameters declared by the contract", () =>
   assert.equal(page.owned?.length, 3);
   for (const node of page.owned ?? []) node.dispose();
   source.dispose();
+});
+
+test("query selections react to data and share the query lifetime", async () => {
+  const read = operationContract({
+    id: "rows.read",
+    input: s.object({}),
+    output: s.array(s.string()),
+  });
+  const rows = query(read, {
+    fetch: async () => Response.json({ ok: true, value: ["first", "second"] }),
+  });
+  try {
+    assert.throws(() => rows.select("size", () => {
+      throw new Error("invalid selector");
+    }), /invalid selector/);
+    const size = rows.select("size", (data) => data?.length ?? 0);
+    assert.equal(size.id, "rows.read.query.select.size");
+    assert.equal(size(), 0);
+    assert.equal(rows.data(), undefined);
+    await rows.refresh();
+    assert.equal(size(), 2);
+    assert.deepEqual(rows.data(), ["first", "second"]);
+    rows.dispose();
+    assert.throws(() => size.subscribe(() => {}), /Disposed derived/);
+    assert.throws(() => rows.select("again", () => 0), /Disposed query/);
+  } finally {
+    rows.dispose();
+  }
 });
 
 test("bound mutation inputs share keyed requests and outcomes", async () => {

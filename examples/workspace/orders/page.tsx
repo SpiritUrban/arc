@@ -1,6 +1,6 @@
 // Браузерна частина замовлень. Зміна користувача оновлює список,
 // а надсилання форми викликає серверну операцію створення.
-import { derive, view } from "@arc/framework/web";
+import { view } from "@arc/framework/web";
 import { ListOrders, CreateOrder, CancelOrder, orderUnitPrice, quantityLimits, type Order } from "./contracts.ts";
 import { activeUser } from "../user-selection.ts";
 import { orderClient } from "./client.ts";
@@ -46,7 +46,7 @@ const cancelOrder = orderClient.mutation(CancelOrder, {
   updateOnError: "ORDER_ALREADY_CANCELLED",
 });
 
-export const visibleOrders = derive("orders.visible", ordersData.data, (orders) => orders ?? []);
+export const visibleOrders = ordersData.select("visible", (orders) => orders ?? []);
 
 export const OrdersPage = view({
   id: "orders.page",
