@@ -187,12 +187,28 @@ test("USR-01–03 · search, create, select and edit a profile", async ({
   await olena.click();
 
   const edit = editUserForm(page);
+  if (!isReact(info)) await expect(edit.locator('[name="id"]')).toHaveCount(0);
   await fillProfile(edit, "Olena Updated", "olena.updated@example.com");
-  await edit.getByRole("button", { name: "Зберегти користувача" }).click();
-  await expect(userRow(page, "Olena Updated")).toHaveAttribute(
-    "aria-pressed",
-    "true",
-  );
+  const save = edit.getByRole("button", { name: "Зберегти користувача" });
+  if (isReact(info)) {
+    await save.click();
+    await expect(userRow(page, "Olena Updated")).toHaveAttribute("aria-pressed", "true");
+  } else {
+    const saving = await hold(page, transport(info, "users.update"), () => true);
+    try {
+      await save.click();
+      const update = await saving.request;
+      expect(update.postDataJSON().id).toBe(await olena.getAttribute("data-user"));
+      await demoRow.click();
+      await expect(edit.locator('[name="name"]')).toHaveValue("Demo User");
+    } finally {
+      await saving.release();
+    }
+    await expect(userRow(page, "Olena Updated")).toBeVisible();
+    await expect(demoRow).toHaveAttribute("aria-pressed", "true");
+    await expect(edit.locator('[name="email"]')).toHaveValue("demo@example.com");
+    await userRow(page, "Olena Updated").click();
+  }
   await fillProfile(edit, "Olena Updated", "demo@example.com");
   await edit.getByRole("button", { name: "Зберегти користувача" }).click();
   await expect(

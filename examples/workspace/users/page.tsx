@@ -15,6 +15,8 @@ export const addUser = mutation(CreateUser, {
   },
 });
 const updateUser = mutation(UpdateUser, {
+  needs: selectedUser,
+  params: () => ({ id: selectedUser() }),
   update: users.replaceBy("id"),
 });
 
@@ -77,7 +79,6 @@ function renderProfileEditor(saved: ReturnType<typeof User.parse> | undefined) {
       <div class="panel-divider"></div>
       <h3>Редагувати вибраного користувача</h3>
       <form data-edit-user onSubmit={updateUser}>
-        <input type="hidden" name="id" value={saved.id} />
         <ProfileFields saved={saved} />
         <button class="button secondary" type="submit">
           {updateUser().running ? "Зберігаємо…" : "Зберегти користувача"}
