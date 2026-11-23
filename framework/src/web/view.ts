@@ -648,6 +648,11 @@ function ownedNodes(owned?: OwnedNodes): OwnedNode[] {
   return Array.isArray(owned) ? owned : [owned as OwnedNode];
 }
 
+type PageRemoteClient = {
+  query(...args: any[]): OwnedNode;
+  mutation(...args: any[]): OwnedNode;
+};
+
 export interface PageContext<Param extends string = string> {
   params: Readonly<Record<Param, string>>;
   local<T>(initial: T, name?: string): Signal<T>;
@@ -660,6 +665,8 @@ export interface PageContext<Param extends string = string> {
     client: { query(...args: Args): T },
     ...args: Args
   ): T;
+  /** Scope a remote client's queries and mutations to this page. */
+  client<T extends PageRemoteClient>(client: T): Pick<T, "query" | "mutation">;
 }
 
 export interface PageLayoutContext<Param extends string = string> extends PageContext<Param> {
@@ -688,7 +695,7 @@ type LocalFactory = <T>(initial: T, name?: string) => Signal<T>;
 
 function scopedView(
   def: Omit<LocalViewOptions<Record<string, unknown>>, "state" | "template">,
-  template: (context: Pick<PageContext, "local" | "own" | "query">) => TemplateElement,
+  template: (context: Pick<PageContext, "local" | "own" | "query" | "client">) => TemplateElement,
 ): View {
   function create(scope?: Scope) {
     const fields = new Map<string, GraphDefinition>();
@@ -711,8 +718,12 @@ function scopedView(
     };
     const query: PageContext["query"] = (client: { query(...args: any[]): OwnedNode }, ...args: any[]) =>
       own(client.query(...args));
+    const client: PageContext["client"] = <T extends PageRemoteClient>(remote: T) => ({
+      query: (...args: any[]) => own(remote.query(...args)),
+      mutation: (...args: any[]) => own(remote.mutation(...args)),
+    }) as Pick<T, "query" | "mutation">;
     try {
-      const instance = buildView({ ...def, owned, template: () => template({ local, own, query }) });
+      const instance = buildView({ ...def, owned, template: () => template({ local, own, query, client }) });
       instance.dependencies = [...(instance.dependencies ?? []), ...fields.values()];
       return instance;
     } catch (error) {

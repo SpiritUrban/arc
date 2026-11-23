@@ -168,6 +168,9 @@ test("Workspace order update has consistent identities and impact in build and S
     assert.deepEqual(artifact, standGraph);
     const mutation = "orders.update.submit";
     const operation = "orders.update";
+    for (const id of ["orders.get.query", mutation, "orders.detail-cancel.submit"]) {
+      assert.equal(graph.nodes.find((node) => node.id === id)?.scope, "view", id);
+    }
     assert.ok(manifest.partitions?.browser.includes(mutation));
     assert.ok(manifest.partitions?.server.includes(operation));
     assert.ok(manifest.boundaries?.some(({ from, to }) =>

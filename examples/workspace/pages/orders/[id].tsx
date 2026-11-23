@@ -8,20 +8,21 @@ import { money } from "../../ui.ts";
 
 export const title = "Деталі замовлення — ARC Workspace";
 
-export default function OrderDetail({ own, params, query }: PageContext<"id">) {
-  const order = query(orderClient, GetOrder);
+export default function OrderDetail({ client, params }: PageContext<"id">) {
+  const orders = client(orderClient);
+  const order = orders.query(GetOrder, { params });
   const { data, loading, error } = order;
   const orderUpdates = [order.replace(), ordersData.replaceBy("id")];
-  const updateOrder = own(orderClient.mutation(UpdateOrder, {
+  const updateOrder = orders.mutation(UpdateOrder, {
     params,
     update: orderUpdates,
-  }));
-  const cancelOrder = own(orderClient.mutation(CancelOrder, {
+  });
+  const cancelOrder = orders.mutation(CancelOrder, {
     id: "orders.detail-cancel.submit",
     params,
     update: orderUpdates,
     updateOnError: "ORDER_ALREADY_CANCELLED",
-  }));
+  });
 
   function renderSummary(saved: ReturnType<typeof data>) {
     if (!saved) return null;
