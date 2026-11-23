@@ -55,7 +55,6 @@ export const OrdersPage = view({
   needs: cancelOrder,
   state: { quantity: "1", search: "", status: "all" },
   template({ quantity, search, status }, { own }) {
-    const { loading, error } = ordersData;
     const history = own(derive("orders.page.history", [visibleOrders, search, status], (orders, search, status) => {
       const term = search.trim().toLowerCase();
       return {
@@ -110,7 +109,7 @@ export const OrdersPage = view({
           <p class="error" role="alert" data-error>
             {failureMessage(
               (createOrder.invalid() ? undefined : createOrder().error) ??
-                error(),
+                ordersData.error(),
             )}
           </p>
         </div>
@@ -128,7 +127,7 @@ export const OrdersPage = view({
               class="muted"
               data-loading
               role="status"
-            >{loading() ? "Завантажуємо замовлення…" : ""}</span>
+            >{ordersData.loading() ? "Завантажуємо замовлення…" : ""}</span>
           </div>
           <div class="order-filters">
             <label class="search-label">
@@ -179,7 +178,7 @@ export const OrdersPage = view({
               </tbody>
             </table>
           </div>
-          {history().rows.length === 0 && !loading() && (
+          {history().rows.length === 0 && !ordersData.loading() && (
             <div class="empty order-empty" data-empty>
               <span class="empty-symbol">▤</span>
               <strong>

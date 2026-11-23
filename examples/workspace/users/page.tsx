@@ -6,8 +6,6 @@ import { CreateUser, UpdateUser, type User } from "./contracts.ts";
 import { failureMessage } from "../ui.ts";
 import { activeUser, selectedUser, users } from "../user-selection.ts";
 
-const { data, loading, error: loadError } = users;
-
 // CreateUser — спільний контракт. На сервері його виконує createUser у ./server.ts.
 export const addUser = mutation(CreateUser, {
   needs: selectedUser,
@@ -31,7 +29,7 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
 
   function message() {
     if (!editing)
-      return failureMessage((duplicate() ? undefined : error()) ?? loadError());
+      return failureMessage((duplicate() ? undefined : error()) ?? users.error());
     if (updateUser.failed("USER_NOT_FOUND")) return "Користувача не знайдено.";
     return duplicate() || form.invalid() ? "" : failureMessage(error());
   }
@@ -97,7 +95,7 @@ export const UsersPage = view({
   needs: [addUser, updateUser],
   state: { search: "" },
   template({ search }, { own }) {
-    const visible = own(derive("users.page.visible", [data, search], (users, search) => {
+    const visible = own(derive("users.page.visible", [users.data, search], (users, search) => {
       const term = search.toLowerCase();
       return (users ?? []).filter((user) =>
         `${user.name} ${user.email}`.toLowerCase().includes(term),
@@ -114,9 +112,9 @@ export const UsersPage = view({
           <span class="badge">LIVE</span>
         </div>
         <p class="muted" data-status>
-          {loading()
+          {users.loading()
             ? "Оновлюємо список…"
-            : `${data()?.length ?? 0} у вашому просторі`}
+            : `${users.data()?.length ?? 0} у вашому просторі`}
         </p>
         <label class="search-label">
           <span>Пошук</span>

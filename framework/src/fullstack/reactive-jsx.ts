@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import type * as TS from "typescript";
 
 const require = createRequire(import.meta.url);
+const queryProjectionNames = new Set(["data", "loading", "error", "stale"]);
 
 export function compileReactiveJsx(
   source: string,
@@ -200,6 +201,12 @@ export function compileReactiveJsx(
                 } else if (ts.isPropertyAccessExpression(callee)) {
                   const method = callee.name.text;
                   if (
+                    child.arguments.length === 0 &&
+                    ts.isIdentifier(callee.expression) &&
+                    queryProjectionNames.has(method)
+                  ) {
+                    reference = callee;
+                  } else if (
                     (method === "get" && child.arguments.length === 0) ||
                     (method === "failed" && (child.arguments.length === 1 || child.arguments.length === 2)) ||
                     ((method === "invalid" || method === "pending" || method === "outcome") &&

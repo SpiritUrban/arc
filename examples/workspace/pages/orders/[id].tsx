@@ -10,7 +10,6 @@ export const title = "Деталі замовлення — ARC Workspace";
 
 export default function OrderDetail({ own, params, query }: PageContext<"id">) {
   const order = query(orderClient, GetOrder);
-  const { data, loading, error } = order;
   const mutationOptions = {
     params,
     update: [order.replace(), ordersData.replaceBy("id")],
@@ -22,7 +21,7 @@ export default function OrderDetail({ own, params, query }: PageContext<"id">) {
     updateOnError: "ORDER_ALREADY_CANCELLED",
   }));
 
-  function renderSummary(saved: ReturnType<typeof data>) {
+  function renderSummary(saved: ReturnType<typeof order.data>) {
     if (!saved) return null;
     return (
       <div data-order-detail>
@@ -48,9 +47,9 @@ export default function OrderDetail({ own, params, query }: PageContext<"id">) {
       <div class="content-grid">
         <div id="users"><UsersPage /></div>
         <section class="panel" aria-label="Замовлення">
-          {loading() && <p role="status">Завантажуємо замовлення…</p>}
-          {error() ? <p class="error" role="alert">Замовлення не знайдено або недоступне.</p> : null}
-          {renderSummary(data())}
+          {order.loading() && <p role="status">Завантажуємо замовлення…</p>}
+          {order.error() ? <p class="error" role="alert">Замовлення не знайдено або недоступне.</p> : null}
+          {renderSummary(order.data())}
           <p class="error" role="alert">
             {cancelOrder.failed("ORDER_ALREADY_CANCELLED")
               ? "Замовлення вже скасовано."
@@ -60,10 +59,10 @@ export default function OrderDetail({ own, params, query }: PageContext<"id">) {
                   ? "Не вдалося скасувати замовлення."
                   : ""}
           </p>
-          {data()?.cancelled === false && (
+          {order.data()?.cancelled === false && (
             <form data-edit-order novalidate onSubmit={updateOrder}>
               <h2>Редагувати замовлення</h2>
-              <OrderFields mutation={updateOrder} order={data} />
+              <OrderFields mutation={updateOrder} order={order.data} />
               <button class="button primary" type="submit">
                 {updateOrder().running ? "Зберігаємо…" : "Зберегти зміни"}
               </button>
