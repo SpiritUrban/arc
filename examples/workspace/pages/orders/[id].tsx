@@ -1,7 +1,9 @@
+import { ValidationError } from "@arc/framework/core";
 import type { PageContext } from "@arc/framework/web";
 import { CancelOrder, GetOrder, UpdateOrder } from "../../orders/contracts.ts";
 import { orderClient } from "../../orders/client.ts";
 import { OrderFields } from "../../orders/fields.tsx";
+import { orderWriteMessage } from "../../orders/messages.ts";
 import { ordersData } from "../../orders/page.tsx";
 import { UsersPage } from "../../users/page.tsx";
 import { money } from "../../ui.ts";
@@ -48,13 +50,9 @@ export default function OrderDetail({ mutation, query }: PageContext<"id">) {
           {order.error() ? <p class="error" role="alert">Замовлення не знайдено або недоступне.</p> : null}
           {renderSummary(order.data())}
           <p class="error" role="alert">
-            {cancelOrder.failed("ORDER_ALREADY_CANCELLED")
-              ? "Замовлення вже скасовано."
-              : cancelOrder.failed("ORDER_NOT_FOUND")
-                ? "Замовлення не знайдено."
-                : cancelOrder.error()
-                  ? "Не вдалося скасувати замовлення."
-                  : ""}
+            {orderWriteMessage(cancelOrder(), "Замовлення вже скасовано.",
+              () => "Не вдалося скасувати замовлення.",
+            )}
           </p>
           {order.data()?.cancelled === false && (
             <form data-edit-order novalidate onSubmit={updateOrder}>
@@ -64,13 +62,9 @@ export default function OrderDetail({ mutation, query }: PageContext<"id">) {
                 {updateOrder.running() ? "Зберігаємо…" : "Зберегти зміни"}
               </button>
               <p class="error" role="alert">
-                {updateOrder.failed("ORDER_ALREADY_CANCELLED")
-                  ? "Скасоване замовлення не можна редагувати."
-                  : updateOrder.failed("ORDER_NOT_FOUND")
-                    ? "Замовлення не знайдено."
-                    : updateOrder.error() && !updateOrder.invalid()
-                      ? "Не вдалося зберегти замовлення."
-                      : ""}
+                {orderWriteMessage(updateOrder(), "Скасоване замовлення не можна редагувати.",
+                  (error) => error instanceof ValidationError ? "" : "Не вдалося зберегти замовлення.",
+                )}
               </p>
             </form>
           )}

@@ -1,10 +1,11 @@
 // Браузерна частина замовлень. Зміна користувача оновлює список,
 // а надсилання форми викликає серверну операцію створення.
 import { derive, view } from "@arc/framework/web";
-import { ListOrders, CreateOrder, CancelOrder, type Order } from "./contracts.ts";
+import { ListOrders, CreateOrder, CancelOrder, orderUnitPrice, quantityLimits, type Order } from "./contracts.ts";
 import { activeUser } from "../user-selection.ts";
 import { orderClient } from "./client.ts";
 import { OrderFields } from "./fields.tsx";
+import { orderWriteMessage } from "./messages.ts";
 import { money, failureMessage } from "../ui.ts";
 
 function CancelOrderControl({ order: { id, cancelled } }: { order: ReturnType<typeof Order.parse> }) {
@@ -22,11 +23,7 @@ function CancelOrderControl({ order: { id, cancelled } }: { order: ReturnType<ty
         </button>
       )}
       <p class="error" role="alert" data-cancel-error>
-        {cancelOrder.failed("ORDER_ALREADY_CANCELLED", id)
-          ? "Це замовлення вже скасовано."
-          : cancelOrder.failed("ORDER_NOT_FOUND", id)
-            ? "Замовлення не знайдено."
-            : failureMessage(cancelOrder.outcome(id)?.error)}
+        {orderWriteMessage(cancelOrder.outcome(id), "Це замовлення вже скасовано.")}
       </p>
     </>
   );
@@ -53,7 +50,7 @@ export const visibleOrders = derive("orders.visible", ordersData.data, (orders) 
 export const OrdersPage = view({
   id: "orders.page",
   needs: cancelOrder,
-  state: { quantity: "1", search: "", status: "all" },
+  state: { quantity: String(quantityLimits.min), search: "", status: "all" },
   template({ quantity, search, status }, { own }) {
     const history = own(derive("orders.page.history", [visibleOrders, search, status], (orders, search, status) => {
       const term = search.trim().toLowerCase();
@@ -81,7 +78,7 @@ export const OrdersPage = view({
             <strong data-amount>
               {money(visibleOrders().reduce((sum, order) => sum + order.total, 0))}
             </strong>
-            <span class="summary-note">25 ₴ за одиницю товару</span>
+            <span class="summary-note">{orderUnitPrice} ₴ за одиницю товару</span>
           </div>
         </div>
         <div class="panel">
@@ -102,7 +99,7 @@ export const OrdersPage = view({
           <div class="form-footer">
             <span>
               Підсумок{" "}
-              <strong data-preview>{money((Number(quantity()) || 0) * 25)}</strong>
+              <strong data-preview>{money((Number(quantity()) || 0) * orderUnitPrice)}</strong>
             </span>
             <span>Для вибраного користувача</span>
           </div>

@@ -14,7 +14,7 @@ import {
   type OperationContract,
 } from "@arc/framework/server";
 import { currentUser } from "../auth.ts";
-import { Order, ListOrders, GetOrder, CreateOrder, UpdateOrder, CancelOrder } from "./contracts.ts";
+import { Order, ListOrders, GetOrder, CreateOrder, UpdateOrder, CancelOrder, orderUnitPrice } from "./contracts.ts";
 
 // Імпортований Order є схемою перевірки. Локальний тип Order описує дані після parse.
 type Order = ReturnType<typeof Order.parse>;
@@ -42,7 +42,7 @@ const ordersRepository = resource({
         const index = orders.findIndex((order) => order.id === id && order.userId === userId);
         if (index < 0) return "ORDER_NOT_FOUND" as const;
         if (orders[index].cancelled) return "ORDER_ALREADY_CANCELLED" as const;
-        const order = { ...orders[index], product, quantity, total: quantity * 25 };
+        const order = { ...orders[index], product, quantity, total: quantity * orderUnitPrice };
         orders[index] = order;
         return order;
       },
@@ -76,7 +76,7 @@ const createOrder = http.post("/orders", CreateOrder, {
       ...input,
       id: randomUUID(),
       userId: user.id,
-      total: input.quantity * 25,
+      total: input.quantity * orderUnitPrice,
       cancelled: false,
     };
     return ok(await orders.save(order));

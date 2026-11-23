@@ -1,6 +1,6 @@
 import type { Infer } from "@arc/framework/core";
 import type { Signal } from "@arc/framework/web";
-import type { CreateOrder } from "./contracts.ts";
+import { productMaxLength, quantityLimits, type CreateOrder } from "./contracts.ts";
 
 type OrderInput = Infer<typeof CreateOrder.input>;
 
@@ -18,7 +18,7 @@ export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
         <input
           data-product
           required
-          maxlength="100"
+          maxlength={productMaxLength}
           placeholder="Наприклад, блокнот ARC"
           name="product"
           value={order?.()?.product}
@@ -36,8 +36,8 @@ export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
             name="quantity"
             required
             type="number"
-            min="1"
-            max="100"
+            min={quantityLimits.min}
+            max={quantityLimits.max}
             step="1"
             value={order?.()?.quantity}
             aria-invalid={mutation.invalid("quantity")}
@@ -45,7 +45,8 @@ export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
           />
         </label>
         <p class="error" role="alert" data-quantity-error>
-          {mutation.invalid("quantity") && "Введіть ціле число від 1 до 100."}
+          {mutation.invalid("quantity") &&
+            `Введіть ціле число від ${quantityLimits.min} до ${quantityLimits.max}.`}
         </p>
       </div>
     </>
