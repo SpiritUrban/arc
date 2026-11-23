@@ -19,6 +19,7 @@ import {
   type ActionContext,
   type ActionOptions,
   type CallableAction,
+  type FormSubmission,
   type ResourceSnapshot,
   type WebResource,
 } from "../web/async.js";
@@ -384,6 +385,9 @@ export type Mutation<
     invalid(): boolean;
     invalid(field: InputField<C>): boolean;
     run(input: Infer<C["input"]>): Promise<RemoteResult<C>>;
+    with: [Field] extends [never]
+      ? (params: Partial<Infer<C["input"]>>) => FormSubmission
+      : never;
     pending(key: Key): boolean;
     outcome(key: Key): MutationOutcome<C> | undefined;
   };
@@ -396,6 +400,11 @@ type MutationOutcome<C extends OperationContract> = {
 const directInput = Symbol("ARC mutation input");
 type DirectSubmission<C extends OperationContract> = { [directInput]: Infer<C["input"]> };
 
+const formInput = Symbol("ARC named form input");
+type BoundSubmission<C extends OperationContract> = {
+  [formInput]: HTMLFormElement;
+  params?: Partial<Infer<C["input"]>>;
+};
 type InputField<C extends OperationContract> =
   Infer<C["input"]> extends Record<string, unknown>
     ? Extract<keyof Infer<C["input"]>, string>
@@ -404,7 +413,7 @@ type InputField<C extends OperationContract> =
 function buildRemoteForm<C extends OperationContract, Field extends string>(
   contract: C, options: FormOptions<C, Field>, defaults: RemoteFormDefaults, callable: true,
 ): RemoteForm<C, Field> & {
-  submit: CallableAction<void | DirectSubmission<C>, RemoteResult<C>>;
+  submit: CallableAction<void | DirectSubmission<C> | BoundSubmission<C>, RemoteResult<C>>;
 };
 function buildRemoteForm<C extends OperationContract, Field extends string>(
   contract: C, options: FormOptions<C, Field>, defaults: RemoteFormDefaults,
@@ -473,7 +482,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     baseUrl,
     fetch,
   });
-  const definition: ActionOptions<void | HTMLFormElement | DirectSubmission<C>, RemoteResult<C>> = {
+  const definition: ActionOptions<void | DirectSubmission<C> | BoundSubmission<C>, RemoteResult<C>> = {
     id,
     needs: Object.fromEntries(
       [
@@ -507,14 +516,14 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
         return execute(contract.input.parse(request[directInput]));
       }
       const submission = request &&
-        readNamedSubmission(request, numericFields, booleanFields, arrayFields);
+        readNamedSubmission(request[formInput], numericFields, booleanFields, arrayFields);
       const values = Object.fromEntries(
         names.map((name) => [name, fields[name].get()]),
       ) as Record<Field, string>;
       if (!fieldOptions && !submission)
         throw new TypeError("Named-field forms must be submitted from an HTML form");
-      const payload = submission
-        ? { ...submission.values, ...params }
+      const payload = submission && request
+        ? { ...submission.values, ...params, ...request.params }
         : input
         ? input(values)
         : (Object.fromEntries(
@@ -544,7 +553,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     ...updates.map((update) => ({ to: update.target, kind: "UPDATES" as const })),
   ];
   if (!fieldOptions) {
-    submit.submitForm = (form, ctx) => submit.execute(form, ctx);
+    submit.submitForm = (form, ctx) => submit.execute({ [formInput]: form }, ctx);
   }
   return { fields, submit };
 }
@@ -597,8 +606,17 @@ function bindMutation(defaults: RemoteFormDefaults) {
         dispose();
       };
     }
+    const bindForm = (params: Partial<Infer<C["input"]>>): FormSubmission => {
+      const values = { ...params };
+      return {
+        kind: "form-submission",
+        action: submit,
+        submit: (form, ctx) => submit.execute({ [formInput]: form, params: values }, ctx),
+      };
+    };
     return Object.assign(submit, {
       fields,
+      with: (options.fields ? undefined : bindForm) as Mutation<C, Field, Key>["with"],
       run(payload: Infer<C["input"]>) {
         const trace = currentWriteTrace();
         if (!keyOf || !revision || disposed)

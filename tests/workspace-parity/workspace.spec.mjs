@@ -205,11 +205,17 @@ test("USR-01–03 · search, create, select and edit a profile", async ({
     await save.click();
     await expect(userRow(page, "Olena Updated")).toHaveAttribute("aria-pressed", "true");
   } else {
+    await expect(edit.locator('[name="id"]')).toHaveCount(0);
     const saving = await hold(page, transport(info, "users.update"), () => true);
     try {
       await save.click();
       const update = await saving.request;
-      expect(update.postDataJSON().id).toBe(await olena.getAttribute("data-user"));
+      expect(update.postDataJSON()).toEqual({
+        id: await olena.getAttribute("data-user"),
+        name: "Olena Updated",
+        email: "olena.updated@example.com",
+      });
+      await expect(edit.getByRole("button", { name: "Зберігаємо…" })).toBeDisabled();
       await demoRow.click();
       await expect(edit.locator('[name="name"]')).toHaveValue("Demo User");
     } finally {

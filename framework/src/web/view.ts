@@ -8,7 +8,7 @@ import {
   type TraceToken,
   type WebTelemetry,
 } from "../neutral/protocol.js";
-import type { Action } from "./async.js";
+import type { Action, FormSubmission } from "./async.js";
 import {
   registerFormChecked,
   registerFormRadio,
@@ -360,7 +360,9 @@ function directive(
 ): Binding[] {
   if (name.startsWith("on:")) {
     const event = name.slice(3);
-    const action = value as Action<void, unknown> | undefined;
+    const form = value as FormSubmission | undefined;
+    const submission = event === "submit" && form?.kind === "form-submission" ? form : undefined;
+    const action = submission?.action ?? (value as Action<void, unknown> | undefined);
     const isAction = action?.kind === "action" && typeof action.execute === "function";
     if (event && typeof value === "function" && !isAction) {
       const handler = value as EventHandler;
@@ -394,11 +396,14 @@ function directive(
       node.handler = (event, trace) => {
         event.preventDefault();
         if (action.get().running) return;
-        if (action.submitForm) {
+        if (submission || action.submitForm) {
           const form = event.currentTarget;
           if ((form as Element | null)?.localName !== "form")
             throw new TypeError("A named-field action must be attached to a form");
-          return action.submitForm(form as HTMLFormElement, { trace });
+          const element = form as HTMLFormElement;
+          return submission
+            ? submission.submit(element, { trace })
+            : action.submitForm!(element, { trace });
         }
         return action.execute(undefined, { trace });
       };

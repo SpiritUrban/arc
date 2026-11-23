@@ -332,6 +332,11 @@ export interface Action<I, O> extends Readable<ActionSnapshot<O>> {
   submitForm?(form: HTMLFormElement, ctx: { trace: TraceToken }): Promise<O>;
   activate(telemetry?: WebTelemetry): void;
 }
+export interface FormSubmission {
+  readonly kind: "form-submission";
+  readonly action: Action<void, unknown>;
+  submit(form: HTMLFormElement, ctx: { trace: TraceToken }): Promise<unknown>;
+}
 export type CallableAction<I, O> = Action<I, O> & (() => ActionSnapshot<O>);
 export interface ActionContext {
   signal: AbortSignal;

@@ -1,4 +1,4 @@
-import type { Action } from "./async.js";
+import type { Action, FormSubmission } from "./async.js";
 import type { Readable, Writable } from "./reactive.js";
 import type { Binding, EventHandler, Projection, View } from "./view.js";
 
@@ -107,7 +107,7 @@ interface TemplateProps {
   "bind:value"?: Writable<string> | Writable<string[]>;
   "bind:checked"?: Writable<boolean>;
   onClick?: Action<void, unknown> | ((event: MouseEvent, context: EventContext) => unknown);
-  onSubmit?: Action<void, unknown> | ((event: SubmitEvent, context: EventContext) => unknown);
+  onSubmit?: Action<void, unknown> | FormSubmission | ((event: SubmitEvent, context: EventContext) => unknown);
   onChange?: Action<void, unknown> | EventHandler;
   onInput?: Action<void, unknown> | EventHandler;
   onFocus?: Action<void, unknown> | EventHandler;
@@ -122,6 +122,7 @@ interface TemplateProps {
   onReset?: Action<void, unknown> | EventHandler;
   [event: `on${Capitalize<string>}`]:
     | Action<void, unknown>
+    | FormSubmission
     | EventHandler
     | ((event: any, context: EventContext) => unknown)
     | undefined;

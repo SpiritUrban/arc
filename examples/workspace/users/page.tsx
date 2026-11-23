@@ -37,8 +37,11 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
     <>
       <div class="panel-divider"></div>
       <h3>{title}</h3>
-      <form data-form={!editing || undefined} data-edit-user={editing || undefined} onSubmit={form}>
-        {user && <input type="hidden" name="id" value={user.id} />}
+      <form
+        data-form={!editing || undefined}
+        data-edit-user={editing || undefined}
+        onSubmit={user ? updateUser.with({ id: user.id }) : addUser}
+      >
         <label>
           Ім’я
           <input
