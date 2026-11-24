@@ -5,6 +5,7 @@ import {
 import { ValidationError, type Infer, type Schema } from "../schema.js";
 import { formValue } from "../web/form-value.js";
 import { withEventTrigger } from "../web/event-trigger.js";
+import { reactiveAttribute } from "../web/jsx-runtime.js";
 import {
   browserEvent,
   identity,
@@ -420,6 +421,18 @@ type FormBindingArgs<C extends OperationContract> =
       [Name in InputField<C>]: [field: Name, value: MutationInput<C>[Name]];
     }[InputField<C>];
 
+type BoundMutation<C extends OperationContract> = {
+  run(): Promise<RemoteResult<C>>;
+  pending(): boolean;
+  outcome(): MutationOutcome<C> | undefined;
+  failed(code: keyof C["errors"] & string): boolean;
+  /** Wire an ARC button to this action and disable it while this row is pending. */
+  buttonProps: {
+    onClick: () => Promise<RemoteResult<C>>;
+    disabled: ReturnType<typeof reactiveAttribute>;
+  };
+};
+
 export type Mutation<
   C extends OperationContract,
   Field extends string = never,
@@ -437,12 +450,7 @@ export type Mutation<
       ...names: Names & readonly InputField<C>[]
     ): Readonly<Record<Names[number], MutationField>>;
     run(input: Infer<C["input"]>): Promise<RemoteResult<C>>;
-    for(input: MutationInput<C> | ScalarMutationInput<MutationInput<C>, KeyField & keyof MutationInput<C>>): {
-      run(): Promise<RemoteResult<C>>;
-      pending(): boolean;
-      outcome(): MutationOutcome<C> | undefined;
-      failed(code: keyof C["errors"] & string): boolean;
-    };
+    for(input: MutationInput<C> | ScalarMutationInput<MutationInput<C>, KeyField & keyof MutationInput<C>>): BoundMutation<C>;
     with: [Field] extends [never]
       ? (...args: FormBindingArgs<C>) => FormSubmission
       : never;
@@ -779,11 +787,14 @@ function bindMutation(defaults: RemoteFormDefaults) {
         const payload = (typeof key === "string" && (typeof input === "string" || typeof input === "number")
           ? { [key]: input }
           : input) as MutationInput<C>;
+        const run = withEventTrigger(() => mutation.run(payload), submit);
+        const pending = () => mutation.pending(keyOf(payload));
         return withEventTrigger({
-          run: withEventTrigger(() => mutation.run(payload), submit),
-          pending: () => mutation.pending(keyOf(payload)),
+          run,
+          pending,
           outcome: () => mutation.outcome(keyOf(payload)),
           failed: (code: keyof C["errors"] & string) => mutation.failed(code, keyOf(payload)),
+          buttonProps: { onClick: run, disabled: reactiveAttribute(pending, () => [revision]) },
         }, submit);
       },
       run(payload: Infer<C["input"]>) {

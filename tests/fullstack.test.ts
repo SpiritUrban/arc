@@ -756,7 +756,7 @@ test("bound mutation inputs share keyed requests and outcomes", async () => {
       id: "row.control",
       template: () => jsx("div", {
         children: [
-          jsx("button", { onClick: first.run }),
+          jsx("button", { ...first.buttonProps }),
           jsx("button", { onClick: reactiveEvent(() => first.run(), () => first) }),
           jsx("button", { onClick: reactiveEvent(() => save.run({ id: "first" }), () => save) }),
         ],

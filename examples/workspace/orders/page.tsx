@@ -17,8 +17,7 @@ function CancelOrderControl({ order: { id, cancelled } }: { order: ReturnType<ty
           class="button secondary"
           type="button"
           data-cancel-order
-          disabled={cancel.pending()}
-          onClick={cancel.run}
+          {...cancel.buttonProps}
         >
           {render.when(cancel.pending, "Скасовуємо…", "Скасувати")}
         </button>
