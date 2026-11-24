@@ -189,13 +189,16 @@ test("render tracks only the active JSX branch and unsubscribes on unmount", asy
   const count = state({ id: "count", initial: 1 });
   const page = view({
     id: "conditional",
-    needs: { show, count },
+    needs: count,
     template: () => jsx("div", {
-      children: ["before", render(() => show.get()
+      children: ["before", render.from(show, (visible) => visible
         ? [jsx("strong", { children: count.get() }), "!"]
         : null), "after"],
     }),
   });
+  assert.ok(compileArchitecture([page]).edges.some((edge) =>
+    edge.from === show.id && edge.to.endsWith(".render") && edge.kind === "BINDS",
+  ));
   const mounted = mount(page, target);
   assert.equal(target.textContent, "beforeafter");
   assert.equal(count._listeners.size, 0);

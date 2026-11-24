@@ -1,5 +1,5 @@
 import { ValidationError } from "@arc/framework/core";
-import type { PageContext } from "@arc/framework/web";
+import { render, type PageContext } from "@arc/framework/web";
 import { CancelOrder, GetOrder, UpdateOrder } from "../../orders/contracts.ts";
 import { orderClient } from "../../orders/client.ts";
 import { OrderFields } from "../../orders/fields.tsx";
@@ -48,7 +48,7 @@ export default function OrderDetail({ bind }: PageContext<"id">) {
         <section class="panel" aria-label="Замовлення">
           {order.loading() && <p role="status">Завантажуємо замовлення…</p>}
           {order.error() ? <p class="error" role="alert">Замовлення не знайдено або недоступне.</p> : null}
-          {renderSummary(order.data())}
+          {render.from(order.data, renderSummary)}
           <p class="error" role="alert">
             {orderWriteMessage(cancelOrder(), "Замовлення вже скасовано.",
               () => "Не вдалося скасувати замовлення.",

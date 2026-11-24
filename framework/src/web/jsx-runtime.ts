@@ -81,6 +81,9 @@ export function render(
   return { [reactiveBlock]: true, template, references };
 }
 
+render.from = <T>(source: Readable<T>, template: (value: T) => RenderContent): RenderBlock =>
+  render(() => template(source.get()), () => [source]);
+
 export function isRenderBlock(child: TemplateChild): child is RenderBlock {
   return child != null && typeof child === "object" && reactiveBlock in child;
 }

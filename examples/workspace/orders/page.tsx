@@ -1,6 +1,6 @@
 // Браузерна частина замовлень. Зміна користувача оновлює список,
 // а надсилання форми викликає серверну операцію створення.
-import { view } from "@arc/framework/web";
+import { render, view } from "@arc/framework/web";
 import { ListOrders, CreateOrder, CancelOrder, orderUnitPrice, quantityLimits, type Order } from "./contracts.ts";
 import { activeUser } from "../user-selection.ts";
 import { orderClient } from "./client.ts";
@@ -116,9 +116,9 @@ export const OrdersPage = view({
             <div>
               <span class="eyebrow">ІСТОРІЯ</span>
               <h2 data-owner>
-                {activeUser()
-                  ? `Замовлення · ${activeUser()!.name}`
-                  : "Оберіть користувача"}
+                {render.from(activeUser, (user) =>
+                  user ? `Замовлення · ${user.name}` : "Оберіть користувача",
+                )}
               </h2>
             </div>
             <span
