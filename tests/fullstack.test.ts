@@ -248,12 +248,13 @@ test("standalone queries infer the input projection from reactive sources", asyn
   const requests: unknown[] = [];
   const result = query(read, {
     from: [id, rank],
+    cache: true,
     key: (id, rank) => {
       if (false) {
         // @ts-expect-error The first key argument comes from the string source.
         id.toFixed();
       }
-      return `${id}:${rank.toFixed()}`;
+      return `${id.toLowerCase()}:${rank.toFixed()}`;
     },
     input: (id, rank) => {
       if (false) {
@@ -271,6 +272,8 @@ test("standalone queries infer the input projection from reactive sources", asyn
   });
   try {
     await result.refresh();
+    id.set("first");
+    assert.equal(result.data(), 1);
     id.set("SECOND");
     rank.set(5);
     assert.equal(result.data(), undefined);
@@ -303,6 +306,7 @@ test("standalone queries can use one source as their complete input", async () =
   const result = query(read, {
     from: params,
     input: true,
+    key: true,
     fetch: async (_url, init) => {
       const { id } = JSON.parse(String(init?.body));
       return Response.json({ ok: true, value: id });
@@ -312,6 +316,7 @@ test("standalone queries can use one source as their complete input", async () =
     await result.refresh();
     assert.equal(result.data(), "first");
     params.set({ id: "second" });
+    assert.equal(result.data(), undefined);
     await result.refresh();
     assert.equal(result.data(), "second");
   } finally {
@@ -365,7 +370,7 @@ test("remote client queries can use their source as complete input inside and ou
   }
 });
 
-test("standalone queries can key cached results by their sources", async () => {
+test("standalone query caches default to source-derived keys", async () => {
   const read = operationContract({
     id: "cached.read",
     input: s.object({ id: s.string() }),
@@ -376,7 +381,6 @@ test("standalone queries can key cached results by their sources", async () => {
   const result = query(read, {
     from: id,
     input: "id",
-    key: true,
     cache: true,
     fetch: async () => Response.json({ ok: true, value: ++reads }),
   });

@@ -886,17 +886,17 @@ function encodeCacheValue(value: unknown, ancestors = new Set<object>()): string
     case "bigint": return `bigint:${value}`;
     case "symbol":
     case "function":
-      throw new TypeError("Cached remoteApi queries need JSON-like from values or an explicit key");
+      throw new TypeError("Automatic query keys need JSON-like from values or an explicit key");
     case "object": {
       if (ancestors.has(value))
-        throw new TypeError("Cached remoteApi queries need acyclic from values or an explicit key");
+        throw new TypeError("Automatic query keys need acyclic from values or an explicit key");
       ancestors.add(value);
       try {
         if (Array.isArray(value))
           return `array:${JSON.stringify(value.map((item) => encodeCacheValue(item, ancestors)))}`;
         const prototype = Object.getPrototypeOf(value);
         if (prototype !== Object.prototype && prototype !== null)
-          throw new TypeError("Cached remoteApi queries need plain from values or an explicit key");
+          throw new TypeError("Automatic query keys need plain from values or an explicit key");
         const entries = Object.entries(value).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
         return `object:${JSON.stringify(entries.map(([key, item]) => [key, encodeCacheValue(item, ancestors)]))}`;
       } finally {
@@ -904,7 +904,7 @@ function encodeCacheValue(value: unknown, ancestors = new Set<object>()): string
       }
     }
     default:
-      throw new TypeError("Cached remoteApi queries need JSON-like from values or an explicit key");
+      throw new TypeError("Automatic query keys need JSON-like from values or an explicit key");
   }
 }
 
@@ -915,11 +915,12 @@ function querySourceKey(values: readonly unknown[]) {
 function bindQueryKey<Values extends readonly unknown[]>(
   key: true | ((...values: Values) => string | number) | undefined,
   sources: readonly Readable<unknown>[],
+  cache?: boolean,
 ): (() => string | number) | undefined {
-  if (key === undefined) return undefined;
+  if (key === undefined && !cache) return undefined;
   return () => {
     const values = sources.map((source) => source.get());
-    return key === true ? querySourceKey(values) : key(...values as unknown as Values);
+    return typeof key === "function" ? key(...values as unknown as Values) : querySourceKey(values);
   };
 }
 
@@ -999,7 +1000,6 @@ export function remoteApi<const Sources extends RemoteSources = readonly []>(
         ? [options?: ClientQueryOptions<C, Sources>]
         : [options: ClientQueryOptions<C, Sources>]
     ): RemoteQuery<C> {
-      const keyOption = query?.key ?? options.key ?? (query?.cache ? true : undefined);
       const project = query && "input" in query ? query.input : undefined;
       return createRemoteResource(contract, {
         id: query?.id ?? `${contract.id}.query`,
@@ -1009,7 +1009,7 @@ export function remoteApi<const Sources extends RemoteSources = readonly []>(
           : query && "input" in query ? project
           : query && "params" in query ? () => query.params as Infer<C["input"]>
           : undefined,
-        key: bindQueryKey(keyOption, from),
+        key: bindQueryKey(query?.key ?? options.key, from, query?.cache),
         cache: query?.cache,
         baseUrl,
         fetch: fetchWithHeaders,
@@ -1113,7 +1113,7 @@ type QueryOptions<C extends OperationContract, Sources extends RemoteSources> =
   Omit<RemoteResourceOptions<C>, "id" | "input" | "from" | "key"> & {
     id?: string;
     from?: Sources;
-    /** Use all sources as the key, or select one from their values. */
+    /** Override the cache context. By default, cached queries use all `from` values. */
     key?: true | ((...values: QuerySourceValues<Sources>) => string | number);
   } & (
     | (
@@ -1149,7 +1149,7 @@ export function query<
     id: options?.id ?? `${contract.id}.query`,
     from: sources,
     input: project ?? (options && "params" in options ? () => params as Infer<C["input"]> : undefined),
-    key: bindQueryKey(key, sources),
+    key: bindQueryKey(key, sources, options?.cache),
   }, true);
 }
 
