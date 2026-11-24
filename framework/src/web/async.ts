@@ -324,18 +324,22 @@ export interface ActionSnapshot<O> {
   result: O | undefined;
   error: unknown;
 }
+interface FormSubmitContext {
+  trace: TraceToken;
+  submitter?: HTMLElement | null;
+}
 export interface Action<I, O> extends Readable<ActionSnapshot<O>> {
   running: Computed<boolean>;
   error: Computed<unknown>;
   result: Computed<O | undefined>;
   execute(input: I, ctx?: { trace?: TraceToken }): Promise<O>;
-  submitForm?(form: HTMLFormElement, ctx: { trace: TraceToken }): Promise<O>;
+  submitForm?(form: HTMLFormElement, ctx: FormSubmitContext): Promise<O>;
   activate(telemetry?: WebTelemetry): void;
 }
 export interface FormSubmission {
   readonly kind: "form-submission";
   readonly action: Action<void, unknown>;
-  submit(form: HTMLFormElement, ctx: { trace: TraceToken }): Promise<unknown>;
+  submit(form: HTMLFormElement, ctx: FormSubmitContext): Promise<unknown>;
 }
 export type CallableAction<I, O> = Action<I, O> & (() => ActionSnapshot<O>);
 export interface ActionContext {

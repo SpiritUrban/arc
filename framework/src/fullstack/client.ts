@@ -198,12 +198,13 @@ type NamedSubmission = {
 
 function readNamedSubmission(
   form: HTMLFormElement,
+  submitter: HTMLElement | null | undefined,
   numericFields: ReadonlySet<string>,
   booleanFields: ReadonlySet<string>,
   arrayFields: ReadonlyMap<string, string>,
   resetOnSuccess: boolean,
 ): NamedSubmission {
-  const entries = new FormData(form);
+  const entries = new FormData(form, submitter ?? undefined);
   const values = Object.create(null) as NamedSubmission["values"];
   for (const [name, value] of entries) {
     const arrayItemType = arrayFields.get(name);
@@ -260,6 +261,8 @@ function readNamedSubmission(
   if (!resetOnSuccess) return { values };
   const fields = Array.from(form.elements).filter(
     (element): element is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement =>
+      !element.matches(":disabled") &&
+      element !== submitter &&
       (element.localName === "input" || element.localName === "textarea" ||
         element.localName === "select") &&
       (entries.has((element as HTMLInputElement).name) ||
@@ -434,6 +437,7 @@ type DirectSubmission<C extends OperationContract> = { [directInput]: Infer<C["i
 const formInput = Symbol("ARC named form input");
 type BoundSubmission<C extends OperationContract> = {
   [formInput]: HTMLFormElement;
+  submitter?: HTMLElement | null;
   params?: Partial<Infer<C["input"]>>;
 };
 type InputField<C extends OperationContract> =
@@ -590,7 +594,9 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
         return execute(contract.input.parse(request[directInput]));
       }
       const submission = request &&
-        readNamedSubmission(request[formInput], numericFields, booleanFields, arrayFields, resetOnSuccess);
+        readNamedSubmission(
+          request[formInput], request.submitter, numericFields, booleanFields, arrayFields, resetOnSuccess,
+        );
       const values = Object.fromEntries(
         names.map((name) => [name, fields[name].get()]),
       ) as Record<Field, string>;
@@ -627,7 +633,8 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     ...updates.map((update) => ({ to: update.target, kind: "UPDATES" as const })),
   ];
   if (!fieldOptions) {
-    submit.submitForm = (form, ctx) => submit.execute({ [formInput]: form }, ctx);
+    submit.submitForm = (form, ctx) =>
+      submit.execute({ [formInput]: form, submitter: ctx.submitter }, ctx);
   }
   return { fields, submit };
 }
@@ -704,7 +711,8 @@ function bindMutation(defaults: RemoteFormDefaults) {
       return {
         kind: "form-submission",
         action: submit,
-        submit: (form, ctx) => submit.execute({ [formInput]: form, params: values }, ctx),
+        submit: (form, ctx) =>
+          submit.execute({ [formInput]: form, submitter: ctx.submitter, params: values }, ctx),
       };
     };
     const mutation = Object.assign(submit, {

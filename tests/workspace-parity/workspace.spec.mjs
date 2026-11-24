@@ -252,6 +252,40 @@ test("USR-01–03 · search, create, select and edit a profile", async ({
   await expect(create.locator('[name="name"]')).toHaveValue("Duplicate User");
 });
 
+test("ARC includes the clicked submit button in the mutation input", async ({ page }, info) => {
+  test.skip(isReact(info), "ARC named-field form binding");
+  await page.goto("/");
+  await expect(userRow(page, "Demo User")).toBeVisible();
+
+  async function addNamedButtons(form, [first, second]) {
+    await form.evaluate((element, names) => {
+      element.querySelector('input[name="name"]').disabled = true;
+      for (const name of names) {
+        const button = document.createElement("button");
+        button.type = "submit";
+        button.name = "name";
+        button.value = name;
+        button.textContent = name;
+        element.append(button);
+      }
+    }, [first, second]);
+  }
+
+  const create = createUserForm(page);
+  await create.locator('[name="email"]').fill("submitter.parity@example.com");
+  await addNamedButtons(create, ["Unused Choice", "Submitter Created"]);
+  await create.getByRole("button", { name: "Submitter Created" }).click();
+  await expect(userRow(page, "Submitter Created").and(page.locator("[data-user]")))
+    .toHaveAttribute("aria-pressed", "true");
+
+  const edit = editUserForm(page);
+  await addNamedButtons(edit, ["Unused Edit", "Submitter Updated"]);
+  await edit.getByRole("button", { name: "Submitter Updated" }).click();
+  const updated = userRow(page, "Submitter Updated").and(page.locator("[data-user]"));
+  await expect(updated).toHaveAttribute("aria-pressed", "true");
+  await expect(updated).toContainText("submitter.parity@example.com");
+});
+
 test("ORD-01–03 · form, filters, totals and a delayed owner query", async ({
   page,
   request,

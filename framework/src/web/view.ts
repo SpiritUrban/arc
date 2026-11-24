@@ -410,9 +410,10 @@ function directive(
           if ((form as Element | null)?.localName !== "form")
             throw new TypeError("A named-field action must be attached to a form");
           const element = form as HTMLFormElement;
+          const context = { trace, submitter: (event as SubmitEvent).submitter };
           return submission
-            ? submission.submit(element, { trace })
-            : action.submitForm!(element, { trace });
+            ? submission.submit(element, context)
+            : action.submitForm!(element, context);
         }
         return action.execute(undefined, { trace });
       };
