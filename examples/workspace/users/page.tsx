@@ -9,14 +9,18 @@ import { activeUser, selectedUser, users } from "../user-selection.ts";
 // CreateUser — спільний контракт. На сервері його виконує createUser у ./server.ts.
 export const addUser = mutation(CreateUser, {
   update: [users.insertBy("id"), setFrom(selectedUser, (user) => user.id)],
+  fieldErrors: { email: "EMAIL_EXISTS" },
 });
 const updateUser = mutation(UpdateUser, {
   update: users.replaceBy("id"),
+  fieldErrors: { email: "EMAIL_EXISTS" },
 });
 
 function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
   const editing = user !== undefined;
   const form = editing ? updateUser : addUser;
+  const name = form.field("name");
+  const email = form.field("email");
   const title = editing ? "Редагувати вибраного користувача" : "Новий користувач";
   const submitLabel = editing ? "Зберегти користувача" : "＋ Додати користувача";
   const pendingLabel = editing ? "Зберігаємо…" : "Додаємо…";
@@ -42,38 +46,31 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
           Ім’я
           <input
             data-name
-            name="name"
-            required
-            minlength="2"
-            maxlength="100"
+            {...name.input}
             placeholder={editing ? undefined : "Олена Коваль"}
             autocomplete="name"
             value={user?.name}
-            aria-invalid={editing ? form.invalid("name") : undefined}
           />
         </label>
         {editing && (
           <p class="error" role="alert">
-            {form.invalid("name") && "Перевірте ім’я користувача."}
+            {name.invalid() && "Перевірте ім’я користувача."}
           </p>
         )}
         <label>
           Email
           <input
             data-email
-            name="email"
-            required
-            type="email"
+            {...email.input}
             placeholder={editing ? undefined : "olena@example.com"}
             autocomplete="email"
             value={user?.email}
-            aria-invalid={duplicate() || (editing && form.invalid("email"))}
           />
         </label>
         <p class="error" role="alert" data-email-error>
           {duplicate()
             ? "Користувач із такою поштою вже існує."
-            : editing && form.invalid("email") && "Перевірте адресу email."}
+            : editing && email.invalid() && "Перевірте адресу email."}
         </p>
         <button class="button secondary" type="submit">
           {form.running() ? pendingLabel : submitLabel}

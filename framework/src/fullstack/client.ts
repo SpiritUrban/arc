@@ -368,7 +368,13 @@ type FormOptions<C extends OperationContract, Field extends string> =
   };
 
 type MutationKey = string | number;
-type KeyedMutationOptions<C extends OperationContract, Key extends MutationKey> = {
+type MutationFieldErrors<C extends OperationContract> = {
+  fieldErrors?: Partial<Record<
+    InputField<NoInfer<C>>,
+    keyof C["errors"] & string
+  >>;
+};
+type KeyedMutationOptions<C extends OperationContract, Key extends MutationKey> = MutationFieldErrors<C> & {
   key?: (input: Infer<C["input"]>) => Key;
 };
 
@@ -381,7 +387,7 @@ export type MutationFieldKey<C extends OperationContract, Field extends Mutation
   Extract<MutationInput<C>[Field], MutationKey>;
 
 export type FieldKeyMutationOptions<C extends OperationContract, Field extends MutationKeyField<C>> =
-  NamedFormOptions<C> & { key: Field };
+  NamedFormOptions<C> & MutationFieldErrors<C> & { key: Field };
 
 export type Mutation<
   C extends OperationContract,
@@ -394,8 +400,8 @@ export type Mutation<
     invalid(): boolean;
     invalid(field: InputField<C>): boolean;
     invalidField(field: InputField<C>): Computed<boolean>;
-    field<Name extends InputField<C>>(name: Name): {
-      input: FieldInputAttributes<Name>;
+    field(name: InputField<C>): {
+      input: FieldInputAttributes;
       invalid: Computed<boolean>;
     };
     run(input: Infer<C["input"]>): Promise<RemoteResult<C>>;
@@ -430,8 +436,8 @@ type InputField<C extends OperationContract> =
     ? Extract<keyof Infer<C["input"]>, string>
     : never;
 
-type FieldInputAttributes<Name extends string> = {
-  name: Name;
+type FieldInputAttributes = {
+  name: string;
   "aria-invalid": Computed<boolean>;
   type?: "text" | "email" | "number";
   required?: boolean;
@@ -442,9 +448,9 @@ type FieldInputAttributes<Name extends string> = {
   step?: number | "any";
 };
 
-function fieldInputAttributes<Name extends string>(
-  schema: Schema<unknown>, name: Name, invalid: Computed<boolean>,
-): FieldInputAttributes<Name> {
+function fieldInputAttributes(
+  schema: Schema<unknown>, name: string, invalid: Computed<boolean>,
+): FieldInputAttributes {
   const input = { name, "aria-invalid": invalid };
   const field = schema.json.properties?.[name];
   const required = Array.isArray(schema.json.required) && schema.json.required.includes(name);
@@ -643,10 +649,10 @@ function bindMutation(defaults: RemoteFormDefaults) {
     contract: C, options: FieldKeyMutationOptions<NoInfer<C>, Field>,
   ): Mutation<C, never, MutationFieldKey<C, Field>>;
   function mutate<C extends OperationContract, Field extends MutationKeyField<NoInfer<C>>>(
-    contract: C, options: ReactiveFormOptions<C> & { key: Field },
+    contract: C, options: ReactiveFormOptions<C> & MutationFieldErrors<C> & { key: Field },
   ): Mutation<C, Extract<keyof MutationInput<C>, string>, MutationFieldKey<C, Field>>;
   function mutate<C extends OperationContract, Field extends string, Name extends MutationKeyField<NoInfer<C>>>(
-    contract: C, options: MappedFormOptions<C, Field> & { key: Name },
+    contract: C, options: MappedFormOptions<C, Field> & MutationFieldErrors<C> & { key: Name },
   ): Mutation<C, Field, MutationFieldKey<C, Name>>;
   function mutate<C extends OperationContract, Key extends MutationKey = MutationKey>(
     contract: C, options?: NamedMutationOptions<C, Key>,
@@ -658,14 +664,17 @@ function bindMutation(defaults: RemoteFormDefaults) {
     contract: C, options: MappedFormOptions<C, Field> & KeyedMutationOptions<C, Key>,
   ): Mutation<C, Field, Key>;
   function mutate<C extends OperationContract, Field extends string, Key extends MutationKey>(
-    contract: C, options: FormOptions<C, Field> & { key?: ((input: MutationInput<C>) => Key) | MutationKeyField<C> } = {},
+    contract: C,
+    options: FormOptions<C, Field> & MutationFieldErrors<C> &
+      { key?: ((input: MutationInput<C>) => Key) | MutationKeyField<C> } = {},
   ): Mutation<C, Field, Key> {
     const { fields, submit } = buildRemoteForm(contract, options, defaults, true);
     const key = options.key;
     const keyOf = typeof key === "string" ? (input: MutationInput<C>) => input[key] as Key : key;
     const requests = new Map<Key, Promise<RemoteResult<C>>>();
     const outcomes = new Map<Key, MutationOutcome<C>>();
-    const invalidFields = new Map<InputField<C>, Computed<boolean>>();
+    const fieldErrors = new Map(Object.entries(options.fieldErrors ?? {}));
+    const invalidFields = new Map<string, Computed<boolean>>();
     const revision = keyOf && state({ id: `${submit.id}.pending`, initial: 0 });
     let disposed = false;
     if (revision) {
@@ -755,17 +764,27 @@ function bindMutation(defaults: RemoteFormDefaults) {
       },
       invalidField(field: InputField<C>) {
         if (disposed) throw new Error(`Disposed mutation: ${submit.id}`);
-        let invalid = invalidFields.get(field);
+        const id = `${submit.id}.invalid.${field}`;
+        let invalid = invalidFields.get(id);
         if (!invalid) {
-          invalid = derive(
-            `${submit.id}.invalid.${field}`, submit.error, (error) => invalidInput(error, field),
-          );
-          invalidFields.set(field, invalid);
+          invalid = derive(id, submit.error, (error) => invalidInput(error, field));
+          invalidFields.set(id, invalid);
         }
         return invalid;
       },
-      field<Name extends InputField<C>>(name: Name) {
-        const invalid = mutation.invalidField(name);
+      field(name: InputField<C>) {
+        if (disposed) throw new Error(`Disposed mutation: ${submit.id}`);
+        const code = fieldErrors.get(name);
+        const id = `${submit.id}.field.${name}.invalid`;
+        let invalid = invalidFields.get(id);
+        if (code === undefined) {
+          invalid = mutation.invalidField(name);
+        } else if (!invalid) {
+          invalid = derive(id, submit, ({ error, result, status }) =>
+            invalidInput(error, name) ||
+            (status === "error" && result?.kind === "business_error" && result.error === code));
+          invalidFields.set(id, invalid);
+        }
         return { input: fieldInputAttributes(contract.input, name, invalid), invalid };
       },
     });

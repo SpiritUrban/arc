@@ -237,6 +237,8 @@ test("USR-01–03 · search, create, select and edit a profile", async ({
     edit.getByRole("alert").filter({ hasText: "вже існує" }),
   ).toBeVisible();
   await expect(edit.locator('[name="email"]')).toHaveValue("demo@example.com");
+  await expect(edit.locator('[name="email"]')).toHaveAttribute("aria-invalid", "true");
+  await expect(edit.locator('[name="name"]')).toHaveAttribute("aria-invalid", "false");
   await expect(userRow(page, "Olena Updated")).toContainText(
     "olena.updated@example.com",
   );
@@ -245,6 +247,8 @@ test("USR-01–03 · search, create, select and edit a profile", async ({
   await expect(
     page.locator("#users").getByRole("alert").filter({ hasText: "вже існує" }),
   ).toHaveCount(2);
+  await expect(create.locator('[name="email"]')).toHaveAttribute("aria-invalid", "true");
+  await expect(create.locator('[name="name"]')).toHaveAttribute("aria-invalid", "false");
   await expect(create.locator('[name="name"]')).toHaveValue("Duplicate User");
 });
 

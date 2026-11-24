@@ -133,8 +133,15 @@ test("mutation field validation shares one reactive value per field", async () =
       title: s.string({ max: 80 }).optional(),
     }),
     output: s.int(),
+    errors: { EMAIL_EXISTS: 409, CONFLICT: 409 },
   });
-  const save = mutation(write, { fetch: async () => Response.json({ ok: true, value: 1 }) });
+  let failure: "EMAIL_EXISTS" | "CONFLICT" | undefined;
+  const save = mutation(write, {
+    fieldErrors: { email: "EMAIL_EXISTS" },
+    fetch: async () => failure
+      ? Response.json({ ok: false, kind: "business_error", error: failure }, { status: 409 })
+      : Response.json({ ok: true, value: 1 }),
+  });
   try {
     const invalid = save.invalidField("quantity");
     assert.equal(save.invalidField("quantity"), invalid);
@@ -146,7 +153,9 @@ test("mutation field validation shares one reactive value per field", async () =
     assert.equal(price.required, false);
     assert.equal(price.min, 0.25);
     assert.equal(price.step, "any");
-    assert.equal(save.field("email").input.type, "email");
+    const email = save.field("email");
+    assert.equal(email.input.type, "email");
+    assert.equal(email.invalid, save.field("email").invalid);
     assert.equal(save.field("title").input.maxlength, 80);
     assert.equal(invalid(), false);
     await assert.rejects(save.run({ quantity: 0 }));
@@ -154,6 +163,17 @@ test("mutation field validation shares one reactive value per field", async () =
     assert.equal(invalid(), true);
     await save.run({ quantity: 1 });
     assert.equal(invalid(), false);
+    failure = "CONFLICT";
+    await save.run({ quantity: 1 });
+    assert.equal(email.invalid(), false);
+    failure = "EMAIL_EXISTS";
+    await save.run({ quantity: 1 });
+    assert.equal(email.invalid(), true);
+    assert.equal(save.invalid("email"), false);
+    assert.equal(invalid(), false);
+    failure = undefined;
+    await save.run({ quantity: 1 });
+    assert.equal(email.invalid(), false);
     save.dispose();
     assert.throws(() => invalid.subscribe(() => {}), /Disposed derived/);
   } finally {
