@@ -26,6 +26,11 @@ test("page operations use only route parameters declared by the contract", () =>
   const read = operationContract({ id: "route.read", input, output: s.string() });
   const localized = s.object({ id: s.string(), locale: s.string() });
   const detail = operationContract({ id: "route.detail", input: localized, output: s.string() });
+  const ranked = operationContract({
+    id: "route.ranked",
+    input: s.object({ id: s.string(), rank: s.int(), limit: s.int().optional() }),
+    output: s.string(),
+  });
   const write = operationContract({ id: "route.write", input, output: s.string() });
   const publish = operationContract({ id: "route.publish", input: localized, output: s.string() });
   const source = state({ id: "route.source", initial: "" });
@@ -34,7 +39,7 @@ test("page operations use only route parameters declared by the contract", () =>
   const client = new Proxy(remote, {
     get(target, key) {
       const method = Reflect.get(target, key);
-      return (contract: typeof read | typeof detail, options: { params: unknown }) => {
+      return (contract: typeof read | typeof detail | typeof ranked, options: { params: unknown }) => {
         calls.push(contract.input.parse(options.params));
         return method(contract, options);
       };
@@ -46,12 +51,17 @@ test("page operations use only route parameters declared by the contract", () =>
     scoped.query(read, { cache: true });
     const details = scoped.query(detail, { params: { locale: "uk" } });
     assert.equal(details.id, "route.page.route.detail.query");
+    scoped.query(ranked, { params: { rank: 7 } });
     const keyed = scoped.mutation(write, { id: "route.write.default", key: "id" });
     assert.equal(keyed.id, "route.write.default");
     assert.equal(keyed.pending("route"), false);
     if (false) {
       // @ts-expect-error The selected input field contains a string key.
       keyed.pending(1);
+      // @ts-expect-error The route does not supply the required locale.
+      scoped.query(detail, { cache: true });
+      // @ts-expect-error The route's string rank cannot supply an integer field.
+      scoped.query(ranked);
     }
     scoped.mutation(publish, { params: { locale: "uk" } });
     scoped.mutation(publish, {
@@ -60,18 +70,19 @@ test("page operations use only route parameters declared by the contract", () =>
     });
     mutation(client, write, { params: { id: "explicit" } });
     return jsx("div", {});
-  }, { owner: "workspace", id: "route" });
+  }, { owner: "workspace", id: "route", rank: "2", limit: "10" });
 
   assert.deepEqual(calls, [
     { id: "route" },
     { id: "route" },
     { id: "route", locale: "uk" },
+    { id: "route", rank: 7 },
     { id: "route" },
     { id: "route", locale: "uk" },
     { id: "override", locale: "uk" },
     { id: "explicit" },
   ]);
-  assert.equal(page.owned?.length, 7);
+  assert.equal(page.owned?.length, 8);
   for (const node of page.owned ?? []) node.dispose();
   source.dispose();
 });

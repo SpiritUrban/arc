@@ -686,16 +686,29 @@ type PageRemoteClient = {
   mutation<C extends OperationContract>(contract: C, ...args: any[]): Mutation<C>;
 };
 
-type RouteQueryOptions<C extends OperationContract> = {
+type StringRouteFields<Input, Param extends string> = {
+  [Name in Extract<keyof Input, Param>]-?: NonNullable<Input[Name]> extends string ? Name : never;
+}[Extract<keyof Input, Param>];
+
+type RouteQueryParams<Input, Param extends string> =
+  Omit<Input, StringRouteFields<Input, Param>> & Partial<Pick<Input, StringRouteFields<Input, Param>>>;
+
+type RouteQueryOptions = {
   id?: string;
   cache?: boolean;
   input?: never;
-  params?: Infer<C["input"]> extends Record<string, unknown> ? Partial<Infer<C["input"]>> : never;
 };
 
-type BoundPageClient<Client extends PageRemoteClient> = {
+type RouteQueryArgs<Input, Param extends string> =
+  Input extends Record<string, unknown>
+    ? {} extends RouteQueryParams<Input, Param>
+      ? [options?: RouteQueryOptions & { params?: RouteQueryParams<Input, Param> }]
+      : [options: RouteQueryOptions & { params: RouteQueryParams<Input, Param> }]
+    : [options: never];
+
+type BoundPageClient<Client extends PageRemoteClient, Param extends string> = {
   query: Client["query"] & (<C extends OperationContract>(
-    contract: C, options?: RouteQueryOptions<NoInfer<C>>,
+    contract: C, ...args: RouteQueryArgs<Infer<NoInfer<C>["input"]>, Param>
   ) => RemoteQuery<C>);
   mutation: Client["mutation"];
 };
@@ -705,7 +718,7 @@ export interface PageContext<Param extends string = string> {
   local<T>(initial: T, name?: string): Signal<T>;
   own<T extends OwnedNode>(node: T): T;
   /** Bind a remote client to the current page and its route parameters. */
-  bind<Client extends PageRemoteClient>(client: Client): BoundPageClient<Client>;
+  bind<Client extends PageRemoteClient>(client: Client): BoundPageClient<Client, Param>;
   /** Create a derived value owned by this view instance. */
   derive<const From extends DerivedFrom, T>(
     name: string, from: From, compute: (...values: DerivedValues<From>) => T,
@@ -746,10 +759,10 @@ export interface PageLayoutContext<Param extends string = string> extends PageCo
   route: string;
 }
 
-export function pageView(
+export function pageView<Param extends string = string>(
   id: string,
-  template: (context: PageContext) => TemplateElement,
-  params: Readonly<Record<string, string>> = {},
+  template: (context: PageContext<Param>) => TemplateElement,
+  params: Readonly<Record<Param, string>> = {} as Readonly<Record<Param, string>>,
 ): View {
   function withRouteParams<Options extends { params?: unknown }>(
     contract: unknown, options?: Options, merge = false,
@@ -757,7 +770,8 @@ export function pageView(
     const operation = contract as Partial<OperationContract> | undefined;
     const fields = operation?.kind === "operation" ? operation.input?.json?.properties : undefined;
     const routeInput = fields
-      ? Object.fromEntries(Object.entries(params).filter(([name]) => Object.hasOwn(fields, name)))
+      ? Object.fromEntries(Object.entries(params).filter(([name]) =>
+        Object.hasOwn(fields, name) && (!merge || fields[name]?.type === "string")))
       : params;
     const explicit = options?.params;
     const input = merge && fields && typeof explicit === "object" && explicit !== null && !Array.isArray(explicit)
@@ -773,14 +787,14 @@ export function pageView(
     local,
     derive,
     own,
-    bind<Client extends PageRemoteClient>(client: Client): BoundPageClient<Client> {
+    bind<Client extends PageRemoteClient>(client: Client): BoundPageClient<Client, Param> {
       return {
         query: ((contract: OperationContract, options?: { id?: string; params?: unknown }) =>
           own(client.query(contract, {
             ...withRouteParams(contract, options, true),
             id: options?.id ?? `${id}.${contract.id}.query`,
           }))
-        ) as BoundPageClient<Client>["query"],
+        ) as BoundPageClient<Client, Param>["query"],
         mutation: ((contract: OperationContract, options?: { id?: string; params?: unknown }) =>
           own(client.mutation(contract, {
             ...withRouteParams(contract, options, true),
@@ -791,7 +805,7 @@ export function pageView(
     },
     query: ((client: { query(...args: any[]): OwnedNode }, ...args: unknown[]) =>
       own(client.query(args[0], withRouteParams(args[0], args[1] as { params?: unknown } | undefined)))
-    ) as PageContext["query"],
+    ) as PageContext<Param>["query"],
     mutation: <
       Contract extends OperationContract,
       Options extends { params?: unknown },
