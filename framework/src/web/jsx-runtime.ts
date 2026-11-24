@@ -1,6 +1,7 @@
 import type { Action, FormSubmission } from "./async.js";
 import type { Readable, Writable } from "./reactive.js";
 import type { Binding, EventHandler, Projection, View } from "./view.js";
+export { reactiveEvent } from "./event-trigger.js";
 
 const templateNode = Symbol("ARC template node");
 const childBinding = Symbol("ARC template child binding");

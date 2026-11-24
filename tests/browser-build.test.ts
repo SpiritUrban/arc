@@ -5,6 +5,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildWeb } from "../framework/src/fullstack/build.ts";
+import { compileReactiveJsx } from "../framework/src/fullstack/reactive-jsx.ts";
 import counter from "../examples/web-counter/app.ts";
 import { createApp } from "../examples/fullstack-tasks/app.ts";
 import { application } from "../framework/src/index.ts";
@@ -12,6 +13,17 @@ import { remoteClient } from "../framework/src/fullstack/client.ts";
 import { read } from "./fixtures/browser-boundary/server.ts";
 import { mount, tick, type View } from "../framework/src/web/index.ts";
 const tasksEntry = new URL("../examples/fullstack-tasks/app.ts", import.meta.url);
+
+test("the TSX compiler preserves the resource behind a refresh callback", () => {
+  const compiled = compileReactiveJsx(
+    `const button = <button onClick={() => tasks.refresh()}>Retry</button>;`,
+    "retry.tsx",
+    { reactive: true },
+  );
+  assert.match(compiled!, /reactiveEvent as arcEvent_\d+/);
+  assert.match(compiled!, /arcEvent_\d+\(\(\) => tasks\.refresh\(\), \(\) => \(tasks\)\)/);
+});
+
 test("pure Web and Fullstack build manifests have no Node/server implementation in browser", async () => {
   const tasks = createApp();
   const dir = await mkdtemp(join(tmpdir(), "arc-browser-"));

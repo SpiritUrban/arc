@@ -32,9 +32,11 @@ export function compileReactiveJsx(
           const { factory } = context;
           const render = factory.createUniqueName("arcRender");
           const attribute = factory.createUniqueName("arcAttribute");
+          const event = factory.createUniqueName("arcEvent");
           const each = factory.createUniqueName("arcEach");
           let usedRender = false;
           let usedAttribute = false;
+          let usedEvent = false;
           let usedEach = false;
 
           function arrow(
@@ -339,7 +341,22 @@ export function compileReactiveJsx(
               return transformed;
 
             const expression = (transformed as TS.JsxExpression).expression!;
-            if (!ts.isJsxAttribute(node.parent)) {
+            if (ts.isJsxAttribute(node.parent)) {
+              const tag = node.parent.parent.parent.tagName;
+              const name = node.parent.name.getText(file);
+              const handler = unwrap(expression);
+              if (ts.isIdentifier(tag) && /^[a-z]/.test(tag.text) && /^on[A-Z]/.test(name) &&
+                  ts.isArrowFunction(handler) && !handler.parameters.length && !ts.isBlock(handler.body)) {
+                const call = unwrap(handler.body);
+                if (ts.isCallExpression(call) && ts.isPropertyAccessExpression(call.expression) &&
+                    call.expression.name.text === "refresh" && ts.isIdentifier(call.expression.expression)) {
+                  usedEvent = true;
+                  return factory.updateJsxExpression(node,
+                    factory.createCallExpression(event, undefined, [expression, arrow(call.expression.expression)]),
+                  );
+                }
+              }
+            } else {
               const list = keyedMap(expression);
               if (list) return factory.updateJsxExpression(node, list);
             }
@@ -401,6 +418,8 @@ export function compileReactiveJsx(
                 attribute,
               ),
             );
+          if (usedEvent)
+            imports.push(factory.createImportSpecifier(false, factory.createIdentifier("reactiveEvent"), event));
           if (!imports.length) return result;
           const runtime = factory.createImportDeclaration(
             undefined,

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseHTML } from "linkedom";
-import { jsx } from "@arc/framework/web/jsx-runtime";
+import { jsx, reactiveEvent } from "@arc/framework/web/jsx-runtime";
 import { compileArchitecture } from "@arc/framework/core";
 import type { BrowserEvent } from "../framework/src/neutral/protocol.ts";
 import {
@@ -71,6 +71,15 @@ test("a resource refresh handler registers its resource and continues the browse
     template: () => jsx("button", { onClick: resource.refresh, children: "Retry" }),
   });
   assert.ok(compileArchitecture([page]).edges.some(({ from, to, kind }) =>
+    from.endsWith(".on:click") && to === resource.id && kind === "TRIGGERS",
+  ));
+  const wrapped = view({
+    id: "retry.wrapped",
+    template: () => jsx("button", {
+      onClick: reactiveEvent(() => resource.refresh(), () => resource),
+    }),
+  });
+  assert.ok(compileArchitecture([wrapped]).edges.some(({ from, to, kind }) =>
     from.endsWith(".on:click") && to === resource.id && kind === "TRIGGERS",
   ));
   const deferred = view({
