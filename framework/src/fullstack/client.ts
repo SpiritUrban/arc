@@ -923,12 +923,28 @@ function bindQueryKey<Values extends readonly unknown[]>(
   };
 }
 
+type DirectQueryInput<C extends OperationContract, Sources extends RemoteSources> =
+  [Sources] extends [Readable<NoInfer<Infer<C["input"]>>>]
+    ? {
+        /** Use the value of the single source as the complete input. */
+        input: true;
+        params?: never;
+      }
+    : never;
+
+function directQueryInput<Input>(from: RemoteSources | undefined): (value: Input) => Input {
+  if (from === undefined || Array.isArray(from)) {
+    throw new TypeError("query input: true requires a single signal");
+  }
+  return (value) => value;
+}
+
 type ClientQueryOptions<C extends OperationContract, Sources extends RemoteSources> = {
   id?: string;
   /** Override the cache context. By default, cached queries use all `from` values. */
   key?: true | ((...values: SourceValues<Sources>) => string | number);
   cache?: boolean;
-} & ({} extends Infer<C["input"]>
+} & (DirectQueryInput<C, Sources> | ({} extends Infer<C["input"]>
   ? {
       input?: (...values: SourceValues<Sources>) => Infer<C["input"]>;
       params?: Infer<C["input"]>;
@@ -938,7 +954,7 @@ type ClientQueryOptions<C extends OperationContract, Sources extends RemoteSourc
     } | {
       /** Use route parameters directly when they form the complete operation input. */
       params: Infer<C["input"]>;
-    });
+    }));
 
 type RemoteApiOptions<Sources extends RemoteSources> = {
   from?: Sources;
@@ -976,11 +992,13 @@ export function remoteApi<const Sources extends RemoteSources = readonly []>(
         : [options: ClientQueryOptions<C, Sources>]
     ): RemoteQuery<C> {
       const keyOption = query?.key ?? options.key ?? (query?.cache ? true : undefined);
+      const project = query && "input" in query ? query.input : undefined;
       return createRemoteResource(contract, {
         id: query?.id ?? `${contract.id}.query`,
         from,
-        input: query && "input" in query ? query.input : query && "params" in query
-          ? () => query.params as Infer<C["input"]>
+        input: project === true ? directQueryInput<Infer<C["input"]>>(options.from)
+          : query && "input" in query ? project
+          : query && "params" in query ? () => query.params as Infer<C["input"]>
           : undefined,
         key: bindQueryKey(keyOption, from),
         cache: query?.cache,
@@ -1099,14 +1117,7 @@ type QueryOptions<C extends OperationContract, Sources extends RemoteSources> =
         params: NoInfer<Infer<C["input"]>>;
         input?: never;
       }
-    | ([Sources] extends [Readable<NoInfer<Infer<C["input"]>>>]
-      ? {
-          from: Sources;
-          /** Use the value of the single source as the complete input. */
-          input: true;
-          params?: never;
-        }
-      : never)
+    | (DirectQueryInput<C, Sources> & { from: Sources })
   );
 
 /** Read the current state of a contract-backed query by calling it. */
@@ -1120,11 +1131,8 @@ export function query<
     : [options: QueryOptions<C, Sources>]
 ): RemoteQuery<C> {
   const { params, input, key, from, ...settings } = options ?? {};
-  if (input === true && (from === undefined || Array.isArray(from))) {
-    throw new TypeError("query input: true requires a single signal");
-  }
   const sources = from === undefined ? [] : sourceList(from);
-  const project = input === true ? (value: Infer<C["input"]>) => value : input;
+  const project = input === true ? directQueryInput<Infer<C["input"]>>(from) : input;
   return createRemoteResource(contract, {
     ...settings,
     id: options?.id ?? `${contract.id}.query`,

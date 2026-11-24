@@ -316,6 +316,47 @@ test("standalone queries can use one source as their complete input", async () =
   }
 });
 
+test("remote client queries can use their source as complete input inside and outside pages", async () => {
+  const read = operationContract({
+    id: "client-source.read",
+    input: s.object({ id: s.string(), locale: s.string().optional() }),
+    output: s.string(),
+  });
+  const params = state({ id: "client-source.params", initial: { id: "first" } });
+  const requests: unknown[] = [];
+  const client = remoteApi({
+    from: params,
+    fetch: async (_url, init) => {
+      const input = JSON.parse(String(init?.body));
+      requests.push(input);
+      return Response.json({ ok: true, value: input.id });
+    },
+  });
+  if (false) {
+    // @ts-expect-error A direct input must supply the required ID.
+    remoteApi({ from: state({ id: "client-source.invalid", initial: {} }) }).query(read, { input: true });
+  }
+
+  const result = client.query(read, { input: true });
+  const page = pageView("client-source.page", ({ bind }) => {
+    bind(client).query(read, { input: true });
+    return jsx("div", {});
+  }, { id: "route-id", locale: "uk" });
+  const [bound] = page.owned as readonly RemoteQuery<typeof read>[];
+  try {
+    assert.equal(bound.id, "client-source.page.client-source.read.query");
+    await result.refresh();
+    params.set({ id: "second" });
+    await bound.refresh();
+    assert.deepEqual(requests, [{ id: "first" }, { id: "second" }]);
+    assert.equal(bound.data(), "second");
+  } finally {
+    result.dispose();
+    bound.dispose();
+    params.dispose();
+  }
+});
+
 test("standalone queries can key cached results by their sources", async () => {
   const read = operationContract({
     id: "cached.read",
