@@ -31,6 +31,11 @@ function browserWindow(window: ReturnType<typeof parseHTML>["window"], location:
   };
 }
 
+const detailPage = "page:pages/orders/[id]";
+const detailQuery = `${detailPage}.orders.get.query`;
+const detailUpdate = `${detailPage}.orders.update.submit`;
+const detailCancel = `${detailPage}.orders.cancel.submit`;
+
 test("Workspace order edit carries the submit trace to the server operation in Stand", async () => {
   const entry = new URL("../examples/workspace/app.ts", import.meta.url);
   const { createApp } = await importApplication(entry) as typeof import("../examples/workspace/app.ts");
@@ -95,13 +100,13 @@ test("Workspace order edit carries the submit trace to the server operation in S
       "detail updated from the mutation response");
     assert.ok(editTrace);
     const mutationEvents = [
-      ["binding.event", "page:pages/orders/[id].dom."],
-      ["action.started", "orders.update.submit"],
-      ["remote.started", "orders.update.submit.remote"],
-      ["remote.finished", "orders.update.submit.remote"],
-      ["resource.updated", "orders.get.query"],
+      ["binding.event", `${detailPage}.dom.`],
+      ["action.started", detailUpdate],
+      ["remote.started", `${detailUpdate}.remote`],
+      ["remote.finished", `${detailUpdate}.remote`],
+      ["resource.updated", detailQuery],
       ["resource.updated", "orders.list.query"],
-      ["action.finished", "orders.update.submit"],
+      ["action.finished", detailUpdate],
     ] as const;
     await waitFor(() => mutationEvents.every(([type, node]) => app.browserEvents.some((event) =>
       event.traceId === editTrace && event.type === type &&
@@ -112,17 +117,17 @@ test("Workspace order edit carries the submit trace to the server operation in S
     assert.ok(interaction);
     assert.deepEqual(interaction.server.map(({ operation }: { operation: string }) => operation), ["orders.update"]);
     const started = interaction.browser.find((event: (typeof app.browserEvents)[number]) =>
-      event.type === "action.started" && event.node === "orders.update.submit");
+      event.type === "action.started" && event.node === detailUpdate);
     const remote = interaction.browser.find((event: (typeof app.browserEvents)[number]) =>
-      event.type === "remote.started" && event.node === "orders.update.submit.remote");
+      event.type === "remote.started" && event.node === `${detailUpdate}.remote`);
     assert.ok(started?.spanId);
     assert.equal(remote?.parentId, started.spanId);
     const updates = interaction.browser.filter((event: (typeof app.browserEvents)[number]) =>
       event.type === "resource.updated");
     assert.deepEqual(updates.map((event: (typeof app.browserEvents)[number]) =>
       [event.node, event.parentId]).sort(), [
-      ["orders.get.query", started.spanId],
       ["orders.list.query", started.spanId],
+      [detailQuery, started.spanId],
     ]);
     const outletIds = ["router-outlet:root", "router-outlet:/", "router-outlet:/orders"];
     for (const id of outletIds) {
@@ -166,9 +171,9 @@ test("Workspace order update has consistent identities and impact in build and S
     const standGraph = await response.json();
     const artifact = JSON.parse(await readFile(join(dir, "architecture.json"), "utf8"));
     assert.deepEqual(artifact, standGraph);
-    const mutation = "orders.update.submit";
+    const mutation = detailUpdate;
     const operation = "orders.update";
-    for (const id of ["orders.get.query", mutation, "orders.detail-cancel.submit"]) {
+    for (const id of [detailQuery, mutation, detailCancel]) {
       assert.equal(graph.nodes.find((node) => node.id === id)?.scope, "view", id);
     }
     assert.ok(manifest.partitions?.browser.includes(mutation));
@@ -181,13 +186,13 @@ test("Workspace order update has consistent identities and impact in build and S
       from === "orders.create.submit" && to.endsWith(".aria-invalid") && kind === "BINDS",
     ).length, 2);
     assert.ok(graph.edges.some(({ from, to, kind }) =>
-      from === mutation && to.startsWith("page:pages/orders/[id].dom.") && kind === "BINDS",
+      from === mutation && to.startsWith(`${detailPage}.dom.`) && kind === "BINDS",
     ));
     assert.ok(graph.edges.some(({ from, to, kind }) =>
       from === "orders.create.submit.running" && to.startsWith("orders.page.dom.") && kind === "BINDS",
     ));
     assert.ok(affected);
-    for (const consumer of [mutation, "http:PUT:/orders/:id", "orders.get.query", "orders.list.query"]) {
+    for (const consumer of [mutation, "http:PUT:/orders/:id", detailQuery, "orders.list.query"]) {
       assert.ok(affected.includes(consumer), consumer);
     }
     assert.ok(!affected.includes(operation));

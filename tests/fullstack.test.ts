@@ -42,8 +42,9 @@ test("page operations use only route parameters declared by the contract", () =>
     query(client, read);
     const scoped = bind(client);
     const details = scoped.query(detail);
-    assert.equal(details.id, "route.detail.query");
+    assert.equal(details.id, "route.page.route.detail.query");
     const keyed = scoped.mutation(write, { id: "route.write.default", key: "id" });
+    assert.equal(keyed.id, "route.write.default");
     assert.equal(keyed.pending("route"), false);
     if (false) {
       // @ts-expect-error The selected input field contains a string key.

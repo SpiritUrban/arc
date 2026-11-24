@@ -754,11 +754,17 @@ export function pageView(
     own,
     bind<Client extends PageRemoteClient>(client: Client): BoundPageClient<Client> {
       return {
-        query: ((contract: OperationContract, options?: { params?: unknown }) =>
-          own(client.query(contract, withRouteParams(contract, options)))
+        query: ((contract: OperationContract, options?: { id?: string; params?: unknown }) =>
+          own(client.query(contract, {
+            ...withRouteParams(contract, options),
+            id: options?.id ?? `${id}.${contract.id}.query`,
+          }))
         ) as BoundPageClient<Client>["query"],
-        mutation: ((contract: OperationContract, options?: { params?: unknown }) =>
-          own(client.mutation(contract, withRouteParams(contract, options)))
+        mutation: ((contract: OperationContract, options?: { id?: string; params?: unknown }) =>
+          own(client.mutation(contract, {
+            ...withRouteParams(contract, options),
+            id: options?.id ?? `${id}.${contract.id}.submit`,
+          }))
         ) as Client["mutation"],
       };
     },

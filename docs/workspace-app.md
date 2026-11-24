@@ -59,10 +59,10 @@ orders.create.submit.fields.product / orders.create.submit.fields.quantity
     INVALIDATES → orders.list.query
 users.update.submit → users.update.submit.remote → users.update [server]
   UPDATES → users.list.query
-page:orders/[id] → orders.update.submit → orders.update.submit.remote → orders.update [server]
-  UPDATES → orders.get.query + orders.list.query
-page:orders/[id] → orders.detail-cancel.submit → orders.detail-cancel.submit.remote → orders.cancel [server]
-  UPDATES → orders.get.query + orders.list.query
+page:pages/orders/[id] → page:pages/orders/[id].orders.update.submit → …submit.remote → orders.update [server]
+  UPDATES → page:pages/orders/[id].orders.get.query + orders.list.query
+page:pages/orders/[id] → page:pages/orders/[id].orders.cancel.submit → …submit.remote → orders.cancel [server]
+  UPDATES → page:pages/orders/[id].orders.get.query + orders.list.query
 orders.list.query → orders.list.query.data → orders.list.query.select.visible → DOM bindings підсумку
 ```
 
