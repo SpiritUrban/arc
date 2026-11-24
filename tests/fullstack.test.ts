@@ -24,15 +24,17 @@ import { pageView } from "../framework/src/web/view.ts";
 test("page operations use only route parameters declared by the contract", () => {
   const input = s.object({ id: s.string() });
   const read = operationContract({ id: "route.read", input, output: s.string() });
-  const detail = operationContract({ id: "route.detail", input, output: s.string() });
+  const localized = s.object({ id: s.string(), locale: s.string() });
+  const detail = operationContract({ id: "route.detail", input: localized, output: s.string() });
   const write = operationContract({ id: "route.write", input, output: s.string() });
+  const publish = operationContract({ id: "route.publish", input: localized, output: s.string() });
   const source = state({ id: "route.source", initial: "" });
   const remote = remoteApi({ from: source, headers: () => ({}) });
   const calls: unknown[] = [];
   const client = new Proxy(remote, {
     get(target, key) {
       const method = Reflect.get(target, key);
-      return (contract: typeof read, options: { params: unknown }) => {
+      return (contract: typeof read | typeof detail, options: { params: unknown }) => {
         calls.push(contract.input.parse(options.params));
         return method(contract, options);
       };
@@ -41,7 +43,8 @@ test("page operations use only route parameters declared by the contract", () =>
   const page = pageView("route.page", ({ bind, query, mutation }) => {
     query(client, read);
     const scoped = bind(client);
-    const details = scoped.query(detail);
+    scoped.query(read, { cache: true });
+    const details = scoped.query(detail, { params: { locale: "uk" } });
     assert.equal(details.id, "route.page.route.detail.query");
     const keyed = scoped.mutation(write, { id: "route.write.default", key: "id" });
     assert.equal(keyed.id, "route.write.default");
@@ -50,12 +53,25 @@ test("page operations use only route parameters declared by the contract", () =>
       // @ts-expect-error The selected input field contains a string key.
       keyed.pending(1);
     }
+    scoped.mutation(publish, { params: { locale: "uk" } });
+    scoped.mutation(publish, {
+      id: "route.publish.override",
+      params: { id: "override", locale: "uk" },
+    });
     mutation(client, write, { params: { id: "explicit" } });
     return jsx("div", {});
   }, { owner: "workspace", id: "route" });
 
-  assert.deepEqual(calls, [{ id: "route" }, { id: "route" }, { id: "route" }, { id: "explicit" }]);
-  assert.equal(page.owned?.length, 4);
+  assert.deepEqual(calls, [
+    { id: "route" },
+    { id: "route" },
+    { id: "route", locale: "uk" },
+    { id: "route" },
+    { id: "route", locale: "uk" },
+    { id: "override", locale: "uk" },
+    { id: "explicit" },
+  ]);
+  assert.equal(page.owned?.length, 7);
   for (const node of page.owned ?? []) node.dispose();
   source.dispose();
 });

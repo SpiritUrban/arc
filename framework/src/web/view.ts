@@ -1,5 +1,6 @@
 import { compileArchitecture, type GraphDefinition } from "../neutral/graph.js";
 import type { OperationContract } from "../neutral/contracts.js";
+import type { Infer } from "../schema.js";
 import type {
   FieldKeyMutationOptions,
   Mutation,
@@ -683,8 +684,17 @@ type PageRemoteClient = {
   mutation<C extends OperationContract>(contract: C, ...args: any[]): Mutation<C>;
 };
 
+type RouteQueryOptions<C extends OperationContract> = {
+  id?: string;
+  cache?: boolean;
+  input?: never;
+  params?: Infer<C["input"]> extends Record<string, unknown> ? Partial<Infer<C["input"]>> : never;
+};
+
 type BoundPageClient<Client extends PageRemoteClient> = {
-  query: Client["query"] & (<C extends OperationContract>(contract: C) => RemoteQuery<C>);
+  query: Client["query"] & (<C extends OperationContract>(
+    contract: C, options?: RouteQueryOptions<NoInfer<C>>,
+  ) => RemoteQuery<C>);
   mutation: Client["mutation"];
 };
 
@@ -736,15 +746,21 @@ export function pageView(
   template: (context: PageContext) => TemplateElement,
   params: Readonly<Record<string, string>> = {},
 ): View {
-  function withRouteParams<Options extends { params?: unknown }>(contract: unknown, options?: Options) {
+  function withRouteParams<Options extends { params?: unknown }>(
+    contract: unknown, options?: Options, merge = false,
+  ) {
     const operation = contract as Partial<OperationContract> | undefined;
     const fields = operation?.kind === "operation" ? operation.input?.json?.properties : undefined;
-    const routeInput = options?.params ?? (fields
+    const routeInput = fields
       ? Object.fromEntries(Object.entries(params).filter(([name]) => Object.hasOwn(fields, name)))
-      : params);
+      : params;
+    const explicit = options?.params;
+    const input = merge && fields && typeof explicit === "object" && explicit !== null && !Array.isArray(explicit)
+      ? { ...routeInput, ...explicit }
+      : explicit ?? routeInput;
     return {
       ...options,
-      params: routeInput as NonNullable<Options["params"]>,
+      params: input as NonNullable<Options["params"]>,
     };
   }
   return scopedView({ id }, ({ local, derive, own }) => template({
@@ -756,13 +772,13 @@ export function pageView(
       return {
         query: ((contract: OperationContract, options?: { id?: string; params?: unknown }) =>
           own(client.query(contract, {
-            ...withRouteParams(contract, options),
+            ...withRouteParams(contract, options, true),
             id: options?.id ?? `${id}.${contract.id}.query`,
           }))
         ) as BoundPageClient<Client>["query"],
         mutation: ((contract: OperationContract, options?: { id?: string; params?: unknown }) =>
           own(client.mutation(contract, {
-            ...withRouteParams(contract, options),
+            ...withRouteParams(contract, options, true),
             id: options?.id ?? `${id}.${contract.id}.submit`,
           }))
         ) as Client["mutation"],
