@@ -152,7 +152,7 @@ export const OrdersPage = view({
                   <th>Статус</th>
                 </tr>
               </thead>
-              <tbody data-rows>
+              <tbody data-rows aria-busy={ordersData.loading}>
                 {each(history, {
                   needs: cancelOrder,
                   render: (order) => (

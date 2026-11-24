@@ -103,7 +103,7 @@ export const UsersPage = view({
           </div>
           <span class="badge">LIVE</span>
         </div>
-        <p class="muted" data-status>
+        <p class="muted" data-status role="status">
           {users.loading()
             ? "Оновлюємо список…"
             : `${profiles().length} у вашому просторі`}
@@ -122,7 +122,7 @@ export const UsersPage = view({
             bind:value={search}
           />
         </label>
-        <div class="user-list" data-list aria-label="Користувачі">
+        <div class="user-list" data-list aria-label="Користувачі" aria-busy={users.loading}>
           {each(visible, {
             empty: <div class="empty">Користувачів не знайдено</div>,
             render: (user) => (

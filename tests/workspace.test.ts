@@ -423,6 +423,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
           new window.Event("submit", { bubbles: true, cancelable: true }),
         );
     await waitFor(() => document.querySelectorAll("[data-user]").length === 1);
+    assert.equal(document.querySelector("[data-list]")!.getAttribute("aria-busy"), "false");
     assert.match(
       document.querySelector("[data-user]")!.textContent!,
       /Demo User/,
@@ -615,11 +616,13 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     );
     assert.equal(document.querySelectorAll("[data-order]").length, 1);
     assert.match(document.querySelector("[data-loading]")!.textContent!, /Завантажуємо/);
+    assert.equal(document.querySelector("[data-rows]")!.getAttribute("aria-busy"), "true");
     returningOrders.release();
     returningOrders = undefined;
     await waitFor(() =>
       document.querySelector("[data-rows]")!.textContent!.includes("Added while away"),
     );
+    assert.equal(document.querySelector("[data-rows]")!.getAttribute("aria-busy"), "false");
     await waitFor(() =>
       app.browserEvents.some(
         (e) => e.node === "orders.create.submit" && e.type === "action.finished",
