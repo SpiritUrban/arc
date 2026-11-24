@@ -233,6 +233,45 @@ test("standalone queries accept fixed contract params", async () => {
   }
 });
 
+test("standalone queries infer the input projection from reactive sources", async () => {
+  const read = operationContract({
+    id: "projected.read",
+    input: s.object({ id: s.string(), rank: s.int() }),
+    output: s.int(),
+  });
+  const id = state({ id: "projected.id", initial: "FIRST" });
+  const rank = state({ id: "projected.rank", initial: 1 });
+  const requests: unknown[] = [];
+  const result = query(read, {
+    from: [id, rank],
+    input: (id, rank) => {
+      if (false) {
+        // @ts-expect-error The first source provides a string.
+        id.toFixed();
+        // @ts-expect-error The second source provides a number.
+        rank.toLowerCase();
+      }
+      return { id: id.toLowerCase(), rank: rank + 1 };
+    },
+    fetch: async (_url, init) => {
+      requests.push(JSON.parse(String(init?.body)));
+      return Response.json({ ok: true, value: requests.length });
+    },
+  });
+  try {
+    await result.refresh();
+    id.set("SECOND");
+    rank.set(5);
+    await result.refresh();
+    assert.deepEqual(requests, [{ id: "first", rank: 2 }, { id: "second", rank: 6 }]);
+    assert.equal(result.data(), 2);
+  } finally {
+    result.dispose();
+    id.dispose();
+    rank.dispose();
+  }
+});
+
 test("query selections react to data and share the query lifetime", async () => {
   const read = operationContract({
     id: "rows.read",

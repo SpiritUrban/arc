@@ -1064,12 +1064,18 @@ type RemoteResourceOptions<C extends OperationContract> = {
   fetch?: typeof globalThis.fetch;
 };
 
-type QueryOptions<C extends OperationContract> =
-  Omit<RemoteResourceOptions<C>, "id" | "input"> & { id?: string } & (
+type QueryProjection<C extends OperationContract, Sources extends RemoteSources> = {
+  // Preserve the existing callback signature when callers provide only the contract type.
+  input?: (...values: RemoteSources extends Sources ? any[] : SourceValues<Sources>) => Infer<C["input"]>;
+};
+
+type QueryOptions<C extends OperationContract, Sources extends RemoteSources> =
+  Omit<RemoteResourceOptions<C>, "id" | "input" | "from"> &
+  { id?: string; from?: Sources } & (
     | (
         ({} extends Infer<C["input"]>
-          ? Pick<RemoteResourceOptions<C>, "input">
-          : Required<Pick<RemoteResourceOptions<C>, "input">>) & { params?: never }
+          ? QueryProjection<C, Sources>
+          : Required<QueryProjection<C, Sources>>) & { params?: never }
       )
     | {
         /** Use a fixed contract input on every read. */
@@ -1079,11 +1085,14 @@ type QueryOptions<C extends OperationContract> =
   );
 
 /** Read the current state of a contract-backed query by calling it. */
-export function query<C extends OperationContract>(
+export function query<
+  C extends OperationContract,
+  const Sources extends RemoteSources = RemoteSources,
+>(
   contract: C,
   ...[options]: {} extends Infer<C["input"]>
-    ? [options?: QueryOptions<C>]
-    : [options: QueryOptions<C>]
+    ? [options?: QueryOptions<C, Sources>]
+    : [options: QueryOptions<C, Sources>]
 ): RemoteQuery<C> {
   const { params, input, ...settings } = options ?? {};
   return createRemoteResource(contract, {
