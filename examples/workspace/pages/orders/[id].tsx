@@ -14,7 +14,7 @@ export default function OrderDetail({ bind }: PageContext<"id">) {
   const { query, mutation } = bind(orderClient);
   const order = query(GetOrder);
   const update = [order.replace(), ordersData.replaceBy("id")];
-  const updateOrder = mutation(UpdateOrder, { update });
+  const updateOrder = mutation(UpdateOrder, { update, resetOnSuccess: false });
   const cancelOrder = mutation(CancelOrder, {
     update,
     updateOnError: "ORDER_ALREADY_CANCELLED",

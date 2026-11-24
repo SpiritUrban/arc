@@ -528,10 +528,25 @@ test("ORD-04–06 · ownership, detail update and independent cancellation", asy
   }
   await edit.locator('[name="product"]').fill("Робочий блокнот");
   await edit.locator('[name="quantity"]').fill("4");
+  const quantityBeforeSave = isReact(info) ? undefined : await edit.locator('[name="quantity"]').elementHandle();
+  await quantityBeforeSave?.evaluate((input) => {
+    const current = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+    Object.defineProperty(input, "value", {
+      ...current,
+      set(value) {
+        if (value === this.defaultValue) this.dataset.reset = "true";
+        current.set.call(this, value);
+      },
+    });
+  });
   await edit.getByRole("button", { name: "Зберегти зміни" }).click();
   await expect(
     orderDetail(page).getByRole("heading", { name: "Робочий блокнот" }),
   ).toBeVisible();
+  if (quantityBeforeSave) {
+    expect(await quantityBeforeSave.evaluate((input) => input.dataset.reset)).toBeUndefined();
+    await quantityBeforeSave.dispose();
+  }
   expect(reads.edit).toBe(0);
   phase = "back";
   const listRefresh = await hold(

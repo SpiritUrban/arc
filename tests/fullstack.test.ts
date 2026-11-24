@@ -186,6 +186,28 @@ test("mutation field validation shares one reactive value per field", async () =
   }
 });
 
+test("mutations can keep bound form values after a successful response", async () => {
+  const write = operationContract({
+    id: "draft.write",
+    input: s.object({ title: s.string() }),
+    output: s.string(),
+  });
+  for (const resetOnSuccess of [undefined, false]) {
+    const save = mutation(write, {
+      fields: { title: "" },
+      resetOnSuccess,
+      fetch: async () => Response.json({ ok: true, value: "Updated" }),
+    });
+    try {
+      save.fields.title.set("Updated");
+      assert.equal((await save.execute()).ok, true);
+      assert.equal(save.fields.title(), resetOnSuccess === false ? "Updated" : "");
+    } finally {
+      save.dispose();
+    }
+  }
+});
+
 test("bound mutation inputs share keyed requests and outcomes", async () => {
   const write = operationContract({
     id: "row.write",

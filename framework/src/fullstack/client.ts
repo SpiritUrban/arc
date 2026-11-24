@@ -178,6 +178,8 @@ type RemoteFormOptions<C extends OperationContract> = {
   invalidates?: WebResource<any, any> | readonly WebResource<any, any>[];
   /** Apply local state changes after a successful response, before refreshing resources. */
   onSuccess?: (value: Infer<C["output"]>, ctx: ActionContext) => void;
+  /** Restore submitted fields to their initial values after success. Defaults to true. */
+  resetOnSuccess?: boolean;
   update?: MutationUpdate<Infer<C["output"]>> | readonly MutationUpdate<Infer<C["output"]>>[];
   /** Also apply update using the typed details of these business errors. */
   updateOnError?: UpdateErrorCode<NoInfer<C>> | readonly UpdateErrorCode<NoInfer<C>>[];
@@ -191,7 +193,7 @@ type RemoteForm<C extends OperationContract, Field extends string> = {
 
 type NamedSubmission = {
   values: Record<string, string | number | boolean | readonly (string | number)[]>;
-  reset(ctx: ActionContext): void;
+  reset?(ctx: ActionContext): void;
 };
 
 function readNamedSubmission(
@@ -199,6 +201,7 @@ function readNamedSubmission(
   numericFields: ReadonlySet<string>,
   booleanFields: ReadonlySet<string>,
   arrayFields: ReadonlyMap<string, string>,
+  resetOnSuccess: boolean,
 ): NamedSubmission {
   const entries = new FormData(form);
   const values = Object.create(null) as NamedSubmission["values"];
@@ -254,6 +257,7 @@ function readNamedSubmission(
     if (!Object.hasOwn(values, control.name)) values[control.name] = [];
   }
 
+  if (!resetOnSuccess) return { values };
   const fields = Array.from(form.elements).filter(
     (element): element is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement =>
       (element.localName === "input" || element.localName === "textarea" ||
@@ -497,6 +501,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     input,
     params,
     onSuccess,
+    resetOnSuccess = true,
     updateOnError,
   } = options;
   const refreshOption = options.refresh ?? options.invalidates;
@@ -585,7 +590,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
         return execute(contract.input.parse(request[directInput]));
       }
       const submission = request &&
-        readNamedSubmission(request[formInput], numericFields, booleanFields, arrayFields);
+        readNamedSubmission(request[formInput], numericFields, booleanFields, arrayFields, resetOnSuccess);
       const values = Object.fromEntries(
         names.map((name) => [name, fields[name].get()]),
       ) as Record<Field, string>;
@@ -602,13 +607,13 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
             ]),
           ) as Infer<C["input"]>);
       const validated = submission || callable ? contract.input.parse(payload) : payload;
-      return execute(validated, () => {
+      return execute(validated, resetOnSuccess ? () => {
         for (const { name, initial } of definitions) {
           if (fields[name].get() === values[name])
             ctx.set(fields[name], initial);
         }
-        submission?.reset(ctx);
-      });
+        submission?.reset?.(ctx);
+      } : undefined);
     },
   };
   const submit = callable ? action({ ...definition, callable: true }) : action(definition);

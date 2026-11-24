@@ -14,6 +14,7 @@ export const addUser = mutation(CreateUser, {
 const updateUser = mutation(UpdateUser, {
   update: users.replaceBy("id"),
   fieldErrors: { email: "EMAIL_EXISTS" },
+  resetOnSuccess: false,
 });
 
 function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
