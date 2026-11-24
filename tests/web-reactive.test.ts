@@ -12,6 +12,7 @@ test("state and explicit derived DAG batch one propagation", async () => {
     b = state({ id: "b", initial: 2 });
   let recomputes = 0,
     updates = 0;
+  assert.equal(a.is(1), true);
   const sum = derive({
     id: "sum",
     from: [a, b],
@@ -28,6 +29,8 @@ test("state and explicit derived DAG batch one propagation", async () => {
     for (let i = 0; i < 100; i++) a.set(i);
   });
   await tick();
+  assert.equal(a.is(1), false);
+  assert.equal(a.is(99), true);
   assert.equal(sum.get(), 103);
   assert.equal(doubled.get(), 206);
   assert.equal(recomputes, 2);

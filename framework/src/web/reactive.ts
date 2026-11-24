@@ -13,6 +13,8 @@ export interface Writable<T> extends Readable<T> {
   update(fn: (value: T) => T): void;
 }
 export type Signal<T> = Writable<T> & (() => T) & {
+  /** Compare the current value using the same equality as a signal write. */
+  is(value: T): boolean;
   /** Create a callback that writes this value when invoked. */
   setTo(value: T): () => void;
 };
@@ -127,6 +129,7 @@ type StateOptions<T> = {
 export function state<T>(def: StateOptions<T>): Signal<T> {
   let node!: Signal<T>;
   node = createState(def, Object.assign(() => node.get(), {
+    is: (value: T) => Object.is(node.get(), value),
     setTo: (value: T) => () => node.set(value),
   }));
   return node;
