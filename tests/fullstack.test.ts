@@ -241,6 +241,10 @@ test("standalone queries infer the input projection from reactive sources", asyn
   });
   const id = state({ id: "projected.id", initial: "FIRST" });
   const rank = state({ id: "projected.rank", initial: 1 });
+  if (false) {
+    // @ts-expect-error A field shorthand cannot also supply the required rank.
+    query(read, { from: id, input: "id" });
+  }
   const requests: unknown[] = [];
   const result = query(read, {
     from: [id, rank],
@@ -323,15 +327,14 @@ test("remote client queries can use their source as complete input inside and ou
     output: s.string(),
   });
   const params = state({ id: "client-source.params", initial: { id: "first" } });
+  const paramsId = state({ id: "client-source.id", initial: "third" });
   const requests: unknown[] = [];
-  const client = remoteApi({
-    from: params,
-    fetch: async (_url, init) => {
-      const input = JSON.parse(String(init?.body));
-      requests.push(input);
-      return Response.json({ ok: true, value: input.id });
-    },
-  });
+  const send: typeof fetch = async (_url, init) => {
+    const input = JSON.parse(String(init?.body));
+    requests.push(input);
+    return Response.json({ ok: true, value: input.id });
+  };
+  const client = remoteApi({ from: params, fetch: send });
   if (false) {
     // @ts-expect-error A direct input must supply the required ID.
     remoteApi({ from: state({ id: "client-source.invalid", initial: {} }) }).query(read, { input: true });
@@ -340,20 +343,25 @@ test("remote client queries can use their source as complete input inside and ou
   const result = client.query(read, { input: true });
   const page = pageView("client-source.page", ({ bind }) => {
     bind(client).query(read, { input: true });
+    bind(remoteApi({ from: paramsId, fetch: send })).query(read, { input: "id", id: "client-source.field" });
     return jsx("div", {});
   }, { id: "route-id", locale: "uk" });
-  const [bound] = page.owned as readonly RemoteQuery<typeof read>[];
+  const [bound, field] = page.owned as readonly RemoteQuery<typeof read>[];
   try {
     assert.equal(bound.id, "client-source.page.client-source.read.query");
     await result.refresh();
     params.set({ id: "second" });
     await bound.refresh();
-    assert.deepEqual(requests, [{ id: "first" }, { id: "second" }]);
+    await field.refresh();
+    assert.deepEqual(requests, [{ id: "first" }, { id: "second" }, { id: "third" }]);
     assert.equal(bound.data(), "second");
+    assert.equal(field.data(), "third");
   } finally {
     result.dispose();
     bound.dispose();
+    field.dispose();
     params.dispose();
+    paramsId.dispose();
   }
 });
 
@@ -367,7 +375,7 @@ test("standalone queries can key cached results by their sources", async () => {
   let reads = 0;
   const result = query(read, {
     from: id,
-    input: (id) => ({ id }),
+    input: "id",
     key: true,
     cache: true,
     fetch: async () => Response.json({ ok: true, value: ++reads }),

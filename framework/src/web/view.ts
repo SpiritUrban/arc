@@ -806,12 +806,12 @@ export function pageView<Param extends string = string>(
     bind<Client extends PageRemoteClient>(client: Client): BoundPageClient<Client, Param> {
       return {
         query: ((contract: OperationContract, options?: {
-          id?: string; params?: unknown; input?: true | ((...values: unknown[]) => unknown);
+          id?: string; params?: unknown; input?: true | string | ((...values: unknown[]) => unknown);
         }) => {
           const queryId = options?.id ?? `${id}.${contract.id}.query`;
           const { input: project, ...queryOptions } = options ?? {};
-          if (project === true) {
-            return own(client.query(contract, { ...queryOptions, input: true, id: queryId }));
+          if (project === true || typeof project === "string") {
+            return own(client.query(contract, { ...queryOptions, input: project, id: queryId }));
           }
           const bound = withRouteParams(contract, queryOptions, true);
           const input = project && contract.input.json.type === "object"

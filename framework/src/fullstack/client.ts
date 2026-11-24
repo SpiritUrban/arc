@@ -923,20 +923,28 @@ function bindQueryKey<Values extends readonly unknown[]>(
   };
 }
 
+type QueryInputField<Input, Value> = {
+  [Name in keyof Input & string]: Record<Name, Value> extends Input ? Name : never;
+}[keyof Input & string];
+
 type DirectQueryInput<C extends OperationContract, Sources extends RemoteSources> =
-  [Sources] extends [Readable<NoInfer<Infer<C["input"]>>>]
+  [Sources] extends [Readable<infer Value>]
     ? {
-        /** Use the value of the single source as the complete input. */
-        input: true;
+        /** Use the single source as the complete input or wrap it in the named field. */
+        input: ([Value] extends [NoInfer<Infer<C["input"]>>] ? true : never)
+          | QueryInputField<NoInfer<Infer<C["input"]>>, Value>;
         params?: never;
       }
     : never;
 
-function directQueryInput<Input>(from: RemoteSources | undefined): (value: Input) => Input {
+function directQueryInput<Input>(
+  from: RemoteSources | undefined,
+  input: true | string,
+): (value: unknown) => Input {
   if (from === undefined || Array.isArray(from)) {
-    throw new TypeError("query input: true requires a single signal");
+    throw new TypeError("Direct query input requires a single signal");
   }
-  return (value) => value;
+  return (value) => (input === true ? value : { [input]: value }) as Input;
 }
 
 type ClientQueryOptions<C extends OperationContract, Sources extends RemoteSources> = {
@@ -996,7 +1004,8 @@ export function remoteApi<const Sources extends RemoteSources = readonly []>(
       return createRemoteResource(contract, {
         id: query?.id ?? `${contract.id}.query`,
         from,
-        input: project === true ? directQueryInput<Infer<C["input"]>>(options.from)
+        input: project === true || typeof project === "string"
+          ? directQueryInput<Infer<C["input"]>>(options.from, project)
           : query && "input" in query ? project
           : query && "params" in query ? () => query.params as Infer<C["input"]>
           : undefined,
@@ -1132,7 +1141,9 @@ export function query<
 ): RemoteQuery<C> {
   const { params, input, key, from, ...settings } = options ?? {};
   const sources = from === undefined ? [] : sourceList(from);
-  const project = input === true ? directQueryInput<Infer<C["input"]>>(from) : input;
+  const project = input === true || typeof input === "string"
+    ? directQueryInput<Infer<C["input"]>>(from, input)
+    : input;
   return createRemoteResource(contract, {
     ...settings,
     id: options?.id ?? `${contract.id}.query`,
