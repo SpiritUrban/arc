@@ -37,12 +37,12 @@ export const ordersData = orderClient.query(ListOrders, {
 
 // CreateOrder — спільний контракт. На сервері його реалізує маршрут createOrder у ./server.ts.
 export const createOrder = orderClient.mutation(CreateOrder, {
-  update: ordersData.insertBy("id"),
+  update: ordersData.insertBy(),
 });
 
 const cancelOrder = orderClient.mutation(CancelOrder, {
   key: "id",
-  update: ordersData.replaceBy("id"),
+  update: ordersData.replaceBy(),
   updateOnError: "ORDER_ALREADY_CANCELLED",
 });
 

@@ -999,6 +999,12 @@ type RowKey<Row> = [Row] extends [never] ? never : {
   [Key in keyof Row]-?: Row[Key] extends string | number ? Key : never;
 }[keyof Row] & string;
 
+type DefaultRowKeyArgument<Row> = [Row] extends [never]
+  ? never
+  : [Row] extends [{ id: string | number }] ? [] : never;
+
+type RowKeyArgument<Row> = [field: RowKey<Row>] | DefaultRowKeyArgument<Row>;
+
 type MutationUpdate<Row> = {
   readonly target: GraphDefinition;
   capture(): (row: Row, trace: TraceToken) => void;
@@ -1028,9 +1034,9 @@ export type RemoteQuery<C extends OperationContract> =
       from: Sources,
       compute: (data: Infer<C["output"]> | undefined, ...values: SourceValues<Sources>) => T,
     ): Computed<T>;
-    replaceBy(field: RowKey<QueryItem<C>>): MutationUpdate<QueryItem<C>>;
+    replaceBy(...[field]: RowKeyArgument<QueryItem<C>>): MutationUpdate<QueryItem<C>>;
     /** Append a confirmed new row to a loaded list, preserving any row with the same key. */
-    insertBy(field: RowKey<QueryItem<C>>): MutationUpdate<QueryItem<C>>;
+    insertBy(...[field]: RowKeyArgument<QueryItem<C>>): MutationUpdate<QueryItem<C>>;
   };
 
 type RemoteResourceOptions<C extends OperationContract> = {
@@ -1156,7 +1162,9 @@ function createRemoteResource<C extends OperationContract>(
         },
       };
     },
-    replaceBy(field: RowKey<QueryItem<C>>): MutationUpdate<QueryItem<C>> {
+    replaceBy(
+      ...[field = "id" as RowKey<QueryItem<C>>]: RowKeyArgument<QueryItem<C>>
+    ): MutationUpdate<QueryItem<C>> {
       return {
         target: result,
         capture() {
@@ -1172,7 +1180,9 @@ function createRemoteResource<C extends OperationContract>(
         },
       };
     },
-    insertBy(field: RowKey<QueryItem<C>>): MutationUpdate<QueryItem<C>> {
+    insertBy(
+      ...[field = "id" as RowKey<QueryItem<C>>]: RowKeyArgument<QueryItem<C>>
+    ): MutationUpdate<QueryItem<C>> {
       return {
         target: result,
         capture() {

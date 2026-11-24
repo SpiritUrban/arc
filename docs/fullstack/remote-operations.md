@@ -111,7 +111,7 @@ const form = () => (
 ```tsx
 const updateOrder = own(orderClient.mutation(UpdateOrder, {
   params: { id: params.id },
-  update: [order.replace(), ordersData.replaceBy("id")],
+  update: [order.replace(), ordersData.replaceBy()],
 }));
 
 return (
@@ -176,26 +176,28 @@ const cancelOrder = orderClient.mutation(CancelOrder, { refresh: orders });
 | Опція | Коли використовувати | Поведінка |
 | --- | --- | --- |
 | `refresh: query` | Серверна операція могла змінити склад або інші поля списку, а її відповідь не є повним списком | Позначає query застарілим і чекає повторного читання з сервера. У графі — `INVALIDATES`. |
-| `update: query.replaceBy("id")` | Відповідь уже містить повний актуальний запис, який є в завантаженому списку | Замінює запис у поточному snapshot і кеші без запиту. У графі — `UPDATES`. |
-| `update: query.insertBy("id")` | Відповідь містить повний новий запис, який належить кінцю списку | Додає запис до завантаженого списку й кешу або зберігає наявний рядок із тим самим ID. У графі — `UPDATES`. |
+| `update: query.replaceBy()` | Відповідь уже містить повний актуальний запис, який є в завантаженому списку | Замінює запис у поточному snapshot і кеші без запиту. У графі — `UPDATES`. |
+| `update: query.insertBy()` | Відповідь містить повний новий запис, який належить кінцю списку | Додає запис до завантаженого списку й кешу або зберігає наявний рядок із тим самим ID. У графі — `UPDATES`. |
 | `update: detail.replace()` | Відповідь є повним значенням detail query | Замінює весь detail snapshot і кеш без запиту. У графі — `UPDATES`. |
+
+Без аргументу `insertBy()` і `replaceBy()` використовують обов’язкове поле `id` типу `string` або `number`. Для іншого ключа передайте назву поля, наприклад `orders.replaceBy("number")`.
 
 Якщо одна відповідь має синхронізувати кілька запитів, передайте масив `update`-стратегій. Усі цілі отримають ту саму типізовану відповідь в одному batch:
 
 ```ts
 const updateOrder = orderClient.mutation(UpdateOrder, {
-  update: [order.replace(), orders.replaceBy("id")],
+  update: [order.replace(), orders.replaceBy()],
 });
 ```
 
 Це підходить, коли одна й та сама операція має оновити detail і список. Для запитів із різними output contracts використовуйте окремі мутації або `refresh`.
 
-`setFrom` із `@arc/framework/fullstack` записує в локальний або спільний стан значення з відповіді. Наприклад, `update: [users.insertBy("id"), setFrom(selectedUser, (user) => user.id)]` додає підтверджений профіль і вибирає його в одному batch. У графі обидві цілі отримують зв’язок `UPDATES`.
+`setFrom` із `@arc/framework/fullstack` записує в локальний або спільний стан значення з відповіді. Наприклад, `update: [users.insertBy(), setFrom(selectedUser, (user) => user.id)]` додає підтверджений профіль і вибирає його в одному batch. У графі обидві цілі отримують зв’язок `UPDATES`.
 
 ```ts
 const cancelOrder = orderClient.mutation(CancelOrder, {
   key: "id",
-  update: orders.replaceBy("id"),
+  update: orders.replaceBy(),
 });
 ```
 
@@ -206,14 +208,14 @@ const cancelOrder = orderClient.mutation(CancelOrder, {
 ```ts
 const cancelOrder = orderClient.mutation(CancelOrder, {
   key: "id",
-  update: ordersData.replaceBy("id"),
+  update: ordersData.replaceBy(),
   updateOnError: "ORDER_ALREADY_CANCELLED",
 });
 ```
 
 Опція приймає код або масив кодів із типізованими `details`, сумісними з виходом операції. ARC застосовує оновлення за початковим ключем запиту й зберігає бізнес-помилку для `failed(...)` та повідомлення у формі.
 
-Для створення замовлення Workspace використовує `update: ordersData.insertBy("id")`. Якщо перше читання списку ще триває, ARC застосує вставку до його результату. Для активного ключа без завантажених даних і без поточного читання ARC запускає читання. Якщо відповідь містить лише частину запису або сервер визначає його позицію чи належність до вибірки, використовуйте `refresh`.
+Для створення замовлення Workspace використовує `update: ordersData.insertBy()`. Якщо перше читання списку ще триває, ARC застосує вставку до його результату. Для активного ключа без завантажених даних і без поточного читання ARC запускає читання. Якщо відповідь містить лише частину запису або сервер визначає його позицію чи належність до вибірки, використовуйте `refresh`.
 
 Якщо потрібне миттєве відображення відповіді, а потім остаточне узгодження з сервером, задайте обидві опції: `update` застосовується першою, `refresh` запускається після неї. У більшості випадків достатньо однієї.
 
