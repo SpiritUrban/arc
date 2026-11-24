@@ -22,6 +22,37 @@ import { jsx } from "../framework/src/web/jsx-runtime.ts";
 import { state, tick } from "../framework/src/web/reactive.ts";
 import { pageView } from "../framework/src/web/view.ts";
 
+test("remote clients share static headers and transport between queries and mutations", async () => {
+  const input = s.object({});
+  const read = operationContract({ id: "client.read", input, output: s.string() });
+  const write = operationContract({ id: "client.write", input, output: s.string() });
+  for (const headers of [undefined, { "x-api-version": "2" }]) {
+    const requests: unknown[] = [];
+    const client = remoteApi({
+      baseUrl: "https://example.test",
+      headers,
+      fetch: async (url, init) => {
+        const sent = new Headers(init?.headers);
+        requests.push([String(url), sent.get("x-api-version"), sent.get("content-type")]);
+        return Response.json({ ok: true, value: "Ready" });
+      },
+    });
+    const data = client.query(read, { cache: true });
+    const save = client.mutation(write);
+    try {
+      await data.refresh();
+      assert.equal(data.data(), "Ready");
+      assert.equal((await save.run({})).ok, true);
+      assert.deepEqual(requests, ["client.read", "client.write"].map((id) => [
+        `https://example.test/_arc/call/${id}`, headers?.["x-api-version"] ?? null, "application/json",
+      ]));
+    } finally {
+      data.dispose();
+      save.dispose();
+    }
+  }
+});
+
 test("page operations use only route parameters declared by the contract", async () => {
   const input = s.object({ id: s.string() });
   const read = operationContract({ id: "route.read", input, output: s.string() });

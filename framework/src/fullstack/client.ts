@@ -919,21 +919,25 @@ type ClientQueryOptions<C extends OperationContract, Sources extends RemoteSourc
       params: Infer<C["input"]>;
     });
 
-/** Share request headers and their reactive dependencies between queries and forms. */
-export function remoteApi<
-  const Sources extends RemoteSources,
->(options: {
-  from: Sources;
-  headers: (...values: SourceValues<Sources>) => HeadersInit;
+type RemoteApiOptions<Sources extends RemoteSources> = {
+  from?: Sources;
+  headers?: HeadersInit | ((...values: SourceValues<Sources>) => HeadersInit);
   key?: true | ((...values: SourceValues<Sources>) => string | number);
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
-}) {
-  const from = sourceList(options.from);
+} & (Sources extends readonly [] ? {} : { from: Sources });
+
+/** Share request headers and their reactive dependencies between queries and forms. */
+export function remoteApi<const Sources extends RemoteSources = readonly []>(
+  options: RemoteApiOptions<Sources>,
+) {
+  const from = options.from === undefined ? [] : sourceList(options.from);
   const { headers, baseUrl } = options;
-  const fetchWithHeaders: typeof globalThis.fetch = (url, init) => {
-    const values = from.map((source) => source.get()) as SourceValues<Sources>;
-    const merged = new Headers(headers(...values));
+  const fetchWithHeaders: typeof globalThis.fetch | undefined = headers === undefined ? options.fetch : (url, init) => {
+    const common = typeof headers === "function"
+      ? headers(...from.map((source) => source.get()) as SourceValues<Sources>)
+      : headers;
+    const merged = new Headers(common);
     new Headers(init?.headers).forEach((value, key) =>
       merged.set(key, value),
     );
