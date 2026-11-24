@@ -54,7 +54,7 @@ test("JSX references add resource dependencies without running the expression", 
   app.dispose();
 });
 
-test("a resource refresh used as a click handler continues the browser trace", async () => {
+test("a resource refresh handler registers its resource and continues the browser trace", async () => {
   const { document, window } = parseHTML('<div id="app"></div>');
   const target = document.querySelector("#app")!;
   const events: BrowserEvent[] = [];
@@ -68,12 +68,24 @@ test("a resource refresh used as a click handler continues the browser trace", a
   });
   const page = view({
     id: "retry.page",
-    needs: resource,
     template: () => jsx("button", { onClick: resource.refresh, children: "Retry" }),
   });
+  assert.ok(compileArchitecture([page]).edges.some(({ from, to, kind }) =>
+    from.endsWith(".on:click") && to === resource.id && kind === "TRIGGERS",
+  ));
+  const deferred = view({
+    id: "retry.deferred",
+    template: () => jsx("div", {
+      children: render(() => jsx("button", { onClick: resource.refresh }), () => [resource.refresh]),
+    }),
+  });
+  assert.ok(compileArchitecture([deferred]).edges.some(({ from, to, kind }) =>
+    from.endsWith(".render") && to === resource.id && kind === "DEPENDS_ON",
+  ));
   const app = startWeb(page, target, { telemetry: { emit: (event) => events.push(event) } });
   try {
     await tick();
+    assert.equal(reads.length, 1);
     const beforeClick = events.length;
     target.querySelector("button")!.dispatchEvent(new window.Event("click"));
     await tick();

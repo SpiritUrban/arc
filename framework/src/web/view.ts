@@ -16,7 +16,7 @@ import {
   type TraceToken,
   type WebTelemetry,
 } from "../neutral/protocol.js";
-import type { Action, FormSubmission } from "./async.js";
+import { resourceRefreshTarget, type Action, type FormSubmission } from "./async.js";
 import {
   registerFormChecked,
   registerFormRadio,
@@ -128,6 +128,7 @@ export interface Binding extends GraphDefinition {
   formValues?: Writable<string[]>;
   list?: KeyedList;
   block?: RenderBlock;
+  trigger?: GraphDefinition;
   handler?:
     | ((event: Event, trace: TraceToken) => unknown)
     | {
@@ -139,12 +140,12 @@ export function binding(
   def: Omit<Binding, "kind" | "runtime" | "dependencies" | "relations">,
 ): Binding {
   const handler = def.handler as unknown as GraphDefinition | undefined;
-  const action = handler?.id ? handler : undefined;
+  const trigger = def.trigger ?? (handler?.id ? handler : undefined);
   const dependencies = (sources: readonly Readable<unknown>[]) =>
-    action ? [...sources, action] : sources;
+    trigger ? [...sources, trigger] : sources;
   const relations = (sources: readonly Readable<unknown>[]) => {
     const links = sources.map((to) => ({ to, kind: "BINDS" as const }));
-    return action ? [...links, { to: action, kind: "TRIGGERS" as const }] : links;
+    return trigger ? [...links, { to: trigger, kind: "TRIGGERS" as const }] : links;
   };
   function graphSources() {
     if (!def.references) return def.sources;
@@ -154,12 +155,15 @@ export function binding(
     return [...new Set([...def.sources, ...inferred])];
   }
   function graphReferences() {
-    return (def.references?.() ?? []).filter((value): value is GraphDefinition =>
-      value !== null && typeof value === "object" &&
-      typeof (value as GraphDefinition).id === "string" &&
-      typeof (value as GraphDefinition).kind === "string" &&
-      !isReadable(value),
-    );
+    return (def.references?.() ?? []).flatMap((value) => {
+      const target = typeof value === "function" && resourceRefreshTarget(value);
+      if (target) return [target];
+      if (value !== null && typeof value === "object" &&
+          typeof (value as GraphDefinition).id === "string" &&
+          typeof (value as GraphDefinition).kind === "string" && !isReadable(value))
+        return [value as GraphDefinition];
+      return [];
+    });
   }
   const node: Binding = {
     ...def,
@@ -380,6 +384,7 @@ function directive(
         type: "event",
         name: event,
         sources: [],
+        trigger: resourceRefreshTarget(handler),
         handler(domEvent, trace) {
           if (event === "submit") domEvent.preventDefault();
           return withWriteTrace(trace, () => handler(domEvent, {
