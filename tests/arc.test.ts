@@ -5,6 +5,7 @@ import {
   operation,
   resource,
   s,
+  ValidationError,
   ok,
   error,
   http,
@@ -29,6 +30,16 @@ test("schemas validate, strip no unknowns, generate valid samples", () => {
   assert.throws(() => schema.parse({ ...schema.sample(), count: 1.5 }));
   assert.throws(() => schema.parse({ ...schema.sample(), extra: true }));
   assert.throws(() => schema.parse(null));
+  const subset = schema.pick("count", "flag");
+  assert.deepEqual(subset.parse(subset.sample()), { count: 1 });
+  assert.deepEqual(subset.json.required, ["count"]);
+  assert.deepEqual(subset.parse({ count: 3, flag: false }), { count: 3, flag: false });
+  assert.throws(() => subset.parse({ count: 6 }), ValidationError);
+  assert.throws(() => subset.parse({ count: 3, name: "Extra" }), ValidationError);
+  if (false) {
+    // @ts-expect-error Only fields declared in the source schema can be selected.
+    schema.pick("missing");
+  }
 });
 test("compiler rejects cycles, scope leaks, duplicate ids and ambiguous routes", async () => {
   const a = resource({ id: "a", open: () => 1 });
