@@ -1193,10 +1193,6 @@ export function mount(
       return;
     }
     if (b.type === "property" && b.name === "disabled") boundDisabled.add(element);
-    if (b.formValue) scope.add(registerFormValue(element, b.formValue));
-    if (b.formChecked) scope.add(registerFormChecked(element, b.formChecked));
-    if (b.formRadio) scope.add(registerFormRadio(element, b.formRadio));
-    if (b.formValues) scope.add(registerFormValues(element, b.formValues));
     const update = () => {
       if (scope.disposed) return;
       const start = performance.now(),
@@ -1225,6 +1221,10 @@ export function mount(
         { duration: performance.now() - start, data: { view: def.id } },
       );
     };
+    if (b.formValue) scope.add(registerFormValue(element, b.formValue, update));
+    if (b.formChecked) scope.add(registerFormChecked(element, b.formChecked, update));
+    if (b.formRadio) scope.add(registerFormRadio(element, b.formRadio, update));
+    if (b.formValues) scope.add(registerFormValues(element, b.formValues, update));
     update();
     for (const source of b.sources) scope.add(source.subscribe(update));
   };

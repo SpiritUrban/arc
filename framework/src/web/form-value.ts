@@ -8,7 +8,7 @@ type FormValueBinding =
 
 const formValues = new WeakMap<Element, FormValueBinding>();
 
-function register(element: Element, binding: FormValueBinding) {
+function register(element: Element, binding: FormValueBinding, sync: () => void) {
   formValues.set(element, binding);
   const document = element.ownerDocument;
   const onReset = (event: Event) => {
@@ -17,6 +17,11 @@ function register(element: Element, binding: FormValueBinding) {
       return;
     queueMicrotask(() => {
       if (event.defaultPrevented || formValues.get(element) !== binding) return;
+      if (binding.kind !== "values" && Object.is(binding.state.get(), binding.initial)) {
+        // The browser may have restored a different DOM default without changing ARC state.
+        sync();
+        return;
+      }
       switch (binding.kind) {
         case "value":
         case "radio":
@@ -38,20 +43,20 @@ function register(element: Element, binding: FormValueBinding) {
   };
 }
 
-export function registerFormValue(element: Element, state: Writable<string>) {
-  return register(element, { kind: "value", state, initial: state.get() });
+export function registerFormValue(element: Element, state: Writable<string>, sync: () => void) {
+  return register(element, { kind: "value", state, initial: state.get() }, sync);
 }
 
-export function registerFormChecked(element: Element, state: Writable<boolean>) {
-  return register(element, { kind: "checked", state, initial: state.get() });
+export function registerFormChecked(element: Element, state: Writable<boolean>, sync: () => void) {
+  return register(element, { kind: "checked", state, initial: state.get() }, sync);
 }
 
-export function registerFormRadio(element: Element, state: Writable<string>) {
-  return register(element, { kind: "radio", state, initial: state.get() });
+export function registerFormRadio(element: Element, state: Writable<string>, sync: () => void) {
+  return register(element, { kind: "radio", state, initial: state.get() }, sync);
 }
 
-export function registerFormValues(element: Element, state: Writable<string[]>) {
-  return register(element, { kind: "values", state, initial: [...state.get()] });
+export function registerFormValues(element: Element, state: Writable<string[]>, sync: () => void) {
+  return register(element, { kind: "values", state, initial: [...state.get()] }, sync);
 }
 
 export function formValue(element: Element) {

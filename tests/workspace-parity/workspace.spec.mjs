@@ -311,6 +311,18 @@ test("ORD-01–03 · form, filters, totals and a delayed owner query", async ({
     await expect(quantity).toHaveAttribute("max", "100");
     await expect(quantity).toHaveAttribute("step", "1");
     await expect(form.locator('[name="product"]')).toHaveAttribute("maxlength", "100");
+    await quantity.evaluate((input) => input.form.reset());
+    await expect(quantity).toHaveValue("1");
+    await quantity.fill("2");
+    await quantity.evaluate((input) => {
+      input.form.addEventListener("reset", (event) => event.preventDefault(), { once: true });
+      input.form.reset();
+    });
+    await expect(quantity).toHaveValue("2");
+    await expect(page.locator("[data-preview]")).toContainText("50");
+    await quantity.evaluate((input) => input.form.reset());
+    await expect(quantity).toHaveValue("1");
+    await expect(page.locator("[data-preview]")).toContainText("25");
   }
   await form.locator('[name="quantity"]').fill("101");
   await form.getByRole("button", { name: /Створити/ }).click();
