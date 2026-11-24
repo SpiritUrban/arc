@@ -11,6 +11,4 @@ export const selectedUser = state({
 
 export const users = query(ListUsers);
 
-export const activeUser = users.select(selectedUser,
-  (users, id) => users?.find((user) => user.id === id),
-);
+export const activeUser = users.findById(selectedUser);

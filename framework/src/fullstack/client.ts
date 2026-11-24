@@ -1043,6 +1043,8 @@ export type RemoteResource<C extends OperationContract> = WebResource<
 type QueryItem<C extends OperationContract> =
   Infer<C["output"]> extends readonly (infer Row)[] ? Row : never;
 
+type QueryRowId<Row> = [Row] extends [{ id: string | number }] ? Row["id"] : never;
+
 type RowKey<Row> = [Row] extends [never] ? never : {
   [Key in keyof Row]-?: Row[Key] extends string | number ? Key : never;
 }[keyof Row] & string;
@@ -1101,6 +1103,8 @@ export type RemoteQuery<C extends OperationContract> =
       from: Sources,
       compute: (data: Infer<C["output"]> | undefined, ...values: SourceValues<Sources>) => T,
     ): Computed<T>;
+    /** Find the current row for an ID or a signal containing an ID. */
+    findById(id: QueryRowId<QueryItem<C>> | Readable<QueryRowId<QueryItem<C>>>): Computed<QueryItem<C> | undefined>;
     replaceBy(...[field]: RowKeyArgument<QueryItem<C>>): MutationUpdate<QueryItem<C>>;
     /** Append a confirmed new row to a loaded list, preserving any row with the same key. */
     insertBy(...[field]: RowKeyArgument<QueryItem<C>>): MutationUpdate<QueryItem<C>>;
@@ -1272,6 +1276,17 @@ function createRemoteResource<C extends OperationContract>(
   return Object.assign(result, {
     result: projection,
     select,
+    findById(
+      id: QueryRowId<QueryItem<C>> | Readable<QueryRowId<QueryItem<C>>>,
+    ): Computed<QueryItem<C> | undefined> {
+      const find = (data: Data, key: unknown): QueryItem<C> | undefined => {
+        const rows = data as readonly (QueryItem<C> & { id: string | number })[] | undefined;
+        return rows?.find((row) => Object.is(row.id, key));
+      };
+      return typeof id === "string" || typeof id === "number"
+        ? select((data) => find(data, id))
+        : select<Readable<unknown>, QueryItem<C> | undefined>(id, find);
+    },
     replace(): MutationUpdate<Infer<C["output"]>> {
       return {
         target: result,

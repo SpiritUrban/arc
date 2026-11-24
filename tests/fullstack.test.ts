@@ -484,6 +484,8 @@ test("query selections react to data and share the query lifetime", async () => 
   try {
     if (false) {
       // @ts-expect-error The query rows do not have an id field.
+      rows.findById("first");
+      // @ts-expect-error The query rows do not have an id field.
       rows.insertBy();
       // @ts-expect-error The query rows do not have an id field.
       rows.replaceBy();
