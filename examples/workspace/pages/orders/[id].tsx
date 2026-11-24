@@ -30,7 +30,7 @@ export default function OrderDetail({ bind }: PageContext<"id">) {
         {!saved.cancelled && (
           <form onSubmit={cancelOrder}>
             <button class="button secondary" type="submit">
-              {cancelOrder.running() ? "Скасовуємо…" : "Скасувати замовлення"}
+              {render.when(cancelOrder.running, "Скасовуємо…", "Скасувати замовлення")}
             </button>
           </form>
         )}
@@ -60,7 +60,7 @@ export default function OrderDetail({ bind }: PageContext<"id">) {
               <h2>Редагувати замовлення</h2>
               <OrderFields mutation={updateOrder} order={order.data} />
               <button class="button primary" type="submit">
-                {updateOrder.running() ? "Зберігаємо…" : "Зберегти зміни"}
+                {render.when(updateOrder.running, "Зберігаємо…", "Зберегти зміни")}
               </button>
               <p class="error" role="alert">
                 {orderWriteMessage(updateOrder(), "Скасоване замовлення не можна редагувати.",

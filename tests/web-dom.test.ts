@@ -194,7 +194,7 @@ test("render tracks only the active JSX branch and unsubscribes on unmount", asy
       children: ["before", render.when(show,
         () => [jsx("strong", { children: count.get() }), "!"],
         "hidden",
-      ), "after"],
+      ), render.when(() => show() && count() > 1, "more"), "after"],
     }),
   });
   assert.ok(compileArchitecture([page]).edges.some((edge) =>
@@ -208,7 +208,7 @@ test("render tracks only the active JSX branch and unsubscribes on unmount", asy
   assert.equal(target.textContent, "before1!after");
   count.set(2);
   await tick();
-  assert.equal(target.textContent, "before2!after");
+  assert.equal(target.textContent, "before2!moreafter");
   show.set(false);
   await tick();
   assert.equal(target.textContent, "beforehiddenafter");

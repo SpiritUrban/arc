@@ -103,16 +103,18 @@ render.present = <T>(
     return typeof template === "function" ? template(value) : template;
   });
 
-/** Render the active branch of a boolean source. */
+/** Render the active branch of a boolean source or predicate. */
 render.when = (
-  source: Readable<boolean>,
+  source: Readable<boolean> | (() => boolean),
   truthy: RenderContent | RenderTemplate,
   falsy?: RenderContent | RenderTemplate,
-): RenderBlock =>
-  render.from(source, (value) => {
+): RenderBlock => {
+  const template = (value: boolean): RenderContent => {
     const branch = value ? truthy : falsy;
     return typeof branch === "function" ? branch() : branch;
-  });
+  };
+  return "get" in source ? render.from(source, template) : render(() => template(source()));
+};
 
 export function isRenderBlock(child: TemplateChild): child is RenderBlock {
   return child != null && typeof child === "object" && reactiveBlock in child;

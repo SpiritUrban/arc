@@ -20,7 +20,7 @@ function CancelOrderControl({ order: { id, cancelled } }: { order: ReturnType<ty
           disabled={cancel.pending()}
           onClick={cancel.run}
         >
-          {cancel.pending() ? "Скасовуємо…" : "Скасувати"}
+          {render.when(cancel.pending, "Скасовуємо…", "Скасувати")}
         </button>
       )}
       <p class="error" role="alert" data-cancel-error>
@@ -94,7 +94,7 @@ export const OrdersPage = view({
           <form class="order-form" data-form novalidate onSubmit={createOrder}>
             <OrderFields mutation={createOrder} quantity={quantity} />
             <button class="button primary" type="submit">
-              {createOrder.running() ? "Створюємо…" : <>Створити <span>→</span></>}
+              {render.when(createOrder.running, "Створюємо…", <>Створити <span>→</span></>)}
             </button>
           </form>
           <div class="form-footer">

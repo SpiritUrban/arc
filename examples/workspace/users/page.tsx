@@ -73,7 +73,7 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
           })}
         </p>
         <button class="button secondary" type="submit">
-          {form.running() ? pendingLabel : submitLabel}
+          {render.when(form.running, pendingLabel, submitLabel)}
         </button>
         <p class="error" role="alert" data-error>{message()}</p>
       </form>
