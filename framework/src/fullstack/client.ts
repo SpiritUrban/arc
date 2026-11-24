@@ -196,12 +196,17 @@ type NamedSubmission = {
   reset?(ctx: ActionContext): void;
 };
 
+type NamedFieldRules = {
+  numericFields: ReadonlySet<string>;
+  booleanFields: ReadonlySet<string>;
+  arrayFields: ReadonlyMap<string, string>;
+  blankOptionalFields: ReadonlySet<string>;
+};
+
 function readNamedSubmission(
   form: HTMLFormElement,
   submitter: HTMLElement | null | undefined,
-  numericFields: ReadonlySet<string>,
-  booleanFields: ReadonlySet<string>,
-  arrayFields: ReadonlyMap<string, string>,
+  { numericFields, booleanFields, arrayFields, blankOptionalFields }: NamedFieldRules,
   resetOnSuccess: boolean,
 ): NamedSubmission {
   const entries = new FormData(form, submitter ?? undefined);
@@ -231,6 +236,15 @@ function readNamedSubmission(
       numericFields.has(name) && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)
         ? Number(text)
         : text;
+  }
+
+  for (const name of blankOptionalFields) {
+    if (values[name] !== "") continue;
+    const badInput = controls.some((control) =>
+      control.localName === "input" && (control as HTMLInputElement).name === name &&
+      (control as HTMLInputElement).validity?.badInput,
+    );
+    if (!badInput) delete values[name];
   }
 
   const checkboxes = controls.filter(
@@ -524,24 +538,41 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
   );
   const fieldOptions = options.fields;
   const properties = callable && !fieldOptions ? contract.input.json.properties : undefined;
+  const namedSchemas = Object.entries<{
+    type?: string;
+    items?: { type?: string };
+    optional?: boolean;
+    format?: string;
+    minLength?: number;
+  }>(properties ?? {});
   const numericFields = new Set(
-    Object.entries<{ type?: string }>(properties ?? {})
+    namedSchemas
       .filter(([, schema]) => schema.type === "number" || schema.type === "integer")
       .map(([name]) => name),
   );
   const booleanFields = new Set(
-    Object.entries<{ type?: string }>(properties ?? {})
+    namedSchemas
       .filter(([, schema]) => schema.type === "boolean")
       .map(([name]) => name),
   );
   const arrayFields = new Map(
-    Object.entries<{ type?: string; items?: { type?: string } }>(properties ?? {})
+    namedSchemas
       .filter(([, schema]) =>
         schema.type === "array" &&
         ["string", "number", "integer"].includes(schema.items?.type ?? ""),
       )
       .map(([name, schema]) => [name, schema.items!.type!]),
   );
+  const blankOptionalFields = new Set(
+    namedSchemas
+      .filter(([name, schema]) => schema.optional && (
+        numericFields.has(name) ||
+        (schema.type === "string" &&
+          (schema.format === "email" || schema.format === "uuid" || (schema.minLength ?? 0) > 0))
+      ))
+      .map(([name]) => name),
+  );
+  const namedFieldRules = { numericFields, booleanFields, arrayFields, blankOptionalFields };
   const names = Object.keys(fieldOptions ?? {}) as Field[];
   const definitions = names.map((name) => {
     const field = fieldOptions![name];
@@ -594,9 +625,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
         return execute(contract.input.parse(request[directInput]));
       }
       const submission = request &&
-        readNamedSubmission(
-          request[formInput], request.submitter, numericFields, booleanFields, arrayFields, resetOnSuccess,
-        );
+        readNamedSubmission(request[formInput], request.submitter, namedFieldRules, resetOnSuccess);
       const values = Object.fromEntries(
         names.map((name) => [name, fields[name].get()]),
       ) as Record<Field, string>;

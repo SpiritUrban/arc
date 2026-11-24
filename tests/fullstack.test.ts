@@ -186,21 +186,32 @@ test("mutation field validation shares one reactive value per field", async () =
   }
 });
 
-test("named forms skip disabled boolean controls and submit enabled unchecked controls as false", async () => {
+test("named forms normalize blank optional fields and read enabled checkboxes", async () => {
   const write = operationContract({
     id: "preferences.write",
     input: s.object({
       checked: s.boolean(),
       unchecked: s.boolean(),
       disabled: s.boolean().optional(),
+      quantity: s.int().optional(),
+      contact: s.email().optional(),
+      note: s.string().optional(),
+      requiredCount: s.int(),
     }),
     output: s.boolean(),
   });
   const NativeFormData = FormData;
-  class CheckboxFormData extends NativeFormData {
+  let quantity = "";
+  let requiredCount = "1";
+  const validity = { badInput: false };
+  class FieldsFormData extends NativeFormData {
     constructor() {
       super();
       this.set("checked", "on");
+      this.set("quantity", quantity);
+      this.set("contact", " ");
+      this.set("note", "");
+      this.set("requiredCount", requiredCount);
     }
   }
   const requests: unknown[] = [];
@@ -211,7 +222,7 @@ test("named forms skip disabled boolean controls and submit enabled unchecked co
       return Response.json({ ok: true, value: true });
     },
   });
-  globalThis.FormData = CheckboxFormData;
+  globalThis.FormData = FieldsFormData;
   try {
     const checkbox = (name: "checked" | "unchecked" | "disabled", checked: boolean, disabled = false) => ({
       ...save.field(name).input,
@@ -228,11 +239,27 @@ test("named forms skip disabled boolean controls and submit enabled unchecked co
         unchecked,
         checkbox("disabled", true, true),
         checkbox("checked", false, true),
+        { localName: "input", name: "quantity", validity, matches: () => false },
       ],
     } as unknown as HTMLFormElement;
     const result = await save.submitForm!(form, { trace: { traceId: "checkbox-submit" } });
     assert.equal(result.ok, true);
-    assert.deepEqual(requests, [{ checked: true, unchecked: false }]);
+    const expected = { checked: true, unchecked: false, note: "", requiredCount: 1 };
+    assert.deepEqual(requests, [expected]);
+
+    validity.badInput = true;
+    await assert.rejects(save.submitForm!(form, { trace: { traceId: "bad-number" } }));
+    assert.equal(save.invalid("quantity"), true);
+    validity.badInput = false;
+
+    quantity = "0";
+    await save.submitForm!(form, { trace: { traceId: "zero-number" } });
+    assert.deepEqual(requests, [expected, { ...expected, quantity: 0 }]);
+
+    requiredCount = "";
+    await assert.rejects(save.submitForm!(form, { trace: { traceId: "blank-required-number" } }));
+    assert.equal(save.invalid("requiredCount"), true);
+    assert.equal(requests.length, 2);
   } finally {
     globalThis.FormData = NativeFormData;
     save.dispose();
