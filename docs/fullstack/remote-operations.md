@@ -66,6 +66,14 @@ const form = () => (
 
 Якщо стан поля потрібен у кількох прив’язках, оголосіть `const quantityInvalid = createOrder.invalidField("quantity")`. Передайте його напряму в `aria-invalid={quantityInvalid}`, а для повідомлення читайте `quantityInvalid()`. ARC повертає те саме реактивне значення для поля й звільняє його разом із мутацією.
 
+`mutation.field(name)` також готує атрибути для іменованого `<input>`. Атрибути містять ім’я, `aria-invalid` і відповідні обмеження з контракту для тексту, email та чисел. Валідація ARC перевіряє весь вхід під час надсилання. Атрибути інтерфейсу, як-от підказку або `bind:value`, додайте поруч.
+
+```tsx
+const quantity = createOrder.field("quantity");
+<input {...quantity.input} />
+{quantity.invalid() && <p role="alert">Перевірте кількість.</p>}
+```
+
 ```tsx
 import { mutation, textField } from "@arc/framework/fullstack";
 

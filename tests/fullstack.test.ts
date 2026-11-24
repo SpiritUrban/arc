@@ -126,13 +126,28 @@ test("query selections react to data and share the query lifetime", async () => 
 test("mutation field validation shares one reactive value per field", async () => {
   const write = operationContract({
     id: "fields.write",
-    input: s.object({ quantity: s.int({ min: 1 }) }),
+    input: s.object({
+      quantity: s.int({ min: 0.5, max: 9.5 }),
+      price: s.number({ min: 0.25 }).optional(),
+      email: s.email().optional(),
+      title: s.string({ max: 80 }).optional(),
+    }),
     output: s.int(),
   });
   const save = mutation(write, { fetch: async () => Response.json({ ok: true, value: 1 }) });
   try {
     const invalid = save.invalidField("quantity");
     assert.equal(save.invalidField("quantity"), invalid);
+    assert.deepEqual(save.field("quantity"), {
+      invalid,
+      input: { name: "quantity", "aria-invalid": invalid, required: true, type: "number", min: 1, max: 9, step: 1 },
+    });
+    const { input: price } = save.field("price");
+    assert.equal(price.required, false);
+    assert.equal(price.min, 0.25);
+    assert.equal(price.step, "any");
+    assert.equal(save.field("email").input.type, "email");
+    assert.equal(save.field("title").input.maxlength, 80);
     assert.equal(invalid(), false);
     await assert.rejects(save.run({ quantity: 0 }));
     assert.equal(save.invalid("quantity"), true);

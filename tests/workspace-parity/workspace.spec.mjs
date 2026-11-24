@@ -266,6 +266,14 @@ test("ORD-01–03 · form, filters, totals and a delayed owner query", async ({
   await userRow(page, user.name).click();
   await expect(orderRow(page, "Блокнот А5")).toBeVisible();
   const form = createOrderForm(page);
+  if (!isReact(info)) {
+    const quantity = form.locator('[name="quantity"]');
+    await expect(quantity).toHaveAttribute("type", "number");
+    await expect(quantity).toHaveAttribute("min", "1");
+    await expect(quantity).toHaveAttribute("max", "100");
+    await expect(quantity).toHaveAttribute("step", "1");
+    await expect(form.locator('[name="product"]')).toHaveAttribute("maxlength", "100");
+  }
   await form.locator('[name="quantity"]').fill("101");
   await form.getByRole("button", { name: /Створити/ }).click();
   await expect(form.locator('[name="quantity"]')).toHaveAttribute(

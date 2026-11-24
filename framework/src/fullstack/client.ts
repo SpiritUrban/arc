@@ -394,6 +394,10 @@ export type Mutation<
     invalid(): boolean;
     invalid(field: InputField<C>): boolean;
     invalidField(field: InputField<C>): Computed<boolean>;
+    field<Name extends InputField<C>>(name: Name): {
+      input: FieldInputAttributes<Name>;
+      invalid: Computed<boolean>;
+    };
     run(input: Infer<C["input"]>): Promise<RemoteResult<C>>;
     for(input: Infer<C["input"]>): {
       run(): Promise<RemoteResult<C>>;
@@ -425,6 +429,48 @@ type InputField<C extends OperationContract> =
   Infer<C["input"]> extends Record<string, unknown>
     ? Extract<keyof Infer<C["input"]>, string>
     : never;
+
+type FieldInputAttributes<Name extends string> = {
+  name: Name;
+  "aria-invalid": Computed<boolean>;
+  type?: "text" | "email" | "number";
+  required?: boolean;
+  minlength?: number;
+  maxlength?: number;
+  min?: number;
+  max?: number;
+  step?: number | "any";
+};
+
+function fieldInputAttributes<Name extends string>(
+  schema: Schema<unknown>, name: Name, invalid: Computed<boolean>,
+): FieldInputAttributes<Name> {
+  const input = { name, "aria-invalid": invalid };
+  const field = schema.json.properties?.[name];
+  const required = Array.isArray(schema.json.required) && schema.json.required.includes(name);
+  if (field?.type === "string") {
+    const format = field.format;
+    return {
+      ...input,
+      type: format === "email" ? "email" : "text",
+      required: required && (field.minLength > 0 || format === "email" || format === "uuid"),
+      minlength: field.minLength,
+      maxlength: field.maxLength,
+    };
+  }
+  if (field?.type === "number" || field?.type === "integer") {
+    const integer = field.type === "integer";
+    return {
+      ...input,
+      type: "number",
+      required,
+      min: integer && field.minimum !== undefined ? Math.ceil(field.minimum) : field.minimum,
+      max: integer && field.maximum !== undefined ? Math.floor(field.maximum) : field.maximum,
+      step: integer ? 1 : "any",
+    };
+  }
+  return input;
+}
 
 function buildRemoteForm<C extends OperationContract, Field extends string>(
   contract: C, options: FormOptions<C, Field>, defaults: RemoteFormDefaults, callable: true,
@@ -717,6 +763,10 @@ function bindMutation(defaults: RemoteFormDefaults) {
           invalidFields.set(field, invalid);
         }
         return invalid;
+      },
+      field<Name extends InputField<C>>(name: Name) {
+        const invalid = mutation.invalidField(name);
+        return { input: fieldInputAttributes(contract.input, name, invalid), invalid };
       },
     });
     return mutation;
