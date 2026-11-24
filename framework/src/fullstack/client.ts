@@ -998,38 +998,63 @@ type ClientQueryOptions<C extends OperationContract, Sources extends RemoteSourc
       params: Infer<C["input"]>;
     }));
 
-type RemoteApiOptions<Sources extends RemoteSources> = {
-  from?: Sources;
+type BearerOption<Sources extends RemoteSources> =
+  | string
+  | ((...values: SourceValues<Sources>) => string | undefined)
+  | ([Sources] extends [Readable<string | undefined>] ? true : never);
+
+type RemoteApiConfig<Sources extends RemoteSources> = {
   headers?: HeadersInit | ((...values: SourceValues<Sources>) => HeadersInit);
-  /** Use a literal token, derive it from the sources, or read a single token signal with true. */
-  bearer?: string
-    | ((...values: SourceValues<Sources>) => string | undefined)
-    | ([Sources] extends [Readable<string | undefined>] ? true : never);
   key?: true | ((...values: SourceValues<Sources>) => string | number);
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
+};
+
+type RemoteApiOptions<Sources extends RemoteSources> = RemoteApiConfig<Sources> & {
+  from?: Sources;
+  bearer?: BearerOption<Sources>;
 } & (Sources extends readonly [] ? {} : { from: Sources });
 
+type RemoteApiSetup<Sources extends RemoteSources> = RemoteApiConfig<Sources> & {
+  from?: Sources;
+  bearer?: BearerOption<Sources> | Readable<string | undefined>;
+};
+
 /** Share request headers and their reactive dependencies between queries and forms. */
+export function remoteApi<const Source extends Readable<string | undefined>>(
+  options: RemoteApiConfig<Source> & { bearer: Source; from?: never },
+): ReturnType<typeof buildRemoteApi<Source>>;
 export function remoteApi<const Sources extends RemoteSources = readonly []>(
   options: RemoteApiOptions<Sources>,
+): ReturnType<typeof buildRemoteApi<Sources>>;
+export function remoteApi<const Sources extends RemoteSources>(
+  options: RemoteApiSetup<Sources>,
 ) {
-  const from = options.from === undefined ? [] : sourceList(options.from);
+  return buildRemoteApi(options);
+}
+
+function buildRemoteApi<const Sources extends RemoteSources>(options: RemoteApiSetup<Sources>) {
   const { bearer, headers, baseUrl } = options;
-  if (bearer === true && (options.from === undefined || Array.isArray(options.from))) {
+  const bearerSource = options.from === undefined && bearer &&
+    (typeof bearer === "object" || typeof bearer === "function") && "get" in bearer
+    ? bearer : undefined;
+  const source = options.from ?? bearerSource;
+  const from = source === undefined ? [] : sourceList(source);
+  if (bearer === true && (source === undefined || Array.isArray(source))) {
     throw new TypeError("bearer: true requires a single token signal");
   }
+  const directBearer = bearer === true || bearerSource !== undefined;
   const fetchWithHeaders: typeof globalThis.fetch | undefined =
     bearer === undefined && headers === undefined ? options.fetch : (url, init) => {
-      const values = (typeof headers === "function" || typeof bearer === "function" || bearer === true
+      const values = (typeof headers === "function" || typeof bearer === "function" || directBearer
         ? from.map((source) => source.get())
         : []) as SourceValues<Sources>;
       const common = typeof headers === "function" ? headers(...values) : headers;
       const merged = new Headers(common);
       new Headers(init?.headers).forEach((value, key) => merged.set(key, value));
       if (!merged.has("authorization")) {
-        const token = typeof bearer === "function" ? bearer(...values)
-          : bearer === true ? values[0]
+        const token = directBearer ? values[0]
+          : typeof bearer === "function" ? bearer(...values)
           : bearer;
         if (typeof token === "string" && token) merged.set("authorization", `Bearer ${token}`);
       }
@@ -1048,7 +1073,7 @@ export function remoteApi<const Sources extends RemoteSources = readonly []>(
         id: query?.id ?? `${contract.id}.query`,
         from,
         input: project === true || typeof project === "string"
-          ? directQueryInput<Infer<C["input"]>>(options.from, project)
+          ? directQueryInput<Infer<C["input"]>>(source, project)
           : query && "input" in query ? project
           : query && "params" in query ? () => query.params as Infer<C["input"]>
           : undefined,

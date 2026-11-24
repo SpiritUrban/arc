@@ -64,7 +64,12 @@ test("remote clients use Bearer tokens on queries and mutations", async () => {
     requests.push(new Headers(init?.headers).get("authorization"));
     return Response.json({ ok: true, value: "Ready" });
   };
-  const client = remoteApi({ from: token, bearer: true, fetch: send });
+  const client = remoteApi({
+    bearer: token,
+    key: (value) => value.toLowerCase(),
+    fetch: send,
+  });
+  const explicitSource = remoteApi({ from: token, bearer: true, fetch: send }).query(read);
   const projectedData = remoteApi({
     from: token,
     bearer: (value) => value.toUpperCase(),
@@ -88,18 +93,21 @@ test("remote clients use Bearer tokens on queries and mutations", async () => {
     await readData.refresh();
     token.set("second");
     await save.run({});
+    assert.equal(readData.data(), undefined);
+    await explicitSource.refresh();
     await projectedData.refresh();
     token.set("");
     await readData.refresh();
     await staticData.refresh();
     await explicitData.refresh();
     assert.deepEqual(requests, [
-      "Bearer first", "Bearer second", "Bearer SECOND", null, "Bearer static", "Custom value",
+      "Bearer first", "Bearer second", "Bearer second", "Bearer SECOND", null, "Bearer static", "Custom value",
     ]);
   } finally {
     readData.dispose();
     save.dispose();
     projectedData.dispose();
+    explicitSource.dispose();
     staticData.dispose();
     explicitData.dispose();
     token.dispose();
