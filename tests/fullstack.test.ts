@@ -15,13 +15,14 @@ import {
   remoteCall,
   remoteApi,
   telemetryTransport,
+  type RemoteQuery,
 } from "../framework/src/fullstack/client.ts";
 import { operationContract } from "../framework/src/core-entry.ts";
 import { jsx } from "../framework/src/web/jsx-runtime.ts";
 import { state, tick } from "../framework/src/web/reactive.ts";
 import { pageView } from "../framework/src/web/view.ts";
 
-test("page operations use only route parameters declared by the contract", () => {
+test("page operations use only route parameters declared by the contract", async () => {
   const input = s.object({ id: s.string() });
   const read = operationContract({ id: "route.read", input, output: s.string() });
   const localized = s.object({ id: s.string(), locale: s.string() });
@@ -33,9 +34,15 @@ test("page operations use only route parameters declared by the contract", () =>
   });
   const write = operationContract({ id: "route.write", input, output: s.string() });
   const publish = operationContract({ id: "route.publish", input: localized, output: s.string() });
-  const source = state({ id: "route.source", initial: "" });
-  const remote = remoteApi({ from: source, headers: () => ({}) });
+  const source = state({ id: "route.source", initial: "Workspace" });
+  const remote = remoteApi({
+    from: source,
+    headers: () => ({}),
+    fetch: async () => Response.json({ ok: true, value: "Ready" }),
+  });
   const calls: unknown[] = [];
+  const cacheKeys: string[] = [];
+  const cachedQueries: RemoteQuery<typeof read>[] = [];
   const client = new Proxy(remote, {
     get(target, key) {
       const method = Reflect.get(target, key);
@@ -48,7 +55,18 @@ test("page operations use only route parameters declared by the contract", () =>
   const page = pageView("route.page", ({ bind, query, mutation }) => {
     query(client, read);
     const scoped = bind(client);
-    scoped.query(read, { cache: true });
+    cachedQueries.push(scoped.query(read, {
+      cache: true,
+      key: (owner) => {
+        if (false) {
+          // @ts-expect-error The cache key receives the string source.
+          owner.toFixed();
+        }
+        const key = owner.toLowerCase();
+        cacheKeys.push(key);
+        return key;
+      },
+    }));
     const details = scoped.query(detail, { params: { locale: "uk" } });
     assert.equal(details.id, "route.page.route.detail.query");
     scoped.query(ranked, { params: { rank: 7 } });
@@ -83,6 +101,9 @@ test("page operations use only route parameters declared by the contract", () =>
     { id: "explicit" },
   ]);
   assert.equal(page.owned?.length, 8);
+  await cachedQueries[0].refresh();
+  assert.ok(cacheKeys.includes("workspace"));
+  assert.equal(cachedQueries[0].data(), "Ready");
   for (const node of page.owned ?? []) node.dispose();
   source.dispose();
 });

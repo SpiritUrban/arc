@@ -693,22 +693,25 @@ type StringRouteFields<Input, Param extends string> = {
 type RouteQueryParams<Input, Param extends string> =
   Omit<Input, StringRouteFields<Input, Param>> & Partial<Pick<Input, StringRouteFields<Input, Param>>>;
 
-type RouteQueryOptions = {
+type ClientQueryOptions<Client extends PageRemoteClient> =
+  NonNullable<Parameters<Client["query"]>[1]>;
+
+type RouteQueryOptions<Client extends PageRemoteClient> = {
   id?: string;
   cache?: boolean;
   input?: never;
-};
+} & Pick<ClientQueryOptions<Client>, "key" & keyof ClientQueryOptions<Client>>;
 
-type RouteQueryArgs<Input, Param extends string> =
+type RouteQueryArgs<Input, Param extends string, Options> =
   Input extends Record<string, unknown>
     ? {} extends RouteQueryParams<Input, Param>
-      ? [options?: RouteQueryOptions & { params?: RouteQueryParams<Input, Param> }]
-      : [options: RouteQueryOptions & { params: RouteQueryParams<Input, Param> }]
+      ? [options?: Options & { params?: RouteQueryParams<Input, Param> }]
+      : [options: Options & { params: RouteQueryParams<Input, Param> }]
     : [options: never];
 
 type BoundPageClient<Client extends PageRemoteClient, Param extends string> = {
   query: Client["query"] & (<C extends OperationContract>(
-    contract: C, ...args: RouteQueryArgs<Infer<NoInfer<C>["input"]>, Param>
+    contract: C, ...args: RouteQueryArgs<Infer<NoInfer<C>["input"]>, Param, RouteQueryOptions<Client>>
   ) => RemoteQuery<C>);
   mutation: Client["mutation"];
 };
