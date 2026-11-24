@@ -24,13 +24,12 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
   const title = editing ? "Редагувати вибраного користувача" : "Новий користувач";
   const submitLabel = editing ? "Зберегти користувача" : "＋ Додати користувача";
   const pendingLabel = editing ? "Зберігаємо…" : "Додаємо…";
-  const duplicate = () => form.failed("EMAIL_EXISTS");
 
   function message() {
     if (!editing)
-      return failureMessage((duplicate() ? undefined : form.error()) ?? users.error());
+      return failureMessage((email.failed() ? undefined : form.error()) ?? users.error());
     if (updateUser.failed("USER_NOT_FOUND")) return "Користувача не знайдено.";
-    return duplicate() || form.invalid() ? "" : failureMessage(form.error());
+    return email.failed() || form.invalid() ? "" : failureMessage(form.error());
   }
 
   return (
@@ -68,7 +67,7 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
           />
         </label>
         <p class="error" role="alert" data-email-error>
-          {duplicate()
+          {email.failed()
             ? "Користувач із такою поштою вже існує."
             : editing && email.invalid() && "Перевірте адресу email."}
         </p>

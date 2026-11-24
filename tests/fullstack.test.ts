@@ -145,9 +145,10 @@ test("mutation field validation shares one reactive value per field", async () =
   try {
     const invalid = save.invalidField("quantity");
     assert.equal(save.invalidField("quantity"), invalid);
-    assert.deepEqual(save.field("quantity"), {
-      invalid,
-      input: { name: "quantity", "aria-invalid": invalid, required: true, type: "number", min: 1, max: 9, step: 1 },
+    const quantity = save.field("quantity");
+    assert.equal(quantity.invalid, invalid);
+    assert.deepEqual(quantity.input, {
+      name: "quantity", "aria-invalid": invalid, required: true, type: "number", min: 1, max: 9, step: 1,
     });
     const { input: price } = save.field("price");
     assert.equal(price.required, false);
@@ -166,14 +167,18 @@ test("mutation field validation shares one reactive value per field", async () =
     failure = "CONFLICT";
     await save.run({ quantity: 1 });
     assert.equal(email.invalid(), false);
+    assert.equal(email.failed(), false);
     failure = "EMAIL_EXISTS";
     await save.run({ quantity: 1 });
     assert.equal(email.invalid(), true);
+    assert.equal(email.failed(), true);
+    assert.equal(quantity.failed(), false);
     assert.equal(save.invalid("email"), false);
     assert.equal(invalid(), false);
     failure = undefined;
     await save.run({ quantity: 1 });
     assert.equal(email.invalid(), false);
+    assert.equal(email.failed(), false);
     save.dispose();
     assert.throws(() => invalid.subscribe(() => {}), /Disposed derived/);
   } finally {

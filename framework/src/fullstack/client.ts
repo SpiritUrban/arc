@@ -403,6 +403,7 @@ export type Mutation<
     field(name: InputField<C>): {
       input: FieldInputAttributes;
       invalid: Computed<boolean>;
+      failed(): boolean;
     };
     run(input: Infer<C["input"]>): Promise<RemoteResult<C>>;
     for(input: Infer<C["input"]>): {
@@ -673,7 +674,9 @@ function bindMutation(defaults: RemoteFormDefaults) {
     const keyOf = typeof key === "string" ? (input: MutationInput<C>) => input[key] as Key : key;
     const requests = new Map<Key, Promise<RemoteResult<C>>>();
     const outcomes = new Map<Key, MutationOutcome<C>>();
-    const fieldErrors = new Map(Object.entries(options.fieldErrors ?? {}));
+    const fieldErrors = new Map(
+      Object.entries(options.fieldErrors ?? {}) as [string, (keyof C["errors"] & string) | undefined][],
+    );
     const invalidFields = new Map<string, Computed<boolean>>();
     const revision = keyOf && state({ id: `${submit.id}.pending`, initial: 0 });
     let disposed = false;
@@ -756,8 +759,7 @@ function bindMutation(defaults: RemoteFormDefaults) {
           revision?.get();
           result = outcomes.get(key)?.result;
         }
-        return result?.kind === "business_error" &&
-          result.error === code;
+        return matchesBusinessError<C>(result, code);
       },
       invalid(field?: InputField<C>) {
         return invalidInput(submit.error(), field);
@@ -782,10 +784,14 @@ function bindMutation(defaults: RemoteFormDefaults) {
         } else if (!invalid) {
           invalid = derive(id, submit, ({ error, result, status }) =>
             invalidInput(error, name) ||
-            (status === "error" && result?.kind === "business_error" && result.error === code));
+            (status === "error" && matchesBusinessError<C>(result, code)));
           invalidFields.set(id, invalid);
         }
-        return { input: fieldInputAttributes(contract.input, name, invalid), invalid };
+        return {
+          input: fieldInputAttributes(contract.input, name, invalid),
+          invalid,
+          failed: () => code !== undefined && mutation.failed(code),
+        };
       },
     });
     return mutation;
@@ -795,6 +801,12 @@ function bindMutation(defaults: RemoteFormDefaults) {
 
 function invalidInput(error: unknown, field?: string): boolean {
   return error instanceof ValidationError && (field === undefined || error.fields.includes(field));
+}
+
+function matchesBusinessError<C extends OperationContract>(
+  result: RemoteResult<C> | undefined, code: string,
+): boolean {
+  return result?.kind === "business_error" && result.error === code;
 }
 
 /** @deprecated Use `mutation`; it provides the same fields and form submission API plus `run` for direct actions. */

@@ -244,7 +244,7 @@ export function compileReactiveJsx(
                     reference = callee;
                   } else if (
                     (method === "get" && child.arguments.length === 0) ||
-                    (method === "failed" && (child.arguments.length === 1 || child.arguments.length === 2)) ||
+                    (method === "failed" && child.arguments.length <= 2) ||
                     (method === "invalid" && child.arguments.length <= 1) ||
                     ((method === "pending" || method === "outcome") &&
                       child.arguments.length <= 1)
