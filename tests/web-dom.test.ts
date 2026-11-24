@@ -187,6 +187,48 @@ test("render cleans up onClick and traces writes to callable state", async () =>
   second.dispatchEvent(new window.Event("click"));
   assert.equal(selected.get(), "");
 });
+test("bound forms share a document reset listener and release it after the last unmount", async (t) => {
+  const { document, window } = parseHTML('<div id="app"></div>');
+  const root = document.querySelector("#app")!;
+  const add = t.mock.method(document, "addEventListener");
+  const remove = t.mock.method(document, "removeEventListener");
+  const first = state({ id: "first.reset", initial: "first" });
+  const second = state({ id: "second.reset", initial: "second" });
+  const mountForm = (value: typeof first) => mount(view({
+    id: `${value.id}.form`,
+    template: () => jsx("form", { children: jsx("input", { "bind:value": value }) }),
+  }), root);
+  const firstMount = mountForm(first);
+  const secondMount = mountForm(second);
+  const [firstForm, secondForm] = root.querySelectorAll("form");
+  for (const form of [firstForm, secondForm]) {
+    // LinkeDOM does not expose the form owner of the input.
+    Object.defineProperty(form.querySelector("input")!, "form", { value: form });
+  }
+  const reset = (form: Element) => form.dispatchEvent(new window.Event("reset", { bubbles: true }));
+  try {
+    assert.equal(add.mock.calls.filter(({ arguments: args }) => args[0] === "reset").length, 1);
+    first.set("edited first");
+    second.set("edited second");
+    reset(firstForm);
+    await tick();
+    assert.equal(first(), "first");
+    assert.equal(second(), "edited second");
+    firstMount.unmount();
+    assert.equal(remove.mock.calls.filter(({ arguments: args }) => args[0] === "reset").length, 0);
+    reset(secondForm);
+    secondMount.unmount();
+    await tick();
+    assert.equal(second(), "edited second");
+    assert.equal(remove.mock.calls.filter(({ arguments: args }) => args[0] === "reset").length, 1);
+  } finally {
+    firstMount.unmount();
+    secondMount.unmount();
+    first.dispose();
+    second.dispose();
+  }
+});
+
 test("view setup once, fine-grained bindings and listener/subscription cleanup", async () => {
   const { document } = parseHTML('<div id="app"></div>');
   const count = state({ id: "count", initial: 0 }),

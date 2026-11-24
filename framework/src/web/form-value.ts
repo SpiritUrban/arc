@@ -6,40 +6,71 @@ type FormValueBinding =
   | { kind: "values"; state: Writable<string[]>; initial: string[] }
   | { kind: "checked"; state: Writable<boolean>; initial: boolean };
 
-const formValues = new WeakMap<Element, FormValueBinding>();
+type FormRegistration = {
+  element: Element;
+  binding: FormValueBinding;
+  sync: () => void;
+};
+
+const formValues = new WeakMap<Element, FormRegistration>();
+const documentFields = new WeakMap<Document, Set<FormRegistration>>();
+
+function restore({ binding, sync }: FormRegistration) {
+  if (binding.kind !== "values" && Object.is(binding.state.get(), binding.initial)) {
+    // A native reset can change the DOM even when ARC state is already initial.
+    sync();
+    return;
+  }
+  switch (binding.kind) {
+    case "value":
+    case "radio":
+      binding.state.set(binding.initial);
+      break;
+    case "checked":
+      binding.state.set(binding.initial);
+      break;
+    case "values":
+      binding.state.set([...binding.initial]);
+      break;
+  }
+}
+
+function onReset(event: Event) {
+  const form = event.target as HTMLFormElement | null;
+  if (form?.localName !== "form") return;
+  const fields = documentFields.get(form.ownerDocument);
+  if (!fields) return;
+  const matching: FormRegistration[] = [];
+  for (const registration of fields) {
+    if ((registration.element as HTMLInputElement).form === form) matching.push(registration);
+  }
+  if (!matching.length) return;
+  queueMicrotask(() => {
+    if (event.defaultPrevented) return;
+    for (const registration of matching) {
+      if (formValues.get(registration.element) === registration) restore(registration);
+    }
+  });
+}
 
 function register(element: Element, binding: FormValueBinding, sync: () => void) {
-  formValues.set(element, binding);
+  const registration = { element, binding, sync };
+  formValues.set(element, registration);
   const document = element.ownerDocument;
-  const onReset = (event: Event) => {
-    const form = event.target as HTMLFormElement | null;
-    if (form?.localName !== "form" || (element as HTMLInputElement).form !== form)
-      return;
-    queueMicrotask(() => {
-      if (event.defaultPrevented || formValues.get(element) !== binding) return;
-      if (binding.kind !== "values" && Object.is(binding.state.get(), binding.initial)) {
-        // The browser may have restored a different DOM default without changing ARC state.
-        sync();
-        return;
-      }
-      switch (binding.kind) {
-        case "value":
-        case "radio":
-          binding.state.set(binding.initial);
-          break;
-        case "checked":
-          binding.state.set(binding.initial);
-          break;
-        case "values":
-          binding.state.set([...binding.initial]);
-          break;
-      }
-    });
-  };
-  document.addEventListener("reset", onReset);
+  let fields = documentFields.get(document);
+  if (!fields) {
+    fields = new Set();
+    documentFields.set(document, fields);
+    document.addEventListener("reset", onReset);
+  }
+  const registered = fields;
+  registered.add(registration);
   return () => {
-    if (formValues.get(element) === binding) formValues.delete(element);
-    document.removeEventListener("reset", onReset);
+    if (formValues.get(element) === registration) formValues.delete(element);
+    if (registered.delete(registration) && !registered.size) {
+      documentFields.delete(document);
+      document.removeEventListener("reset", onReset);
+    }
   };
 }
 
@@ -60,5 +91,5 @@ export function registerFormValues(element: Element, state: Writable<string[]>, 
 }
 
 export function formValue(element: Element) {
-  return formValues.get(element);
+  return formValues.get(element)?.binding;
 }
