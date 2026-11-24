@@ -200,6 +200,39 @@ test("mutation updates can copy a response field into state", async () => {
   }
 });
 
+test("standalone queries accept fixed contract params", async () => {
+  const read = operationContract({
+    id: "fixed.read",
+    input: s.object({ id: s.string() }),
+    output: s.string(),
+  });
+  if (false) {
+    // @ts-expect-error The required input must be supplied.
+    query(read, {});
+    // @ts-expect-error The contract requires a string ID.
+    query(read, { params: { id: 1 } });
+    // @ts-expect-error Choose fixed params or an input projection.
+    query(read, { params: { id: "first" }, input: () => ({ id: "second" }) });
+  }
+
+  const requests: unknown[] = [];
+  const result = query(read, {
+    params: { id: "first" },
+    fetch: async (_url, init) => {
+      requests.push(JSON.parse(String(init?.body)));
+      return Response.json({ ok: true, value: "Ready" });
+    },
+  });
+  try {
+    await result.refresh();
+    await result.refresh();
+    assert.deepEqual(requests, [{ id: "first" }, { id: "first" }]);
+    assert.equal(result.data(), "Ready");
+  } finally {
+    result.dispose();
+  }
+});
+
 test("query selections react to data and share the query lifetime", async () => {
   const read = operationContract({
     id: "rows.read",

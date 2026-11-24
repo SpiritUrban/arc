@@ -1065,18 +1065,31 @@ type RemoteResourceOptions<C extends OperationContract> = {
 };
 
 type QueryOptions<C extends OperationContract> =
-  Omit<RemoteResourceOptions<C>, "id"> & { id?: string };
+  Omit<RemoteResourceOptions<C>, "id" | "input"> & { id?: string } & (
+    | (
+        ({} extends Infer<C["input"]>
+          ? Pick<RemoteResourceOptions<C>, "input">
+          : Required<Pick<RemoteResourceOptions<C>, "input">>) & { params?: never }
+      )
+    | {
+        /** Use a fixed contract input on every read. */
+        params: NoInfer<Infer<C["input"]>>;
+        input?: never;
+      }
+  );
 
 /** Read the current state of a contract-backed query by calling it. */
 export function query<C extends OperationContract>(
   contract: C,
   ...[options]: {} extends Infer<C["input"]>
     ? [options?: QueryOptions<C>]
-    : [options: QueryOptions<C> & Required<Pick<QueryOptions<C>, "input">>]
+    : [options: QueryOptions<C>]
 ): RemoteQuery<C> {
+  const { params, input, ...settings } = options ?? {};
   return createRemoteResource(contract, {
-    ...options,
+    ...settings,
     id: options?.id ?? `${contract.id}.query`,
+    input: input ?? (options && "params" in options ? () => params as Infer<C["input"]> : undefined),
   }, true);
 }
 
