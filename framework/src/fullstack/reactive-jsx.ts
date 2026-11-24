@@ -349,7 +349,8 @@ export function compileReactiveJsx(
                   ts.isArrowFunction(handler) && !handler.parameters.length && !ts.isBlock(handler.body)) {
                 const call = unwrap(handler.body);
                 if (ts.isCallExpression(call) && ts.isPropertyAccessExpression(call.expression) &&
-                    call.expression.name.text === "refresh" && ts.isIdentifier(call.expression.expression)) {
+                    ["refresh", "run"].includes(call.expression.name.text) &&
+                    ts.isIdentifier(call.expression.expression)) {
                   usedEvent = true;
                   return factory.updateJsxExpression(node,
                     factory.createCallExpression(event, undefined, [expression, arrow(call.expression.expression)]),

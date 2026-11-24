@@ -750,12 +750,12 @@ function bindMutation(defaults: RemoteFormDefaults) {
       with: (options.fields ? undefined : bindForm) as Mutation<C, Field, Key>["with"],
       for(payload: Infer<C["input"]>) {
         if (!keyOf) throw new TypeError("mutation.for requires a mutation key");
-        return {
+        return withEventTrigger({
           run: withEventTrigger(() => mutation.run(payload), submit),
           pending: () => mutation.pending(keyOf(payload)),
           outcome: () => mutation.outcome(keyOf(payload)),
           failed: (code: keyof C["errors"] & string) => mutation.failed(code, keyOf(payload)),
-        };
+        }, submit);
       },
       run(payload: Infer<C["input"]>) {
         const trace = currentWriteTrace();
@@ -837,6 +837,7 @@ function bindMutation(defaults: RemoteFormDefaults) {
         };
       },
     });
+    withEventTrigger(mutation.run, submit);
     return mutation;
   }
   return mutate;

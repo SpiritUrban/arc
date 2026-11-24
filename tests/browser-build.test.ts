@@ -14,14 +14,20 @@ import { read } from "./fixtures/browser-boundary/server.ts";
 import { mount, tick, type View } from "../framework/src/web/index.ts";
 const tasksEntry = new URL("../examples/fullstack-tasks/app.ts", import.meta.url);
 
-test("the TSX compiler preserves the resource behind a refresh callback", () => {
+test("the TSX compiler preserves resources and mutations behind simple event callbacks", () => {
   const compiled = compileReactiveJsx(
-    `const button = <button onClick={() => tasks.refresh()}>Retry</button>;`,
+    `
+      const retry = <button onClick={() => tasks.refresh()}>Retry</button>;
+      const write = <button onClick={() => save.run(payload)}>Save</button>;
+      const repeat = <button onClick={() => bound.run()}>Repeat</button>;
+    `,
     "retry.tsx",
     { reactive: true },
   );
   assert.match(compiled!, /reactiveEvent as arcEvent_\d+/);
   assert.match(compiled!, /arcEvent_\d+\(\(\) => tasks\.refresh\(\), \(\) => \(tasks\)\)/);
+  assert.match(compiled!, /arcEvent_\d+\(\(\) => save\.run\(payload\), \(\) => \(save\)\)/);
+  assert.match(compiled!, /arcEvent_\d+\(\(\) => bound\.run\(\), \(\) => \(bound\)\)/);
 });
 
 test("pure Web and Fullstack build manifests have no Node/server implementation in browser", async () => {

@@ -19,7 +19,7 @@ import {
   type RemoteQuery,
 } from "../framework/src/fullstack/client.ts";
 import { operationContract } from "../framework/src/core-entry.ts";
-import { jsx } from "../framework/src/web/jsx-runtime.ts";
+import { jsx, reactiveEvent } from "../framework/src/web/jsx-runtime.ts";
 import { state, tick } from "../framework/src/web/reactive.ts";
 import { pageView, view } from "../framework/src/web/view.ts";
 
@@ -397,11 +397,17 @@ test("bound mutation inputs share keyed requests and outcomes", async () => {
     const first = save.for({ id: "first" });
     const control = view({
       id: "row.control",
-      template: () => jsx("button", { onClick: first.run }),
+      template: () => jsx("div", {
+        children: [
+          jsx("button", { onClick: first.run }),
+          jsx("button", { onClick: reactiveEvent(() => first.run(), () => first) }),
+          jsx("button", { onClick: reactiveEvent(() => save.run({ id: "first" }), () => save) }),
+        ],
+      }),
     });
-    assert.ok(compileArchitecture([control]).edges.some(({ from, to, kind }) =>
+    assert.equal(compileArchitecture([control]).edges.filter(({ from, to, kind }) =>
       from.endsWith(".on:click") && to === save.id && kind === "TRIGGERS",
-    ));
+    ).length, 3);
     const same = save.for({ id: "first" });
     const other = save.for({ id: "other" });
     const request = first.run();

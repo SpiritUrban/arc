@@ -157,7 +157,9 @@ export function binding(
   }
   function graphReferences() {
     return (def.references?.() ?? []).flatMap((value) => {
-      const target = typeof value === "function" && eventTrigger(value);
+      const target = value !== null && (typeof value === "function" || typeof value === "object")
+        ? eventTrigger(value)
+        : undefined;
       if (target) return [target];
       if (value !== null && typeof value === "object" &&
           typeof (value as GraphDefinition).id === "string" &&
