@@ -238,6 +238,13 @@ test("mutation updates can copy a response field into state", async () => {
   const selected = state({ id: "selection.id", initial: "" });
   const count = state({ id: "selection.count", initial: "" });
   if (false) {
+    const rows = query(operationContract({
+      id: "selection.rows",
+      input: s.object({}),
+      output: s.array(s.string()),
+    }));
+    // @ts-expect-error One mutation response cannot replace the complete list.
+    mutation(write, { update: rows });
     // @ts-expect-error The response does not contain an email.
     mutation(write, { update: setFrom(selected, "email") });
     // @ts-expect-error The response count cannot be written to string state.

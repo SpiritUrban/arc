@@ -115,7 +115,7 @@ const form = () => (
 ```tsx
 const updateOrder = own(orderClient.mutation(UpdateOrder, {
   params: { id: params.id },
-  update: [order.replace(), ordersData.replaceBy()],
+  update: [order, ordersData.replaceBy()],
 }));
 
 return (
@@ -186,13 +186,15 @@ const cancelOrder = orderClient.mutation(CancelOrder, { refresh: orders });
 | `update: query.insertBy()` | Відповідь містить повний новий запис, який належить кінцю списку | Додає запис до завантаженого списку й кешу або зберігає наявний рядок із тим самим ID. У графі — `UPDATES`. |
 | `update: detail.replace()` | Відповідь є повним значенням detail query | Замінює весь detail snapshot і кеш без запиту. У графі — `UPDATES`. |
 
+Передайте сам запит у `update`, коли відповідь мутації має стати його повним значенням. Явний виклик `order.replace()` теж працює.
+
 Без аргументу `insertBy()` і `replaceBy()` використовують обов’язкове поле `id` типу `string` або `number`. Для іншого ключа передайте назву поля, наприклад `orders.replaceBy("number")`.
 
 Якщо одна відповідь має синхронізувати кілька запитів, передайте масив `update`-стратегій. Усі цілі отримають ту саму типізовану відповідь в одному batch:
 
 ```ts
 const updateOrder = orderClient.mutation(UpdateOrder, {
-  update: [order.replace(), orders.replaceBy()],
+  update: [order, orders.replaceBy()],
 });
 ```
 

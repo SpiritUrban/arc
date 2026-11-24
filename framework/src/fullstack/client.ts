@@ -181,7 +181,7 @@ type RemoteFormOptions<C extends OperationContract> = {
   onSuccess?: (value: Infer<C["output"]>, ctx: ActionContext) => void;
   /** Restore submitted fields to their initial values after success. Defaults to true. */
   resetOnSuccess?: boolean;
-  update?: MutationUpdate<Infer<C["output"]>> | readonly MutationUpdate<Infer<C["output"]>>[];
+  update?: MutationUpdateTarget<Infer<C["output"]>> | readonly MutationUpdateTarget<Infer<C["output"]>>[];
   /** Also apply update using the typed details of these business errors. */
   updateOnError?: UpdateErrorCode<NoInfer<C>> | readonly UpdateErrorCode<NoInfer<C>>[];
   baseUrl?: string;
@@ -534,11 +534,12 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     : Array.isArray(refreshOption)
       ? refreshOption
       : [refreshOption as WebResource<any, any>];
-  const updates: readonly MutationUpdate<Infer<C["output"]>>[] = options.update === undefined
+  const updateTargets: readonly MutationUpdateTarget<Infer<C["output"]>>[] = options.update === undefined
     ? []
     : Array.isArray(options.update)
       ? options.update
-      : [options.update as MutationUpdate<Infer<C["output"]>>];
+      : [options.update as MutationUpdateTarget<Infer<C["output"]>>];
+  const updates = updateTargets.map((target) => "capture" in target ? target : target.replace());
   const updateErrors = new Set<string>(
     typeof updateOnError === "string" ? [updateOnError] : updateOnError,
   );
@@ -1056,6 +1057,10 @@ type MutationUpdate<Row> = {
   readonly target: GraphDefinition;
   capture(): (row: Row, trace: TraceToken) => void;
 };
+
+type MutationUpdateTarget<Output> = MutationUpdate<Output> | (GraphDefinition & {
+  replace(): MutationUpdate<Output>;
+});
 
 /** Set a writable value from a confirmed mutation response. */
 export function setFrom<Output, Value>(

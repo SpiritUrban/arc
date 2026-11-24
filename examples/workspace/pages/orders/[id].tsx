@@ -13,7 +13,7 @@ export const title = "Деталі замовлення — ARC Workspace";
 export default function OrderDetail({ bind }: PageContext<"id">) {
   const { query, mutation } = bind(orderClient);
   const order = query(GetOrder);
-  const update = [order.replace(), ordersData.replaceBy()];
+  const update = [order, ordersData.replaceBy()];
   const updateOrder = mutation(UpdateOrder, { update, resetOnSuccess: false });
   const cancelOrder = mutation(CancelOrder, {
     update,
