@@ -456,6 +456,8 @@ test("keyed JSX lists retain unchanged rows across additions, edits and reorderi
   if (false) {
     // @ts-expect-error Rows without an ID require an explicit key.
     each(() => [{ label: "First" }], { render: (item) => jsx("li", { children: item.label }) });
+    // @ts-expect-error A bare renderer also requires rows with an ID.
+    each(() => [{ label: "First" }], () => jsx("li", {}));
   }
   const { document } = parseHTML('<div id="app"></div>');
   const items = state({

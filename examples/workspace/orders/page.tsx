@@ -1,6 +1,6 @@
 // Браузерна частина замовлень. Зміна користувача оновлює список,
 // а надсилання форми викликає серверну операцію створення.
-import { render, view } from "@arc/framework/web";
+import { each, render, view } from "@arc/framework/web";
 import { ListOrders, CreateOrder, CancelOrder, orderUnitPrice, quantityLimits, type Order } from "./contracts.ts";
 import { activeUser } from "../user-selection.ts";
 import { orderClient } from "./client.ts";
@@ -55,14 +55,14 @@ export const OrdersPage = view({
   template({ quantity, search, status }, { derive }) {
     const history = derive([visibleOrders, search, status], (orders, search, status) => {
       const term = search.trim().toLowerCase();
-      return {
-        filtering: Boolean(term) || status !== "all",
-        rows: orders.filter((order) =>
-          order.product.toLowerCase().includes(term) &&
-          (status === "all" || order.cancelled === (status === "cancelled")),
-        ),
-      };
+      return orders.filter((order) =>
+        order.product.toLowerCase().includes(term) &&
+        (status === "all" || order.cancelled === (status === "cancelled")),
+      );
     });
+    const filtering = derive([search, status], (search, status) =>
+      search.trim() !== "" || status !== "all",
+    );
 
     return (
       <section id="orders" class="orders-panel">
@@ -155,8 +155,8 @@ export const OrdersPage = view({
                 </tr>
               </thead>
               <tbody data-rows>
-                {history().rows.map((order) => (
-                    <tr key={order.id} data-order={order.id}>
+                {each(history, (order) => (
+                    <tr data-order={order.id}>
                       <td>
                         <strong><a href={`/orders/${order.id}`}>{order.product}</a></strong>
                         <small>#{order.id.slice(0, 8)}</small>
@@ -174,16 +174,16 @@ export const OrdersPage = view({
               </tbody>
             </table>
           </div>
-          {history().rows.length === 0 && !ordersData.loading() && (
+          {history().length === 0 && !ordersData.loading() && (
             <div class="empty order-empty" data-empty>
               <span class="empty-symbol">▤</span>
               <strong>
-                {history().filtering
+                {filtering()
                   ? "Замовлень не знайдено"
                   : "Тут з’являться замовлення"}
               </strong>
               <p>
-                {history().filtering
+                {filtering()
                   ? "Змініть пошук або статус замовлення."
                   : "Створіть перше замовлення для цього користувача."}
               </p>

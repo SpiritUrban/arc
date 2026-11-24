@@ -50,26 +50,30 @@ export type TemplateChild =
   | readonly TemplateChild[];
 
 type ListKey = string | number;
-type EachOptions<T> = {
+type EachConfig<T> = {
   empty?: TemplateElement;
   references?: ExpressionReferences;
+  key?: (item: T) => ListKey;
   render: (item: T) => TemplateElement;
-} & ([NoInfer<T>] extends [{ id: ListKey }]
-  ? { key?: (item: T) => ListKey }
-  : { key: (item: T) => ListKey });
+};
+
+type EachOptions<T> = [NoInfer<T>] extends [{ id: ListKey }]
+  ? EachConfig<T> | EachConfig<T>["render"]
+  : EachConfig<T> & Required<Pick<EachConfig<T>, "key">>;
 
 /** Render a reactive collection using one HTML element per stable key. */
 export function each<T>(
   source: Readable<readonly T[] | null | undefined> | (() => readonly T[] | null | undefined),
   options: EachOptions<T>,
 ): KeyedList {
+  const config: EachConfig<T> = typeof options === "function" ? { render: options } : options;
   return {
     [keyedList]: true,
     source,
-    empty: options.empty,
-    references: options.references,
-    key: (item) => options.key ? options.key(item as T) : (item as { id: ListKey }).id,
-    render: (item) => options.render(item as T),
+    empty: config.empty,
+    references: config.references,
+    key: (item) => config.key ? config.key(item as T) : (item as { id: ListKey }).id,
+    render: (item) => config.render(item as T),
   };
 }
 
