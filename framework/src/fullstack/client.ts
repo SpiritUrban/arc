@@ -447,7 +447,7 @@ type InputField<C extends OperationContract> =
 type FieldInputAttributes = {
   name: string;
   "aria-invalid": Computed<boolean>;
-  type?: "text" | "email" | "number";
+  type?: "text" | "email" | "number" | "checkbox";
   required?: boolean;
   minlength?: number;
   maxlength?: number;
@@ -461,6 +461,7 @@ function fieldInputAttributes(
 ): FieldInputAttributes {
   const input = { name, "aria-invalid": invalid };
   const field = schema.json.properties?.[name];
+  if (field?.type === "boolean") return { ...input, type: "checkbox" };
   const required = Array.isArray(schema.json.required) && schema.json.required.includes(name);
   if (field?.type === "string") {
     const format = field.format;

@@ -196,21 +196,6 @@ test("named forms skip disabled boolean controls and submit enabled unchecked co
     }),
     output: s.boolean(),
   });
-  const checkbox = (name: string, checked: boolean, disabled = false) => ({
-    localName: "input",
-    type: "checkbox",
-    name,
-    checked,
-    matches: (selector: string) => selector === ":disabled" && disabled,
-  });
-  const form = {
-    elements: [
-      checkbox("checked", true),
-      checkbox("unchecked", false),
-      checkbox("disabled", true, true),
-      checkbox("checked", false, true),
-    ],
-  } as unknown as HTMLFormElement;
   const NativeFormData = FormData;
   class CheckboxFormData extends NativeFormData {
     constructor() {
@@ -228,6 +213,23 @@ test("named forms skip disabled boolean controls and submit enabled unchecked co
   });
   globalThis.FormData = CheckboxFormData;
   try {
+    const checkbox = (name: "checked" | "unchecked" | "disabled", checked: boolean, disabled = false) => ({
+      ...save.field(name).input,
+      localName: "input",
+      checked,
+      matches: (selector: string) => selector === ":disabled" && disabled,
+    });
+    const unchecked = checkbox("unchecked", false);
+    assert.equal(unchecked.type, "checkbox");
+    assert.equal(unchecked.required, undefined);
+    const form = {
+      elements: [
+        checkbox("checked", true),
+        unchecked,
+        checkbox("disabled", true, true),
+        checkbox("checked", false, true),
+      ],
+    } as unknown as HTMLFormElement;
     const result = await save.submitForm!(form, { trace: { traceId: "checkbox-submit" } });
     assert.equal(result.ok, true);
     assert.deepEqual(requests, [{ checked: true, unchecked: false }]);
