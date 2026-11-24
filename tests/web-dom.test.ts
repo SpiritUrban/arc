@@ -453,6 +453,10 @@ test("reactive TSX text updates in place and releases subscriptions on unmount",
 });
 
 test("keyed JSX lists retain unchanged rows across additions, edits and reordering", async () => {
+  if (false) {
+    // @ts-expect-error Rows without an ID require an explicit key.
+    each(() => [{ label: "First" }], { render: (item) => jsx("li", { children: item.label }) });
+  }
   const { document } = parseHTML('<div id="app"></div>');
   const items = state({
     id: "list.items",
@@ -462,7 +466,7 @@ test("keyed JSX lists retain unchanged rows across additions, edits and reorderi
     id: "keyed.page",
     template: () => jsx("ul", {
       children: each(items, {
-        key: (item) => item.id,
+        empty: jsx("li", { children: "Empty" }),
         render: (item) => jsx("li", {
           children: [item.label, jsx("input", { value: item.label })],
         }),
@@ -491,6 +495,9 @@ test("keyed JSX lists retain unchanged rows across additions, edits and reorderi
   assert.deepEqual(Array.from(rows, (row) => row.textContent), ["Second", "Changed"]);
   assert.equal(rows[0], second);
   assert.notEqual(rows[1], first);
+  items.set([]);
+  await tick();
+  assert.equal(target.textContent, "Empty");
   mounted.unmount();
   assert.equal(items._listeners.size, 0);
   items.dispose();

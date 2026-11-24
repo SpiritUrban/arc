@@ -1,6 +1,6 @@
 // Браузерна частина користувачів. Мережевий ресурс завантажує записи,
 // локальний пошук фільтрує їх, а вибір рядка змінює список замовлень.
-import { render, view } from "@arc/framework/web";
+import { each, render, view } from "@arc/framework/web";
 import { mutation, setFrom } from "@arc/framework/fullstack";
 import { CreateUser, UpdateUser, type User } from "./contracts.ts";
 import { failureMessage } from "../ui.ts";
@@ -122,24 +122,25 @@ export const UsersPage = view({
           />
         </label>
         <div class="user-list" data-list aria-label="Користувачі">
-          {!visible().length && <div class="empty">Користувачів не знайдено</div>}
-          {visible().map((user) => (
-            <button
-              key={user.id}
-              type="button"
-              class="user-row"
-              data-user={user.id}
-              aria-pressed={selectedUser() === user.id}
-              onClick={() => selectedUser.set(user.id)}
-            >
-              <span class="avatar">{user.name.slice(0, 2).toUpperCase()}</span>
-              <span class="user-info">
-                <strong>{user.name}</strong>
-                <small>{user.email}</small>
-              </span>
-              <span class="select-mark" aria-hidden="true"></span>
-            </button>
-          ))}
+          {each(visible, {
+            empty: <div class="empty">Користувачів не знайдено</div>,
+            render: (user) => (
+              <button
+                type="button"
+                class="user-row"
+                data-user={user.id}
+                aria-pressed={selectedUser() === user.id}
+                onClick={() => selectedUser.set(user.id)}
+              >
+                <span class="avatar">{user.name.slice(0, 2).toUpperCase()}</span>
+                <span class="user-info">
+                  <strong>{user.name}</strong>
+                  <small>{user.email}</small>
+                </span>
+                <span class="select-mark" aria-hidden="true"></span>
+              </button>
+            ),
+          })}
         </div>
         <ProfileForm />
         {render.present(activeUser, (user) => <ProfileForm user={user} />)}

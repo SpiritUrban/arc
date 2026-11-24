@@ -49,22 +49,26 @@ export type TemplateChild =
   | ChildBinding
   | readonly TemplateChild[];
 
+type ListKey = string | number;
+type EachOptions<T> = {
+  empty?: TemplateElement;
+  references?: ExpressionReferences;
+  render: (item: T) => TemplateElement;
+} & ([NoInfer<T>] extends [{ id: ListKey }]
+  ? { key?: (item: T) => ListKey }
+  : { key: (item: T) => ListKey });
+
 /** Render a reactive collection using one HTML element per stable key. */
 export function each<T>(
   source: Readable<readonly T[] | null | undefined> | (() => readonly T[] | null | undefined),
-  options: {
-    empty?: TemplateElement;
-    references?: ExpressionReferences;
-    key: (item: T) => string | number;
-    render: (item: T) => TemplateElement;
-  },
+  options: EachOptions<T>,
 ): KeyedList {
   return {
     [keyedList]: true,
     source,
     empty: options.empty,
     references: options.references,
-    key: (item) => options.key(item as T),
+    key: (item) => options.key ? options.key(item as T) : (item as { id: ListKey }).id,
     render: (item) => options.render(item as T),
   };
 }
