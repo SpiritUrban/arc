@@ -123,7 +123,7 @@ export const OrdersPage = view({
               class="muted"
               data-loading
               role="status"
-            >{ordersData.loading() ? "Завантажуємо замовлення…" : ""}</span>
+            >{render.when(ordersData.loading, "Завантажуємо замовлення…")}</span>
           </div>
           <div class="order-filters">
             <label class="search-label">

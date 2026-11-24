@@ -191,16 +191,17 @@ test("render tracks only the active JSX branch and unsubscribes on unmount", asy
     id: "conditional",
     needs: count,
     template: () => jsx("div", {
-      children: ["before", render.from(show, (visible) => visible
-        ? [jsx("strong", { children: count.get() }), "!"]
-        : null), "after"],
+      children: ["before", render.when(show,
+        () => [jsx("strong", { children: count.get() }), "!"],
+        "hidden",
+      ), "after"],
     }),
   });
   assert.ok(compileArchitecture([page]).edges.some((edge) =>
     edge.from === show.id && edge.to.endsWith(".render") && edge.kind === "BINDS",
   ));
   const mounted = mount(page, target);
-  assert.equal(target.textContent, "beforeafter");
+  assert.equal(target.textContent, "beforehiddenafter");
   assert.equal(count._listeners.size, 0);
   show.set(true);
   await tick();
@@ -210,7 +211,7 @@ test("render tracks only the active JSX branch and unsubscribes on unmount", asy
   assert.equal(target.textContent, "before2!after");
   show.set(false);
   await tick();
-  assert.equal(target.textContent, "beforeafter");
+  assert.equal(target.textContent, "beforehiddenafter");
   assert.equal(count._listeners.size, 0);
   mounted.unmount();
   assert.equal(show._listeners.size, 0);
