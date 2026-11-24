@@ -576,9 +576,12 @@ test("mutation field validation shares one reactive value per field", async () =
     assert.equal(email.input.type, "email");
     assert.equal(email.invalid, save.field("email").invalid);
     const messages = { invalid: "Invalid email", failed: "Email exists" };
+    const sharedMessage = "Check the email address";
     assert.equal(email.errorMessage(messages), undefined);
+    assert.equal(email.errorMessage(sharedMessage), undefined);
     await assert.rejects(save.run({ quantity: 1, email: "invalid" }));
     assert.equal(email.errorMessage(messages), "Invalid email");
+    assert.equal(email.errorMessage(sharedMessage), sharedMessage);
     assert.equal(save.field("title").input.maxlength, 80);
     assert.equal(invalid(), false);
     await assert.rejects(save.run({ quantity: 0 }));
@@ -595,6 +598,7 @@ test("mutation field validation shares one reactive value per field", async () =
     assert.equal(email.invalid(), true);
     assert.equal(email.failed(), true);
     assert.equal(email.errorMessage(messages), "Email exists");
+    assert.equal(email.errorMessage(sharedMessage), sharedMessage);
     assert.equal(email.errorMessage({ invalid: "Invalid email" }), undefined);
     assert.equal(quantity.failed(), false);
     assert.equal(save.invalid("email"), false);

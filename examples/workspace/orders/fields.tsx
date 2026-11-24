@@ -24,7 +24,7 @@ export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
           value={order?.()?.product}
         />
         <span class="error" role="alert" data-product-error>
-          {product.invalid() && "Вкажіть назву товару."}
+          {product.errorMessage("Вкажіть назву товару.")}
         </span>
       </label>
       <div class="quantity-field">
@@ -38,8 +38,9 @@ export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
           />
         </label>
         <p class="error" role="alert" data-quantity-error>
-          {quantityField.invalid() &&
-            `Введіть ціле число від ${quantityLimits.min} до ${quantityLimits.max}.`}
+          {quantityField.errorMessage(
+            `Введіть ціле число від ${quantityLimits.min} до ${quantityLimits.max}.`,
+          )}
         </p>
       </div>
     </>

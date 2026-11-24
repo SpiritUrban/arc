@@ -463,12 +463,17 @@ type InputField<C extends OperationContract> =
     ? Extract<keyof Infer<C["input"]>, string>
     : never;
 
+type FieldErrorMessages = {
+  invalid?: string;
+  failed?: string;
+};
+
 type MutationField = {
   input: FieldInputAttributes;
   invalid: Computed<boolean>;
   failed(): boolean;
   /** Read the message for the current field error, if one is supplied. */
-  errorMessage(messages: { invalid?: string; failed?: string }): string | undefined;
+  errorMessage(messages: string | FieldErrorMessages): string | undefined;
 };
 
 type FieldInputAttributes = {
@@ -857,8 +862,11 @@ function bindMutation(defaults: RemoteFormDefaults) {
           input: fieldInputAttributes(contract.input, name, invalidState),
           invalid: invalidState,
           failed,
-          errorMessage: (messages: { invalid?: string; failed?: string }) =>
-            failed() ? messages.failed : invalidState() ? messages.invalid : undefined,
+          errorMessage(messages: string | FieldErrorMessages) {
+            if (typeof messages === "string") return invalidState() ? messages : undefined;
+            if (failed()) return messages.failed;
+            return invalidState() ? messages.invalid : undefined;
+          },
         };
       },
     });

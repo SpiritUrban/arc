@@ -53,7 +53,7 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
         </label>
         {editing && (
           <p class="error" role="alert">
-            {name.invalid() && "Перевірте ім’я користувача."}
+            {name.errorMessage("Перевірте ім’я користувача.")}
           </p>
         )}
         <label>
