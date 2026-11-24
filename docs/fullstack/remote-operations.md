@@ -131,13 +131,13 @@ ARC об’єднує іменовані поля з `params` і перевір�
 
 ## Спільний клієнт для читання та запису
 
-Для статичних налаштувань достатньо, наприклад, `remoteApi({ headers: { "x-api-version": "2" } })`. Клієнт використовує ці заголовки в запитах і мутаціях. Реактивне джерело `from` потрібне, коли контекст запитів залежить від сигналів.
+Для статичних налаштувань достатньо, наприклад, `remoteApi({ headers: { "x-api-version": "2" } })`. Клієнт використовує ці заголовки в запитах і мутаціях. Реактивне джерело `from` потрібне, коли контекст запитів залежить від сигналів. Для Bearer-токена передайте рядок у `bearer` або функцію, яка читає значення `from`. Якщо функція поверне `undefined` чи порожній рядок, ARC не додасть заголовка. Явний `Authorization` має пріоритет.
 
 ```ts
 const orderClient = remoteApi({
   from: selectedUser,
   key: true,
-  headers: (userId) => ({ authorization: `Bearer ${userId}` }),
+  bearer: (userId) => userId,
 });
 const orders = orderClient.query(ListOrders, {
   cache: true,

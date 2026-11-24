@@ -55,6 +55,42 @@ test("remote clients share static headers and transport between queries and muta
   }
 });
 
+test("remote clients use Bearer tokens on queries and mutations", async () => {
+  const read = operationContract({ id: "bearer.read", input: s.object({}), output: s.string() });
+  const write = operationContract({ id: "bearer.write", input: s.object({}), output: s.string() });
+  const token = state({ id: "bearer.token", initial: "first" });
+  const requests: (string | null)[] = [];
+  const send: typeof fetch = async (_url, init) => {
+    requests.push(new Headers(init?.headers).get("authorization"));
+    return Response.json({ ok: true, value: "Ready" });
+  };
+  const client = remoteApi({ from: token, bearer: (value) => value || undefined, fetch: send });
+  const readData = client.query(read);
+  const save = client.mutation(write);
+  const staticData = remoteApi({ bearer: "static", fetch: send }).query(read);
+  const explicitData = remoteApi({
+    bearer: "ignored",
+    headers: { Authorization: "Custom value" },
+    fetch: send,
+  }).query(read);
+  try {
+    await readData.refresh();
+    token.set("second");
+    await save.run({});
+    token.set("");
+    await readData.refresh();
+    await staticData.refresh();
+    await explicitData.refresh();
+    assert.deepEqual(requests, ["Bearer first", "Bearer second", null, "Bearer static", "Custom value"]);
+  } finally {
+    readData.dispose();
+    save.dispose();
+    staticData.dispose();
+    explicitData.dispose();
+    token.dispose();
+  }
+});
+
 test("page operations use only route parameters declared by the contract", async () => {
   const input = s.object({ id: s.string() });
   const read = operationContract({ id: "route.read", input, output: s.string() });

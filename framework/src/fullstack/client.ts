@@ -968,6 +968,8 @@ type ClientQueryOptions<C extends OperationContract, Sources extends RemoteSourc
 type RemoteApiOptions<Sources extends RemoteSources> = {
   from?: Sources;
   headers?: HeadersInit | ((...values: SourceValues<Sources>) => HeadersInit);
+  /** Provide a Bearer token directly or derive it from the current sources. */
+  bearer?: string | ((...values: SourceValues<Sources>) => string | undefined);
   key?: true | ((...values: SourceValues<Sources>) => string | number);
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
@@ -978,20 +980,21 @@ export function remoteApi<const Sources extends RemoteSources = readonly []>(
   options: RemoteApiOptions<Sources>,
 ) {
   const from = options.from === undefined ? [] : sourceList(options.from);
-  const { headers, baseUrl } = options;
-  const fetchWithHeaders: typeof globalThis.fetch | undefined = headers === undefined ? options.fetch : (url, init) => {
-    const common = typeof headers === "function"
-      ? headers(...from.map((source) => source.get()) as SourceValues<Sources>)
-      : headers;
-    const merged = new Headers(common);
-    new Headers(init?.headers).forEach((value, key) =>
-      merged.set(key, value),
-    );
-    return (options.fetch ?? globalThis.fetch)(url, {
-      ...init,
-      headers: merged,
-    });
-  };
+  const { bearer, headers, baseUrl } = options;
+  const fetchWithHeaders: typeof globalThis.fetch | undefined =
+    bearer === undefined && headers === undefined ? options.fetch : (url, init) => {
+      const values = (typeof headers === "function" || typeof bearer === "function"
+        ? from.map((source) => source.get())
+        : []) as SourceValues<Sources>;
+      const common = typeof headers === "function" ? headers(...values) : headers;
+      const merged = new Headers(common);
+      new Headers(init?.headers).forEach((value, key) => merged.set(key, value));
+      if (!merged.has("authorization")) {
+        const token = typeof bearer === "function" ? bearer(...values) : bearer;
+        if (token) merged.set("authorization", `Bearer ${token}`);
+      }
+      return (options.fetch ?? globalThis.fetch)(url, { ...init, headers: merged });
+    };
   const defaults = { needs: from, baseUrl, fetch: fetchWithHeaders };
   return {
     query<C extends OperationContract>(
