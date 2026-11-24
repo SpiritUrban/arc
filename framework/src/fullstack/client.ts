@@ -924,7 +924,7 @@ function bindQueryKey<Values extends readonly unknown[]>(
   };
 }
 
-type QueryInputField<Input, Value> = {
+export type QueryInputField<Input, Value> = {
   [Name in keyof Input & string]: Record<Name, Value> extends Input ? Name : never;
 }[keyof Input & string];
 

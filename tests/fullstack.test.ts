@@ -118,6 +118,7 @@ test("page operations use only route parameters declared by the contract", async
         return owner === "Workspace" ? { locale } : { locale, id: "override" };
       },
     }));
+    projectedQueries.push(scoped.query(detail, { id: "route.detail.field", input: "locale" }));
     scoped.query(ranked, { params: { rank: 7 }, key: true });
     const keyed = scoped.mutation(write, { id: "route.write.default", key: "id" });
     assert.equal(keyed.id, "route.write.default");
@@ -131,6 +132,10 @@ test("page operations use only route parameters declared by the contract", async
       scoped.query(ranked);
       // @ts-expect-error An input projection still supplies required non-route fields.
       scoped.query(detail, { input: () => ({}) });
+      // @ts-expect-error An ID projection leaves the required locale missing.
+      scoped.query(detail, { input: "id" });
+      // @ts-expect-error The string source cannot supply an integer rank.
+      scoped.query(ranked, { input: "rank" });
     }
     const localizedWrite = scoped.mutation(publish, { key: "id", params: { locale: "uk" } });
     if (false) {
@@ -155,16 +160,18 @@ test("page operations use only route parameters declared by the contract", async
     { id: "override", locale: "uk" },
     { id: "explicit" },
   ]);
-  assert.equal(page.owned?.length, 9);
+  assert.equal(page.owned?.length, 10);
   await cachedQueries[0].refresh();
   assert.ok(cacheKeys.includes("workspace"));
   assert.equal(cachedQueries[0].data(), "Ready");
   await projectedQueries[0].refresh();
+  await projectedQueries[1].refresh();
   source.set("UK");
   await projectedQueries[0].refresh();
   assert.deepEqual(requests, [
     { id: "route" },
     { id: "route", locale: "workspace" },
+    { id: "route", locale: "Workspace" },
     { id: "override", locale: "uk" },
   ]);
   for (const node of page.owned ?? []) node.dispose();

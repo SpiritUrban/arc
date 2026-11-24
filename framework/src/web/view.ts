@@ -7,6 +7,7 @@ import type {
   MutationFieldKey,
   MutationKeyField,
   NamedMutationOptions,
+  QueryInputField,
   RemoteQuery,
 } from "../fullstack/client.js";
 import {
@@ -707,6 +708,9 @@ type ClientQueryOptions<Client extends PageRemoteClient> =
 type QueryInputSources<Options> =
   Options extends { input?: (...values: infer Sources) => unknown } ? Sources : never;
 
+type RouteQueryInputField<Input, Sources> =
+  Sources extends readonly [infer Value] ? QueryInputField<Input, Value> : never;
+
 type RouteQueryOptions<Client extends PageRemoteClient> = {
   id?: string;
   cache?: boolean;
@@ -716,7 +720,9 @@ type RouteQueryArgs<Input, Param extends string, Client extends PageRemoteClient
   Input extends Record<string, unknown>
     ? [options: RouteQueryOptions<Client> & {
       params?: never;
-      input: (...values: QueryInputSources<ClientQueryOptions<Client>>) => RouteQueryParams<Input, Param>;
+      input:
+        | ((...values: QueryInputSources<ClientQueryOptions<Client>>) => RouteQueryParams<Input, Param>)
+        | RouteQueryInputField<RouteQueryParams<Input, Param>, QueryInputSources<ClientQueryOptions<Client>>>;
     }] | ({} extends RouteQueryParams<Input, Param>
       ? [options?: RouteQueryOptions<Client> & { params?: RouteQueryParams<Input, Param>; input?: never }]
       : [options: RouteQueryOptions<Client> & { params: RouteQueryParams<Input, Param>; input?: never }])
@@ -810,18 +816,20 @@ export function pageView<Param extends string = string>(
         }) => {
           const queryId = options?.id ?? `${id}.${contract.id}.query`;
           const { input: project, ...queryOptions } = options ?? {};
-          if (project === true || typeof project === "string") {
-            return own(client.query(contract, { ...queryOptions, input: project, id: queryId }));
+          const projection = typeof project === "string" ? (value: unknown) => ({ [project]: value }) : project;
+          if (projection === true || (typeof project === "string" &&
+              !contract.input.json.required?.some((field: unknown) => field !== project))) {
+            return own(client.query(contract, { ...queryOptions, input: projection, id: queryId }));
           }
           const bound = withRouteParams(contract, queryOptions, true);
-          const input = project && contract.input.json.type === "object"
+          const input = projection && contract.input.json.type === "object"
             ? (...values: unknown[]) => {
-              const explicit = project(...values);
+              const explicit = projection(...values);
               return explicit && typeof explicit === "object" && !Array.isArray(explicit)
                 ? { ...bound.params, ...explicit }
                 : explicit;
             }
-            : project;
+            : projection;
           return own(client.query(contract, {
             ...bound,
             ...(input ? { input } : {}),
