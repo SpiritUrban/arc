@@ -229,7 +229,16 @@ test("query selections react to data and share the query lifetime", async () => 
     const current = rows.select("current", [index, fallback], (data, index, fallback) =>
       data?.[index] ?? fallback,
     );
+    rows.select("3", () => null);
+    const first = rows.select((data) => data?.[0]);
+    const selected = rows.select([index, fallback], (data, index, fallback) =>
+      data?.[index] ?? fallback,
+    );
     assert.equal(size.id, "rows.read.query.select.size");
+    assert.equal(first.id, "rows.read.query.select.4");
+    assert.equal(selected.id, "rows.read.query.select.5");
+    assert.equal(first(), undefined);
+    assert.equal(selected(), "empty");
     assert.equal(size(), 0);
     assert.equal(current(), "empty");
     assert.equal(rows.data(), undefined);
@@ -239,6 +248,8 @@ test("query selections react to data and share the query lifetime", async () => 
     index.set(1);
     await tick();
     assert.equal(current(), "second");
+    assert.equal(first(), "first");
+    assert.equal(selected(), "second");
     assert.equal(reads, 1);
     assert.deepEqual(rows.data(), ["first", "second"]);
     rows.dispose();

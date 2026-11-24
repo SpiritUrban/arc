@@ -1038,7 +1038,12 @@ export function setFrom<Output, Value, Field extends string>(
 export type RemoteQuery<C extends OperationContract> =
   RemoteResource<C> & (() => ResourceSnapshot<Infer<C["output"]>>) & {
     /** Derive a value from the current query data, including when it is absent. */
+    select<T>(compute: (data: Infer<C["output"]> | undefined) => T): Computed<T>;
     select<T>(name: string, compute: (data: Infer<C["output"]> | undefined) => T): Computed<T>;
+    select<const Sources extends RemoteSources, T>(
+      from: Sources,
+      compute: (data: Infer<C["output"]> | undefined, ...values: SourceValues<Sources>) => T,
+    ): Computed<T>;
     select<const Sources extends RemoteSources, T>(
       name: string,
       from: Sources,
@@ -1144,19 +1149,35 @@ function createRemoteResource<C extends OperationContract>(
     projection.dispose();
     dispose();
   };
+  type Data = Infer<C["output"]> | undefined;
   function select<const Sources extends RemoteSources, T>(
-    name: string,
     ...args:
-      | [compute: (data: Infer<C["output"]> | undefined) => T]
-      | [from: Sources, compute: (data: Infer<C["output"]> | undefined, ...values: SourceValues<Sources>) => T]
+      | [compute: (data: Data) => T]
+      | [name: string, compute: (data: Data) => T]
+      | [from: Sources, compute: (data: Data, ...values: SourceValues<Sources>) => T]
+      | [name: string, from: Sources, compute: (data: Data, ...values: SourceValues<Sources>) => T]
   ): Computed<T> {
     if (disposed) throw new Error(`Disposed query: ${result.id}`);
-    if (selections.has(name)) throw new Error(`Duplicate query selection ${name} in ${result.id}`);
+    let name: string;
+    if (typeof args[0] === "string") {
+      name = args[0];
+      if (selections.has(name)) throw new Error(`Duplicate query selection ${name} in ${result.id}`);
+    } else {
+      let index = selections.size;
+      while (selections.has(String(index))) index++;
+      name = String(index);
+    }
     const id = `${result.id}.select.${name}`;
-    const selection = args.length === 1
-      ? derive(id, result.data, args[0])
-      : derive(id, [result.data, ...sourceList(args[0])], (data, ...values) =>
-        args[1](data, ...(values as SourceValues<Sources>)));
+    const [first, second, third] = args;
+    const compute = (third ?? second ?? first) as (data: Data, ...values: unknown[]) => T;
+    const sources = args.length === 3
+      ? args[1]
+      : args.length === 2 && typeof args[0] !== "string" ? args[0] : undefined;
+    const selection = derive(
+      id,
+      [result.data, ...(sources ? sourceList(sources) : [])],
+      compute,
+    );
     selections.set(name, selection);
     return selection;
   }
