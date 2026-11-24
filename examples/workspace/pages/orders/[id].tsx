@@ -46,7 +46,9 @@ export default function OrderDetail({ bind }: PageContext<"id">) {
         <UsersPage />
         <section class="panel" aria-label="Замовлення">
           {render.when(order.loading, <p role="status">Завантажуємо замовлення…</p>)}
-          {order.error() ? <p class="error" role="alert">Замовлення не знайдено або недоступне.</p> : null}
+          {render.present(order.error,
+            <p class="error" role="alert">Замовлення не знайдено або недоступне.</p>,
+          )}
           {render.present(order.data, renderSummary)}
           <p class="error" role="alert">
             {orderWriteMessage(cancelOrder(), "Замовлення вже скасовано.",

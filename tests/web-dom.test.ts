@@ -224,7 +224,10 @@ test("render.present shows a fallback only for null or undefined", async () => {
   const page = view({
     id: "present",
     template: () => jsx("div", {
-      children: render.present(value, (number) => number.toFixed(), "empty"),
+      children: [
+        render.present(value, (number) => number.toFixed(), "empty"),
+        render.present(value, jsx("strong", { children: " present" })),
+      ],
     }),
   });
   const mounted = mount(page, target);
@@ -232,7 +235,7 @@ test("render.present shows a fallback only for null or undefined", async () => {
     assert.equal(target.textContent, "empty");
     value.set(0);
     await tick();
-    assert.equal(target.textContent, "0");
+    assert.equal(target.textContent, "0 present");
     value.set(null);
     await tick();
     assert.equal(target.textContent, "empty");

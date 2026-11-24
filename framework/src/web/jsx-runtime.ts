@@ -95,10 +95,13 @@ render.from = <T>(source: Readable<T>, template: (value: T) => RenderContent): R
 /** Render a value when it is present, with optional content while it is absent. */
 render.present = <T>(
   source: Readable<T>,
-  template: (value: NoInfer<NonNullable<T>>) => RenderContent,
+  template: RenderContent | ((value: NoInfer<NonNullable<T>>) => RenderContent),
   fallback?: RenderContent,
 ): RenderBlock =>
-  render.from(source, (value) => value == null ? fallback : template(value));
+  render.from(source, (value) => {
+    if (value == null) return fallback;
+    return typeof template === "function" ? template(value) : template;
+  });
 
 /** Render the active branch of a boolean source. */
 render.when = (
