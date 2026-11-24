@@ -4,6 +4,7 @@ import {
 } from "../neutral/contracts.js";
 import { ValidationError, type Infer, type Schema } from "../schema.js";
 import { formValue } from "../web/form-value.js";
+import { withEventTrigger } from "../web/event-trigger.js";
 import {
   browserEvent,
   identity,
@@ -750,7 +751,7 @@ function bindMutation(defaults: RemoteFormDefaults) {
       for(payload: Infer<C["input"]>) {
         if (!keyOf) throw new TypeError("mutation.for requires a mutation key");
         return {
-          run: () => mutation.run(payload),
+          run: withEventTrigger(() => mutation.run(payload), submit),
           pending: () => mutation.pending(keyOf(payload)),
           outcome: () => mutation.outcome(keyOf(payload)),
           failed: (code: keyof C["errors"] & string) => mutation.failed(code, keyOf(payload)),

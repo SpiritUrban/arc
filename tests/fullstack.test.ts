@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   application,
+  compileArchitecture,
   operation,
   resource,
   s,
@@ -20,7 +21,7 @@ import {
 import { operationContract } from "../framework/src/core-entry.ts";
 import { jsx } from "../framework/src/web/jsx-runtime.ts";
 import { state, tick } from "../framework/src/web/reactive.ts";
-import { pageView } from "../framework/src/web/view.ts";
+import { pageView, view } from "../framework/src/web/view.ts";
 
 test("remote clients share static headers and transport between queries and mutations", async () => {
   const input = s.object({});
@@ -380,6 +381,7 @@ test("mutations can keep bound form values after a successful response", async (
 test("bound mutation inputs share keyed requests and outcomes", async () => {
   const write = operationContract({
     id: "row.write",
+    expose: { web: true },
     input: s.object({ id: s.string() }),
     output: s.string(),
     errors: { CONFLICT: 409 },
@@ -393,6 +395,13 @@ test("bound mutation inputs share keyed requests and outcomes", async () => {
   });
   try {
     const first = save.for({ id: "first" });
+    const control = view({
+      id: "row.control",
+      template: () => jsx("button", { onClick: first.run }),
+    });
+    assert.ok(compileArchitecture([control]).edges.some(({ from, to, kind }) =>
+      from.endsWith(".on:click") && to === save.id && kind === "TRIGGERS",
+    ));
     const same = save.for({ id: "first" });
     const other = save.for({ id: "other" });
     const request = first.run();

@@ -1,5 +1,6 @@
 import type { Schema } from "../schema.js";
 import type { GraphDefinition } from "../neutral/graph.js";
+import { withEventTrigger } from "./event-trigger.js";
 import {
   browserEvent,
   identity,
@@ -28,11 +29,6 @@ export interface ResourceSnapshot<T> {
   outcome: "idle" | "ok" | "business_error" | "fault" | "cancelled";
 }
 export const captureResourceUpdate = Symbol("ARC resource update");
-const refreshTargets = new WeakMap<object, GraphDefinition>();
-
-export function resourceRefreshTarget(handler: object) {
-  return refreshTargets.get(handler);
-}
 
 export interface WebResource<T, I = unknown> extends Readable<
   ResourceSnapshot<T>
@@ -325,7 +321,7 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
       originalDispose();
     },
   });
-  refreshTargets.set(resource.refresh, resource);
+  withEventTrigger(resource.refresh, resource);
   return resource;
 }
 export interface ActionSnapshot<O> {

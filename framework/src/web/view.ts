@@ -16,7 +16,8 @@ import {
   type TraceToken,
   type WebTelemetry,
 } from "../neutral/protocol.js";
-import { resourceRefreshTarget, type Action, type FormSubmission } from "./async.js";
+import type { Action, FormSubmission } from "./async.js";
+import { eventTrigger } from "./event-trigger.js";
 import {
   registerFormChecked,
   registerFormRadio,
@@ -156,7 +157,7 @@ export function binding(
   }
   function graphReferences() {
     return (def.references?.() ?? []).flatMap((value) => {
-      const target = typeof value === "function" && resourceRefreshTarget(value);
+      const target = typeof value === "function" && eventTrigger(value);
       if (target) return [target];
       if (value !== null && typeof value === "object" &&
           typeof (value as GraphDefinition).id === "string" &&
@@ -384,7 +385,7 @@ function directive(
         type: "event",
         name: event,
         sources: [],
-        trigger: resourceRefreshTarget(handler),
+        trigger: eventTrigger(handler),
         handler(domEvent, trace) {
           if (event === "submit") domEvent.preventDefault();
           return withWriteTrace(trace, () => handler(domEvent, {
