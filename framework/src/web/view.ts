@@ -310,6 +310,7 @@ function compileTemplate(id: string, root: TemplateChild) {
       }
       const reactiveName = reactiveAttributeName(name);
       if (isReadable(value) && reactiveName) {
+        delete attributes[name];
         const property = ["value", "checked", "selected", "disabled"].includes(name);
         attached.push(binding({
           id: `${id}.dom.${path}.${name}`,
@@ -1210,8 +1211,10 @@ export function mount(
           option.selected = selected.has(option.value);
       } else if (b.type === "property") (element as any)[b.name!] = value;
       else if (b.type === "attribute") {
-        if (value === false || value == null) element.removeAttribute(b.name!);
-        else element.setAttribute(b.name!, String(value));
+        const name = b.name!;
+        if (value == null || (value === false && !/^(aria|data)-/.test(name)))
+          element.removeAttribute(name);
+        else element.setAttribute(name, String(value));
       } else (element as HTMLElement).hidden = !value;
       browserEvent(
         telemetry,

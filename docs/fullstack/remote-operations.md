@@ -64,6 +64,8 @@ const form = () => (
 
 `mutation.invalid(field)` перевіряє, чи не пройшло поле вхідну валідацію перед запитом. Ім’я поля TypeScript бере зі схеми входу. Наприклад, `aria-invalid={createOrder.invalid("quantity")}` позначає кількість, а JSX поруч із полем може показати власне повідомлення. `mutation.invalid()` повертає `true`, якщо контрактну перевірку не пройшло хоча б одне поле; ним зручно приховати загальне повідомлення про помилку, коли помилки вже показані біля полів. Щоб браузер передав надсилання ARC навіть із невалідним значенням, додайте до форми `novalidate`.
 
+Якщо стан поля потрібен у кількох прив’язках, оголосіть `const quantityInvalid = createOrder.invalidField("quantity")`. Передайте його напряму в `aria-invalid={quantityInvalid}`, а для повідомлення читайте `quantityInvalid()`. ARC повертає те саме реактивне значення для поля й звільняє його разом із мутацією.
+
 ```tsx
 import { mutation, textField } from "@arc/framework/fullstack";
 

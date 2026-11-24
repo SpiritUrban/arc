@@ -393,6 +393,7 @@ export type Mutation<
     failed(code: keyof C["errors"] & string, key?: Key): boolean;
     invalid(): boolean;
     invalid(field: InputField<C>): boolean;
+    invalidField(field: InputField<C>): Computed<boolean>;
     run(input: Infer<C["input"]>): Promise<RemoteResult<C>>;
     for(input: Infer<C["input"]>): {
       run(): Promise<RemoteResult<C>>;
@@ -618,19 +619,23 @@ function bindMutation(defaults: RemoteFormDefaults) {
     const keyOf = typeof key === "string" ? (input: MutationInput<C>) => input[key] as Key : key;
     const requests = new Map<Key, Promise<RemoteResult<C>>>();
     const outcomes = new Map<Key, MutationOutcome<C>>();
+    const invalidFields = new Map<InputField<C>, Computed<boolean>>();
     const revision = keyOf && state({ id: `${submit.id}.pending`, initial: 0 });
     let disposed = false;
     if (revision) {
       submit.dependencies = [...(submit.dependencies ?? []), revision];
-      const dispose = submit.dispose.bind(submit);
-      submit.dispose = () => {
-        disposed = true;
-        requests.clear();
-        outcomes.clear();
-        revision.dispose();
-        dispose();
-      };
     }
+    const dispose = submit.dispose.bind(submit);
+    submit.dispose = () => {
+      if (disposed) return;
+      disposed = true;
+      for (const field of invalidFields.values()) field.dispose();
+      invalidFields.clear();
+      requests.clear();
+      outcomes.clear();
+      revision?.dispose();
+      dispose();
+    };
     const bindForm = (params: Partial<Infer<C["input"]>>): FormSubmission => {
       const values = { ...params };
       return {
@@ -700,14 +705,27 @@ function bindMutation(defaults: RemoteFormDefaults) {
           result.error === code;
       },
       invalid(field?: InputField<C>) {
-        const { error } = submit();
-        return error instanceof ValidationError &&
-          (field === undefined || error.fields.includes(field));
+        return invalidInput(submit.error(), field);
+      },
+      invalidField(field: InputField<C>) {
+        if (disposed) throw new Error(`Disposed mutation: ${submit.id}`);
+        let invalid = invalidFields.get(field);
+        if (!invalid) {
+          invalid = derive(
+            `${submit.id}.invalid.${field}`, submit.error, (error) => invalidInput(error, field),
+          );
+          invalidFields.set(field, invalid);
+        }
+        return invalid;
       },
     });
     return mutation;
   }
   return mutate;
+}
+
+function invalidInput(error: unknown, field?: string): boolean {
+  return error instanceof ValidationError && (field === undefined || error.fields.includes(field));
 }
 
 /** @deprecated Use `mutation`; it provides the same fields and form submission API plus `run` for direct actions. */

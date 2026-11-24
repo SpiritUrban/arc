@@ -1,16 +1,19 @@
 import type { Infer } from "@arc/framework/core";
+import type { Mutation } from "@arc/framework/fullstack";
 import type { Signal } from "@arc/framework/web";
 import { productMaxLength, quantityLimits, type CreateOrder } from "./contracts.ts";
 
 type OrderInput = Infer<typeof CreateOrder.input>;
 
 interface OrderFieldsProps {
-  mutation: { invalid(field: keyof OrderInput): boolean };
+  mutation: Pick<Mutation<typeof CreateOrder>, "invalidField">;
   order?: () => OrderInput | undefined;
   quantity?: Signal<string>;
 }
 
 export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
+  const productInvalid = mutation.invalidField("product");
+  const quantityInvalid = mutation.invalidField("quantity");
   return (
     <>
       <label class="product-field">
@@ -22,10 +25,10 @@ export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
           placeholder="Наприклад, блокнот ARC"
           name="product"
           value={order?.()?.product}
-          aria-invalid={mutation.invalid("product")}
+          aria-invalid={productInvalid}
         />
         <span class="error" role="alert" data-product-error>
-          {mutation.invalid("product") && "Вкажіть назву товару."}
+          {productInvalid() && "Вкажіть назву товару."}
         </span>
       </label>
       <div class="quantity-field">
@@ -40,12 +43,12 @@ export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
             max={quantityLimits.max}
             step="1"
             value={order?.()?.quantity}
-            aria-invalid={mutation.invalid("quantity")}
+            aria-invalid={quantityInvalid}
             bind:value={quantity}
           />
         </label>
         <p class="error" role="alert" data-quantity-error>
-          {mutation.invalid("quantity") &&
+          {quantityInvalid() &&
             `Введіть ціле число від ${quantityLimits.min} до ${quantityLimits.max}.`}
         </p>
       </div>
