@@ -1,4 +1,4 @@
-import { derive, state } from "@arc/framework/web";
+import { state } from "@arc/framework/web";
 import { query } from "@arc/framework/fullstack";
 import { ListUsers } from "./users/contracts.ts";
 
@@ -11,6 +11,6 @@ export const selectedUser = state({
 
 export const users = query(ListUsers);
 
-export const activeUser = derive("users.active", [users.data, selectedUser],
+export const activeUser = users.select("active", selectedUser,
   (users, id) => users?.find((user) => user.id === id),
 );

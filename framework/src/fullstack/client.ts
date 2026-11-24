@@ -715,6 +715,10 @@ export const remoteForm = bindRemoteForm({});
 export const mutation = bindMutation({});
 
 type RemoteSources = Readable<unknown> | readonly Readable<unknown>[];
+function sourceList(from: RemoteSources): readonly Readable<unknown>[] {
+  return Array.isArray(from) ? from : [from as Readable<unknown>];
+}
+
 type SourceValues<Sources extends RemoteSources> = Sources extends Readable<infer Value>
   ? [Value]
   : Sources extends readonly Readable<unknown>[]
@@ -784,9 +788,7 @@ export function remoteApi<
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
 }) {
-  const from: readonly Readable<unknown>[] = Array.isArray(options.from)
-    ? options.from
-    : [options.from as Readable<unknown>];
+  const from = sourceList(options.from);
   const { headers, baseUrl } = options;
   const fetchWithHeaders: typeof globalThis.fetch = (url, init) => {
     const values = from.map((source) => source.get()) as SourceValues<Sources>;
@@ -867,6 +869,11 @@ export type RemoteQuery<C extends OperationContract> =
   RemoteResource<C> & (() => ResourceSnapshot<Infer<C["output"]>>) & {
     /** Derive a value from the current query data, including when it is absent. */
     select<T>(name: string, compute: (data: Infer<C["output"]> | undefined) => T): Computed<T>;
+    select<const Sources extends RemoteSources, T>(
+      name: string,
+      from: Sources,
+      compute: (data: Infer<C["output"]> | undefined, ...values: SourceValues<Sources>) => T,
+    ): Computed<T>;
     replaceBy(field: RowKey<QueryItem<C>>): MutationUpdate<QueryItem<C>>;
     /** Append a confirmed new row to a loaded list, preserving any row with the same key. */
     insertBy(field: RowKey<QueryItem<C>>): MutationUpdate<QueryItem<C>>;
@@ -967,15 +974,25 @@ function createRemoteResource<C extends OperationContract>(
     projection.dispose();
     dispose();
   };
+  function select<const Sources extends RemoteSources, T>(
+    name: string,
+    ...args:
+      | [compute: (data: Infer<C["output"]> | undefined) => T]
+      | [from: Sources, compute: (data: Infer<C["output"]> | undefined, ...values: SourceValues<Sources>) => T]
+  ): Computed<T> {
+    if (disposed) throw new Error(`Disposed query: ${result.id}`);
+    if (selections.has(name)) throw new Error(`Duplicate query selection ${name} in ${result.id}`);
+    const id = `${result.id}.select.${name}`;
+    const selection = args.length === 1
+      ? derive(id, result.data, args[0])
+      : derive(id, [result.data, ...sourceList(args[0])], (data, ...values) =>
+        args[1](data, ...(values as SourceValues<Sources>)));
+    selections.set(name, selection);
+    return selection;
+  }
   return Object.assign(result, {
     result: projection,
-    select<T>(name: string, compute: (data: Infer<C["output"]> | undefined) => T): Computed<T> {
-      if (disposed) throw new Error(`Disposed query: ${result.id}`);
-      if (selections.has(name)) throw new Error(`Duplicate query selection ${name} in ${result.id}`);
-      const selection = derive(`${result.id}.select.${name}`, result.data, compute);
-      selections.set(name, selection);
-      return selection;
-    },
+    select,
     replace(): MutationUpdate<Infer<C["output"]>> {
       return {
         target: result,

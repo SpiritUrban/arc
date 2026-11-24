@@ -18,7 +18,7 @@ import {
 } from "../framework/src/fullstack/client.ts";
 import { operationContract } from "../framework/src/core-entry.ts";
 import { jsx } from "../framework/src/web/jsx-runtime.ts";
-import { state } from "../framework/src/web/reactive.ts";
+import { state, tick } from "../framework/src/web/reactive.ts";
 import { pageView } from "../framework/src/web/view.ts";
 
 test("page operations use only route parameters declared by the contract", () => {
@@ -61,25 +61,44 @@ test("query selections react to data and share the query lifetime", async () => 
     input: s.object({}),
     output: s.array(s.string()),
   });
+  const index = state({ id: "rows.index", initial: 0 });
+  const fallback = state({ id: "rows.fallback", initial: "empty" });
+  let reads = 0;
   const rows = query(read, {
-    fetch: async () => Response.json({ ok: true, value: ["first", "second"] }),
+    fetch: async () => {
+      reads++;
+      return Response.json({ ok: true, value: ["first", "second"] });
+    },
   });
   try {
     assert.throws(() => rows.select("size", () => {
       throw new Error("invalid selector");
     }), /invalid selector/);
     const size = rows.select("size", (data) => data?.length ?? 0);
+    const current = rows.select("current", [index, fallback], (data, index, fallback) =>
+      data?.[index] ?? fallback,
+    );
     assert.equal(size.id, "rows.read.query.select.size");
     assert.equal(size(), 0);
+    assert.equal(current(), "empty");
     assert.equal(rows.data(), undefined);
     await rows.refresh();
     assert.equal(size(), 2);
+    assert.equal(current(), "first");
+    index.set(1);
+    await tick();
+    assert.equal(current(), "second");
+    assert.equal(reads, 1);
     assert.deepEqual(rows.data(), ["first", "second"]);
     rows.dispose();
     assert.throws(() => size.subscribe(() => {}), /Disposed derived/);
+    assert.equal(index._children.size, 0);
+    assert.equal(fallback._children.size, 0);
     assert.throws(() => rows.select("again", () => 0), /Disposed query/);
   } finally {
     rows.dispose();
+    index.dispose();
+    fallback.dispose();
   }
 });
 
