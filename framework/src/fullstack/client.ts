@@ -1103,6 +1103,8 @@ export type RemoteQuery<C extends OperationContract> =
       from: Sources,
       compute: (data: Infer<C["output"]> | undefined, ...values: SourceValues<Sources>) => T,
     ): Computed<T>;
+    /** Derive the current query data, using a fallback when it is undefined. */
+    dataOr(fallback: Exclude<Infer<C["output"]>, undefined>, name?: string): Computed<Exclude<Infer<C["output"]>, undefined>>;
     /** Find the current row for an ID or a signal containing an ID. */
     findById(id: QueryRowId<QueryItem<C>> | Readable<QueryRowId<QueryItem<C>>>): Computed<QueryItem<C> | undefined>;
     replaceBy(...[field]: RowKeyArgument<QueryItem<C>>): MutationUpdate<QueryItem<C>>;
@@ -1276,6 +1278,10 @@ function createRemoteResource<C extends OperationContract>(
   return Object.assign(result, {
     result: projection,
     select,
+    dataOr(fallback: Exclude<Data, undefined>, name?: string): Computed<Exclude<Data, undefined>> {
+      const withFallback = (data: Data) => (data === undefined ? fallback : data) as Exclude<Data, undefined>;
+      return name === undefined ? select(withFallback) : select(name, withFallback);
+    },
     findById(
       id: QueryRowId<QueryItem<C>> | Readable<QueryRowId<QueryItem<C>>>,
     ): Computed<QueryItem<C> | undefined> {

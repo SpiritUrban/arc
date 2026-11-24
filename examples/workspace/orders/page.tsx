@@ -46,7 +46,7 @@ const cancelOrder = orderClient.mutation(CancelOrder, {
   updateOnError: "ORDER_ALREADY_CANCELLED",
 });
 
-export const visibleOrders = ordersData.select("visible", (orders) => orders ?? []);
+export const visibleOrders = ordersData.dataOr([], "visible");
 
 export const OrdersPage = view({
   id: "orders.page",

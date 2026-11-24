@@ -483,6 +483,8 @@ test("query selections react to data and share the query lifetime", async () => 
   });
   try {
     if (false) {
+      // @ts-expect-error The fallback must match the data type.
+      rows.dataOr(0);
       // @ts-expect-error The query rows do not have an id field.
       rows.findById("first");
       // @ts-expect-error The query rows do not have an id field.
@@ -505,6 +507,8 @@ test("query selections react to data and share the query lifetime", async () => 
     assert.equal(size.id, "rows.read.query.select.size");
     assert.equal(first.id, "rows.read.query.select.4");
     assert.equal(selected.id, "rows.read.query.select.5");
+    const withFallback = rows.dataOr(["fallback"]);
+    assert.deepEqual(withFallback(), ["fallback"]);
     assert.equal(first(), undefined);
     assert.equal(selected(), "empty");
     assert.equal(size(), 0);
@@ -513,6 +517,7 @@ test("query selections react to data and share the query lifetime", async () => 
     await rows.refresh();
     assert.equal(size(), 2);
     assert.equal(current(), "first");
+    assert.deepEqual(withFallback(), ["first", "second"]);
     index.set(1);
     await tick();
     assert.equal(current(), "second");
@@ -522,6 +527,7 @@ test("query selections react to data and share the query lifetime", async () => 
     assert.deepEqual(rows.data(), ["first", "second"]);
     rows.dispose();
     assert.throws(() => size.subscribe(() => {}), /Disposed derived/);
+    assert.throws(() => withFallback.subscribe(() => {}), /Disposed derived/);
     assert.equal(index._children.size, 0);
     assert.equal(fallback._children.size, 0);
     assert.throws(() => rows.select("again", () => 0), /Disposed query/);
