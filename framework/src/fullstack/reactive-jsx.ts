@@ -248,6 +248,7 @@ export function compileReactiveJsx(
                     (method === "get" && child.arguments.length === 0) ||
                     (method === "failed" && child.arguments.length <= 2) ||
                     (method === "invalid" && child.arguments.length <= 1) ||
+                    (method === "errorMessage" && child.arguments.length === 1) ||
                     ((method === "pending" || method === "outcome") &&
                       child.arguments.length <= 1)
                   ) {

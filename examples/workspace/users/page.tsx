@@ -67,9 +67,10 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
           />
         </label>
         <p class="error" role="alert" data-email-error>
-          {email.failed()
-            ? "Користувач із такою поштою вже існує."
-            : editing && email.invalid() && "Перевірте адресу email."}
+          {email.errorMessage({
+            failed: "Користувач із такою поштою вже існує.",
+            invalid: editing ? "Перевірте адресу email." : undefined,
+          })}
         </p>
         <button class="button secondary" type="submit">
           {form.running() ? pendingLabel : submitLabel}

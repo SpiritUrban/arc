@@ -467,6 +467,8 @@ type MutationField = {
   input: FieldInputAttributes;
   invalid: Computed<boolean>;
   failed(): boolean;
+  /** Read the message for the current field error, if one is supplied. */
+  errorMessage(messages: { invalid?: string; failed?: string }): string | undefined;
 };
 
 type FieldInputAttributes = {
@@ -849,10 +851,14 @@ function bindMutation(defaults: RemoteFormDefaults) {
             (status === "error" && matchesBusinessError<C>(result, code)));
           invalidFields.set(id, invalid);
         }
+        const failed = () => code !== undefined && mutation.failed(code);
+        const invalidState = invalid;
         return {
-          input: fieldInputAttributes(contract.input, name, invalid),
-          invalid,
-          failed: () => code !== undefined && mutation.failed(code),
+          input: fieldInputAttributes(contract.input, name, invalidState),
+          invalid: invalidState,
+          failed,
+          errorMessage: (messages: { invalid?: string; failed?: string }) =>
+            failed() ? messages.failed : invalidState() ? messages.invalid : undefined,
         };
       },
     });
