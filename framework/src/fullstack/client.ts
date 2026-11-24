@@ -1099,6 +1099,14 @@ type QueryOptions<C extends OperationContract, Sources extends RemoteSources> =
         params: NoInfer<Infer<C["input"]>>;
         input?: never;
       }
+    | ([Sources] extends [Readable<NoInfer<Infer<C["input"]>>>]
+      ? {
+          from: Sources;
+          /** Use the value of the single source as the complete input. */
+          input: true;
+          params?: never;
+        }
+      : never)
   );
 
 /** Read the current state of a contract-backed query by calling it. */
@@ -1112,12 +1120,16 @@ export function query<
     : [options: QueryOptions<C, Sources>]
 ): RemoteQuery<C> {
   const { params, input, key, from, ...settings } = options ?? {};
+  if (input === true && (from === undefined || Array.isArray(from))) {
+    throw new TypeError("query input: true requires a single signal");
+  }
   const sources = from === undefined ? [] : sourceList(from);
+  const project = input === true ? (value: Infer<C["input"]>) => value : input;
   return createRemoteResource(contract, {
     ...settings,
     id: options?.id ?? `${contract.id}.query`,
     from: sources,
-    input: input ?? (options && "params" in options ? () => params as Infer<C["input"]> : undefined),
+    input: project ?? (options && "params" in options ? () => params as Infer<C["input"]> : undefined),
     key: bindQueryKey(key, sources),
   }, true);
 }

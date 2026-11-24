@@ -280,6 +280,42 @@ test("standalone queries infer the input projection from reactive sources", asyn
   }
 });
 
+test("standalone queries can use one source as their complete input", async () => {
+  const read = operationContract({
+    id: "source.read",
+    input: s.object({ id: s.string() }),
+    output: s.string(),
+  });
+  const params = state({ id: "source.params", initial: { id: "first" } });
+  if (false) {
+    // @ts-expect-error A direct input requires a source.
+    query(read, { input: true });
+    // @ts-expect-error A direct input takes one signal, not an array.
+    query(read, { from: [params], input: true });
+    // @ts-expect-error The signal must contain the full contract input.
+    query(read, { from: state({ id: "source.invalid", initial: "first" }), input: true });
+  }
+
+  const result = query(read, {
+    from: params,
+    input: true,
+    fetch: async (_url, init) => {
+      const { id } = JSON.parse(String(init?.body));
+      return Response.json({ ok: true, value: id });
+    },
+  });
+  try {
+    await result.refresh();
+    assert.equal(result.data(), "first");
+    params.set({ id: "second" });
+    await result.refresh();
+    assert.equal(result.data(), "second");
+  } finally {
+    result.dispose();
+    params.dispose();
+  }
+});
+
 test("standalone queries can key cached results by their sources", async () => {
   const read = operationContract({
     id: "cached.read",
