@@ -35,19 +35,24 @@ test("page operations use only route parameters declared by the contract", async
   const write = operationContract({ id: "route.write", input, output: s.string() });
   const publish = operationContract({ id: "route.publish", input: localized, output: s.string() });
   const source = state({ id: "route.source", initial: "Workspace" });
+  const requests: unknown[] = [];
   const remote = remoteApi({
     from: source,
     headers: () => ({}),
-    fetch: async () => Response.json({ ok: true, value: "Ready" }),
+    fetch: async (_url, init) => {
+      requests.push(JSON.parse(String(init?.body)));
+      return Response.json({ ok: true, value: "Ready" });
+    },
   });
   const calls: unknown[] = [];
   const cacheKeys: string[] = [];
   const cachedQueries: RemoteQuery<typeof read>[] = [];
+  const projectedQueries: RemoteQuery<typeof detail>[] = [];
   const client = new Proxy(remote, {
     get(target, key) {
       const method = Reflect.get(target, key);
-      return (contract: typeof read | typeof detail | typeof ranked, options: { params: unknown }) => {
-        calls.push(contract.input.parse(options.params));
+      return (contract: typeof read | typeof detail | typeof ranked, options: { params: unknown; input?: unknown }) => {
+        if (!options.input) calls.push(contract.input.parse(options.params));
         return method(contract, options);
       };
     },
@@ -69,6 +74,17 @@ test("page operations use only route parameters declared by the contract", async
     }));
     const details = scoped.query(detail, { params: { locale: "uk" } });
     assert.equal(details.id, "route.page.route.detail.query");
+    projectedQueries.push(scoped.query(detail, {
+      id: "route.detail.projected",
+      input: (owner) => {
+        if (false) {
+          // @ts-expect-error The input projection receives the string source.
+          owner.toFixed();
+        }
+        const locale = owner.toLowerCase();
+        return owner === "Workspace" ? { locale } : { locale, id: "override" };
+      },
+    }));
     scoped.query(ranked, { params: { rank: 7 } });
     const keyed = scoped.mutation(write, { id: "route.write.default", key: "id" });
     assert.equal(keyed.id, "route.write.default");
@@ -80,6 +96,8 @@ test("page operations use only route parameters declared by the contract", async
       scoped.query(detail, { cache: true });
       // @ts-expect-error The route's string rank cannot supply an integer field.
       scoped.query(ranked);
+      // @ts-expect-error An input projection still supplies required non-route fields.
+      scoped.query(detail, { input: () => ({}) });
     }
     scoped.mutation(publish, { params: { locale: "uk" } });
     scoped.mutation(publish, {
@@ -100,10 +118,18 @@ test("page operations use only route parameters declared by the contract", async
     { id: "override", locale: "uk" },
     { id: "explicit" },
   ]);
-  assert.equal(page.owned?.length, 8);
+  assert.equal(page.owned?.length, 9);
   await cachedQueries[0].refresh();
   assert.ok(cacheKeys.includes("workspace"));
   assert.equal(cachedQueries[0].data(), "Ready");
+  await projectedQueries[0].refresh();
+  source.set("UK");
+  await projectedQueries[0].refresh();
+  assert.deepEqual(requests, [
+    { id: "route" },
+    { id: "route", locale: "workspace" },
+    { id: "override", locale: "uk" },
+  ]);
   for (const node of page.owned ?? []) node.dispose();
   source.dispose();
 });
