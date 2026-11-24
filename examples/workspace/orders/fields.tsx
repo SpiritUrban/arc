@@ -6,26 +6,25 @@ import { quantityLimits, type CreateOrder } from "./contracts.ts";
 type OrderInput = Infer<typeof CreateOrder.input>;
 
 interface OrderFieldsProps {
-  mutation: Pick<Mutation<typeof CreateOrder>, "field">;
+  mutation: Pick<Mutation<typeof CreateOrder>, "fieldsFor">;
   order?: () => OrderInput | undefined;
   quantity?: Signal<string>;
 }
 
 export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
-  const { input: productInput, invalid: productInvalid } = mutation.field("product");
-  const { input: quantityInput, invalid: quantityInvalid } = mutation.field("quantity");
+  const { product, quantity: quantityField } = mutation.fieldsFor("product", "quantity");
   return (
     <>
       <label class="product-field">
         Назва товару
         <input
           data-product
-          {...productInput}
+          {...product.input}
           placeholder="Наприклад, блокнот ARC"
           value={order?.()?.product}
         />
         <span class="error" role="alert" data-product-error>
-          {productInvalid() && "Вкажіть назву товару."}
+          {product.invalid() && "Вкажіть назву товару."}
         </span>
       </label>
       <div class="quantity-field">
@@ -33,13 +32,13 @@ export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
           Кількість
           <input
             data-quantity
-            {...quantityInput}
+            {...quantityField.input}
             value={order?.()?.quantity}
             bind:value={quantity}
           />
         </label>
         <p class="error" role="alert" data-quantity-error>
-          {quantityInvalid() &&
+          {quantityField.invalid() &&
             `Введіть ціле число від ${quantityLimits.min} до ${quantityLimits.max}.`}
         </p>
       </div>

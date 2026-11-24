@@ -426,11 +426,10 @@ export type Mutation<
     invalid(): boolean;
     invalid(field: InputField<C>): boolean;
     invalidField(field: InputField<C>): Computed<boolean>;
-    field(name: InputField<C>): {
-      input: FieldInputAttributes;
-      invalid: Computed<boolean>;
-      failed(): boolean;
-    };
+    field(name: InputField<C>): MutationField;
+    fieldsFor<const Names extends readonly string[]>(
+      ...names: Names & readonly InputField<C>[]
+    ): Readonly<Record<Names[number], MutationField>>;
     run(input: Infer<C["input"]>): Promise<RemoteResult<C>>;
     for(input: MutationInput<C> | ScalarMutationInput<MutationInput<C>, KeyField & keyof MutationInput<C>>): {
       run(): Promise<RemoteResult<C>>;
@@ -463,6 +462,12 @@ type InputField<C extends OperationContract> =
   Infer<C["input"]> extends Record<string, unknown>
     ? Extract<keyof Infer<C["input"]>, string>
     : never;
+
+type MutationField = {
+  input: FieldInputAttributes;
+  invalid: Computed<boolean>;
+  failed(): boolean;
+};
 
 type FieldInputAttributes = {
   name: string;
@@ -825,6 +830,11 @@ function bindMutation(defaults: RemoteFormDefaults) {
           invalidFields.set(id, invalid);
         }
         return invalid;
+      },
+      fieldsFor<const Names extends readonly string[]>(...names: Names & readonly InputField<C>[]) {
+        const fields: readonly InputField<C>[] = names;
+        return Object.fromEntries(fields.map((name) => [name, mutation.field(name)])) as
+          Readonly<Record<Names[number], MutationField>>;
       },
       field(name: InputField<C>) {
         if (disposed) throw new Error(`Disposed mutation: ${submit.id}`);

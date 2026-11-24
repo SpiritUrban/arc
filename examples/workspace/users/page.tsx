@@ -20,8 +20,7 @@ const updateUser = mutation(UpdateUser, {
 function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
   const editing = user !== undefined;
   const form = editing ? updateUser : addUser;
-  const name = form.field("name");
-  const email = form.field("email");
+  const { name, email } = form.fieldsFor("name", "email");
   const title = editing ? "Редагувати вибраного користувача" : "Новий користувач";
   const submitLabel = editing ? "Зберегти користувача" : "＋ Додати користувача";
   const pendingLabel = editing ? "Зберігаємо…" : "Додаємо…";

@@ -560,7 +560,11 @@ test("mutation field validation shares one reactive value per field", async () =
   try {
     const invalid = save.invalidField("quantity");
     assert.equal(save.invalidField("quantity"), invalid);
-    const quantity = save.field("quantity");
+    const { quantity, email } = save.fieldsFor("quantity", "email");
+    if (false) {
+      // @ts-expect-error Only contract input fields can be requested.
+      save.fieldsFor("quantity", "missing");
+    }
     assert.equal(quantity.invalid, invalid);
     assert.deepEqual(quantity.input, {
       name: "quantity", "aria-invalid": invalid, required: true, type: "number", min: 1, max: 9, step: 1,
@@ -569,7 +573,6 @@ test("mutation field validation shares one reactive value per field", async () =
     assert.equal(price.required, false);
     assert.equal(price.min, 0.25);
     assert.equal(price.step, "any");
-    const email = save.field("email");
     assert.equal(email.input.type, "email");
     assert.equal(email.invalid, save.field("email").invalid);
     assert.equal(save.field("title").input.maxlength, 80);
