@@ -4,5 +4,5 @@ import { selectedUser } from "../user-selection.ts";
 export const orderClient = remoteApi({
   from: selectedUser,
   key: true,
-  bearer: (userId) => userId,
+  bearer: true,
 });

@@ -64,7 +64,18 @@ test("remote clients use Bearer tokens on queries and mutations", async () => {
     requests.push(new Headers(init?.headers).get("authorization"));
     return Response.json({ ok: true, value: "Ready" });
   };
-  const client = remoteApi({ from: token, bearer: (value) => value || undefined, fetch: send });
+  const client = remoteApi({ from: token, bearer: true, fetch: send });
+  const projectedData = remoteApi({
+    from: token,
+    bearer: (value) => value.toUpperCase(),
+    fetch: send,
+  }).query(read);
+  if (false) {
+    // @ts-expect-error The direct Bearer token source must provide a string.
+    remoteApi({ from: state({ id: "bearer.invalid", initial: 1 }), bearer: true });
+    // @ts-expect-error This option requires a source.
+    remoteApi({ bearer: true });
+  }
   const readData = client.query(read);
   const save = client.mutation(write);
   const staticData = remoteApi({ bearer: "static", fetch: send }).query(read);
@@ -77,14 +88,18 @@ test("remote clients use Bearer tokens on queries and mutations", async () => {
     await readData.refresh();
     token.set("second");
     await save.run({});
+    await projectedData.refresh();
     token.set("");
     await readData.refresh();
     await staticData.refresh();
     await explicitData.refresh();
-    assert.deepEqual(requests, ["Bearer first", "Bearer second", null, "Bearer static", "Custom value"]);
+    assert.deepEqual(requests, [
+      "Bearer first", "Bearer second", "Bearer SECOND", null, "Bearer static", "Custom value",
+    ]);
   } finally {
     readData.dispose();
     save.dispose();
+    projectedData.dispose();
     staticData.dispose();
     explicitData.dispose();
     token.dispose();

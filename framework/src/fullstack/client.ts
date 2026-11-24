@@ -968,8 +968,10 @@ type ClientQueryOptions<C extends OperationContract, Sources extends RemoteSourc
 type RemoteApiOptions<Sources extends RemoteSources> = {
   from?: Sources;
   headers?: HeadersInit | ((...values: SourceValues<Sources>) => HeadersInit);
-  /** Provide a Bearer token directly or derive it from the current sources. */
-  bearer?: string | ((...values: SourceValues<Sources>) => string | undefined);
+  /** Use a literal token, derive it from the sources, or read a single token signal with true. */
+  bearer?: string
+    | ((...values: SourceValues<Sources>) => string | undefined)
+    | ([Sources] extends [Readable<string | undefined>] ? true : never);
   key?: true | ((...values: SourceValues<Sources>) => string | number);
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
@@ -981,17 +983,22 @@ export function remoteApi<const Sources extends RemoteSources = readonly []>(
 ) {
   const from = options.from === undefined ? [] : sourceList(options.from);
   const { bearer, headers, baseUrl } = options;
+  if (bearer === true && (options.from === undefined || Array.isArray(options.from))) {
+    throw new TypeError("bearer: true requires a single token signal");
+  }
   const fetchWithHeaders: typeof globalThis.fetch | undefined =
     bearer === undefined && headers === undefined ? options.fetch : (url, init) => {
-      const values = (typeof headers === "function" || typeof bearer === "function"
+      const values = (typeof headers === "function" || typeof bearer === "function" || bearer === true
         ? from.map((source) => source.get())
         : []) as SourceValues<Sources>;
       const common = typeof headers === "function" ? headers(...values) : headers;
       const merged = new Headers(common);
       new Headers(init?.headers).forEach((value, key) => merged.set(key, value));
       if (!merged.has("authorization")) {
-        const token = typeof bearer === "function" ? bearer(...values) : bearer;
-        if (token) merged.set("authorization", `Bearer ${token}`);
+        const token = typeof bearer === "function" ? bearer(...values)
+          : bearer === true ? values[0]
+          : bearer;
+        if (typeof token === "string" && token) merged.set("authorization", `Bearer ${token}`);
       }
       return (options.fetch ?? globalThis.fetch)(url, { ...init, headers: merged });
     };
