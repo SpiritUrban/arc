@@ -39,7 +39,7 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
       <form
         data-form={!editing || undefined}
         data-edit-user={editing || undefined}
-        onSubmit={user ? updateUser.with({ id: user.id }) : addUser}
+        onSubmit={user ? updateUser.with("id", user.id) : addUser}
       >
         <label>
           Ім’я

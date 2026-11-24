@@ -414,6 +414,12 @@ type ScalarMutationInput<Input, Field extends keyof Input> = {
   [Name in Field]: Pick<Input, Name> extends Input ? never : Name;
 }[Field] extends never ? Input[Field] : never;
 
+type FormBindingArgs<C extends OperationContract> =
+  | [params: Partial<MutationInput<C>>]
+  | {
+      [Name in InputField<C>]: [field: Name, value: MutationInput<C>[Name]];
+    }[InputField<C>];
+
 export type Mutation<
   C extends OperationContract,
   Field extends string = never,
@@ -438,7 +444,7 @@ export type Mutation<
       failed(code: keyof C["errors"] & string): boolean;
     };
     with: [Field] extends [never]
-      ? (params: Partial<Infer<C["input"]>>) => FormSubmission
+      ? (...args: FormBindingArgs<C>) => FormSubmission
       : never;
     pending(key: Key): boolean;
     outcome(key: Key): MutationOutcome<C> | undefined;
@@ -754,8 +760,10 @@ function bindMutation(defaults: RemoteFormDefaults) {
       revision?.dispose();
       dispose();
     };
-    const bindForm = (params: Partial<Infer<C["input"]>>): FormSubmission => {
-      const values = { ...params };
+    const bindForm = (...args: FormBindingArgs<C>): FormSubmission => {
+      const values = args.length === 2
+        ? { [args[0]]: args[1] } as Partial<MutationInput<C>>
+        : { ...args[0] };
       return {
         kind: "form-submission",
         action: submit,

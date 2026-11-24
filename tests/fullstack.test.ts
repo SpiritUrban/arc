@@ -559,6 +559,14 @@ test("mutation field validation shares one reactive value per field", async () =
   });
   try {
     const invalid = save.invalidField("quantity");
+    assert.equal(save.with("quantity", 1).action, save);
+    assert.equal(save.with({ quantity: 1 }).action, save);
+    if (false) {
+      // @ts-expect-error The bound quantity must be a number.
+      save.with("quantity", "1");
+      // @ts-expect-error The binding must refer to an input field.
+      save.with("missing", 1);
+    }
     assert.equal(save.invalidField("quantity"), invalid);
     const { quantity, email } = save.fieldsFor("quantity", "email");
     if (false) {
