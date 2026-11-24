@@ -186,6 +186,57 @@ test("mutation field validation shares one reactive value per field", async () =
   }
 });
 
+test("named forms skip disabled boolean controls and submit enabled unchecked controls as false", async () => {
+  const write = operationContract({
+    id: "preferences.write",
+    input: s.object({
+      checked: s.boolean(),
+      unchecked: s.boolean(),
+      disabled: s.boolean().optional(),
+    }),
+    output: s.boolean(),
+  });
+  const checkbox = (name: string, checked: boolean, disabled = false) => ({
+    localName: "input",
+    type: "checkbox",
+    name,
+    checked,
+    matches: (selector: string) => selector === ":disabled" && disabled,
+  });
+  const form = {
+    elements: [
+      checkbox("checked", true),
+      checkbox("unchecked", false),
+      checkbox("disabled", true, true),
+      checkbox("checked", false, true),
+    ],
+  } as unknown as HTMLFormElement;
+  const NativeFormData = FormData;
+  class CheckboxFormData extends NativeFormData {
+    constructor() {
+      super();
+      this.set("checked", "on");
+    }
+  }
+  const requests: unknown[] = [];
+  const save = mutation(write, {
+    resetOnSuccess: false,
+    fetch: async (_url, init) => {
+      requests.push(JSON.parse(String(init?.body)));
+      return Response.json({ ok: true, value: true });
+    },
+  });
+  globalThis.FormData = CheckboxFormData;
+  try {
+    const result = await save.submitForm!(form, { trace: { traceId: "checkbox-submit" } });
+    assert.equal(result.ok, true);
+    assert.deepEqual(requests, [{ checked: true, unchecked: false }]);
+  } finally {
+    globalThis.FormData = NativeFormData;
+    save.dispose();
+  }
+});
+
 test("mutations can keep bound form values after a successful response", async () => {
   const write = operationContract({
     id: "draft.write",

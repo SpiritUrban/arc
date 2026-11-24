@@ -205,6 +205,7 @@ function readNamedSubmission(
   resetOnSuccess: boolean,
 ): NamedSubmission {
   const entries = new FormData(form, submitter ?? undefined);
+  const controls = Array.from(form.elements).filter((element) => !element.matches(":disabled"));
   const values = Object.create(null) as NamedSubmission["values"];
   for (const [name, value] of entries) {
     const arrayItemType = arrayFields.get(name);
@@ -232,7 +233,7 @@ function readNamedSubmission(
         : text;
   }
 
-  const checkboxes = Array.from(form.elements).filter(
+  const checkboxes = controls.filter(
     (element): element is HTMLInputElement =>
       element.localName === "input" &&
       (element as HTMLInputElement).type === "checkbox" &&
@@ -247,11 +248,10 @@ function readNamedSubmission(
     values[checkbox.name] = checkbox.checked;
   }
 
-  const arrayControls = Array.from(form.elements).filter(
+  const arrayControls = controls.filter(
     (element): element is HTMLSelectElement | HTMLInputElement =>
       ((element.localName === "select" && (element as HTMLSelectElement).multiple) ||
         (element.localName === "input" && (element as HTMLInputElement).type === "checkbox")) &&
-      !element.matches(":disabled") &&
       arrayFields.has((element as HTMLInputElement).name),
   );
   for (const control of arrayControls) {
@@ -259,9 +259,8 @@ function readNamedSubmission(
   }
 
   if (!resetOnSuccess) return { values };
-  const fields = Array.from(form.elements).filter(
+  const fields = controls.filter(
     (element): element is HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement =>
-      !element.matches(":disabled") &&
       element !== submitter &&
       (element.localName === "input" || element.localName === "textarea" ||
         element.localName === "select") &&
