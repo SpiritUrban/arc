@@ -83,7 +83,7 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
 
 export const UsersPage = view({
   id: "users.page",
-  needs: [addUser, updateUser],
+  needs: updateUser,
   state: { search: "" },
   template({ search }, { derive }) {
     const visible = derive([users.data, search], (users, search) => {
