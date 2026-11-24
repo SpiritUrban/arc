@@ -456,10 +456,12 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     const userReadsBeforeCreate = listUserRequests;
     submit("#users form");
     await waitFor(() => addButton.disabled, "add user button disabled while submitting");
+    assert.equal(document.querySelector("#users form")!.getAttribute("aria-busy"), "true");
     releaseUser();
     await waitFor(() => document.querySelectorAll("[data-user]").length === 2);
     assert.equal(listUserRequests, userReadsBeforeCreate);
     assert.equal(addButton.disabled, false);
+    assert.equal(document.querySelector("#users form")!.getAttribute("aria-busy"), "false");
     assert.match(document.querySelector("#users [data-status]")!.textContent!, /^2 /);
     assert.deepEqual(userFields.map((field) => field.value), ["", ""]);
     await waitFor(() =>

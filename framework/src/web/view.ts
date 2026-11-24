@@ -350,6 +350,18 @@ function compileTemplate(id: string, root: TemplateChild) {
         }),
       );
     }
+    if (child.tag === "form" && !Object.hasOwn(child.props, "aria-busy") &&
+        !attached.some((item) => item.name === "aria-busy")) {
+      const running = attached.find((item) => item.submitRunning)?.submitRunning;
+      if (running) {
+        attached.push(binding({
+          id: `${id}.dom.${path}.aria-busy`,
+          type: "attribute",
+          name: "aria-busy",
+          sources: [running],
+        }));
+      }
+    }
     for (const item of attached) bindings.add(item);
     return {
       ...child,

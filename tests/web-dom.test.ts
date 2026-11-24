@@ -540,7 +540,10 @@ test("TSX directives declare graph nodes before mount and preserve form behavior
       }),
   });
   const graph = compileArchitecture([page]);
-  assert.equal(graph.nodes.filter((node) => node.kind === "binding").length, 5);
+  assert.equal(graph.nodes.filter((node) => node.kind === "binding").length, 6);
+  assert.ok(graph.edges.some((edge) =>
+    edge.kind === "BINDS" && edge.from === save.running.id && edge.to.endsWith(".aria-busy"),
+  ));
   assert.ok(
     graph.edges.some((edge) => edge.kind === "TRIGGERS" && edge.to === save.id),
   );
@@ -555,6 +558,7 @@ test("TSX directives declare graph nodes before mount and preserve form behavior
   const instance = mount(page, target as unknown as Element);
   const input = target.querySelector("input")!;
   const form = target.querySelector("form")!;
+  assert.equal(form.getAttribute("aria-busy"), "false");
   assert.equal(input.value, "before");
   input.value = "after";
   input.dispatchEvent(new window.Event("input"));
@@ -578,12 +582,14 @@ test("TSX directives declare graph nodes before mount and preserve form behavior
   assert.equal(submit(), false);
   await tick();
   assert.equal(submissions, 1);
+  assert.equal(form.getAttribute("aria-busy"), "true");
   assert.equal(target.querySelector("button")!.disabled, true);
   complete();
   await new Promise<void>((resolve) => setImmediate(resolve));
   await tick();
   assert.equal(target.querySelector("button")!.disabled, false);
   assert.equal(auto.disabled, false);
+  assert.equal(form.getAttribute("aria-busy"), "false");
   assert.equal(locked.disabled, true);
   assert.equal(regular.disabled, false);
   instance.unmount();
