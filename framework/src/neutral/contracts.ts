@@ -23,7 +23,7 @@ export class Fault extends Error {
   }
 }
 export type ErrorDefinition =
-  number | { status: number; details?: Schema<any> };
+  number | { status: number; details?: Schema<any>; field?: string };
 export type ErrorContracts = Record<string, ErrorDefinition>;
 export const errorStatus = (definition: ErrorDefinition) =>
   typeof definition === "number" ? definition : definition.status;
@@ -62,7 +62,7 @@ export function operationContract<
   id: string;
   input: Schema<I>;
   output: Schema<O>;
-  errors?: E;
+  errors?: E & { [K in keyof E]: number | { status: number; field?: Extract<keyof NoInfer<I>, string> } };
   expose?: { web?: boolean };
 }): OperationContract<I, O, E> {
   return Object.freeze({

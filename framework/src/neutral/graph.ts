@@ -110,7 +110,7 @@ function describe(def: GraphDefinition): GraphNode {
               k,
               typeof v === "number"
                 ? { status: v }
-                : { status: v.status, details: v.details?.json },
+                : { status: v.status, details: v.details?.json, ...(v.field !== undefined ? { field: v.field } : {}) },
             ]),
           ),
           expose: def.expose ?? {},

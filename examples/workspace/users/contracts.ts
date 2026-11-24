@@ -15,11 +15,12 @@ export const ListUsers = operationContract({
 });
 // Клієнт передає ім’я й пошту. Під час створення сервер генерує ID
 // і повертає оголошену тут помилку EMAIL_EXISTS із HTTP 409, якщо пошта зайнята.
+const emailExists = { status: 409, field: "email" } as const;
 export const CreateUser = operationContract({
   id: "users.create",
   input: UserProfile,
   output: User,
-  errors: { EMAIL_EXISTS: 409 },
+  errors: { EMAIL_EXISTS: emailExists },
   expose: { web: true },
 });
 
@@ -27,6 +28,6 @@ export const UpdateUser = operationContract({
   id: "users.update",
   input: s.object({ id: s.uuid(), ...userFields }),
   output: User,
-  errors: { USER_NOT_FOUND: 404, EMAIL_EXISTS: 409 },
+  errors: { USER_NOT_FOUND: 404, EMAIL_EXISTS: emailExists },
   expose: { web: true },
 });

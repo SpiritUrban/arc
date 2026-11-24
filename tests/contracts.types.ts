@@ -75,3 +75,11 @@ async function remoteTypes() {
     void name;
   }
 }
+
+operationContract({
+  id: "typed.field-error",
+  input: s.object({ email: s.email() }),
+  output: s.string(),
+  // @ts-expect-error The error must refer to a field of this operation's input.
+  errors: { EMAIL_EXISTS: { status: 409, field: "name" } },
+});

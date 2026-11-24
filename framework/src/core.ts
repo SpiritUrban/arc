@@ -1087,6 +1087,9 @@ export class Application {
                       ...(typeof def !== "number" && def.details
                         ? { details: def.details.json }
                         : {}),
+                      ...(typeof def !== "number" && def.field !== undefined
+                        ? { field: def.field }
+                        : {}),
                     },
                   ]),
                 ),

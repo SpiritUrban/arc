@@ -53,6 +53,7 @@ export function wireContract(contract: OperationContract) {
           ? def
           : {
               status: def.status,
+              ...(def.field !== undefined ? { field: def.field } : {}),
               ...(def.details ? { details: def.details.json } : {}),
             },
       ]),
@@ -74,6 +75,7 @@ export function descriptor(
           ? def
           : {
               status: def.status,
+              ...(def.field !== undefined ? { field: def.field } : {}),
               ...(def.details ? { details: schemaFromJSON(def.details) } : {}),
             },
       ]),

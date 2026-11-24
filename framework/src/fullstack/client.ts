@@ -749,9 +749,17 @@ function bindMutation(defaults: RemoteFormDefaults) {
     const keyOf = typeof key === "string" ? (input: MutationInput<C>) => input[key] as Key : key;
     const requests = new Map<Key, Promise<RemoteResult<C>>>();
     const outcomes = new Map<Key, MutationOutcome<C>>();
-    const fieldErrors = new Map(
-      Object.entries(options.fieldErrors ?? {}) as [string, (keyof C["errors"] & string) | undefined][],
-    );
+    type ErrorCode = keyof C["errors"] & string;
+    const fieldErrors = new Map<string, ErrorCode[]>();
+    for (const [code, def] of Object.entries(contract.errors)) {
+      if (typeof def === "number" || def.field === undefined) continue;
+      const codes = fieldErrors.get(def.field);
+      if (codes) codes.push(code as ErrorCode);
+      else fieldErrors.set(def.field, [code as ErrorCode]);
+    }
+    for (const [name, code] of Object.entries(options.fieldErrors ?? {})) {
+      if (code !== undefined) fieldErrors.set(name, [code as ErrorCode]);
+    }
     const invalidFields = new Map<string, Computed<boolean>>();
     const revision = keyOf && state({ id: `${submit.id}.pending`, initial: 0 });
     let disposed = false;
@@ -866,18 +874,18 @@ function bindMutation(defaults: RemoteFormDefaults) {
       },
       field(name: InputField<C>) {
         if (disposed) throw new Error(`Disposed mutation: ${submit.id}`);
-        const code = fieldErrors.get(name);
+        const codes = fieldErrors.get(name);
         const id = `${submit.id}.field.${name}.invalid`;
         let invalid = invalidFields.get(id);
-        if (code === undefined) {
+        if (codes === undefined) {
           invalid = mutation.invalidField(name);
         } else if (!invalid) {
           invalid = derive(id, submit, ({ error, result, status }) =>
             invalidInput(error, name) ||
-            (status === "error" && matchesBusinessError<C>(result, code)));
+            (status === "error" && codes.some((code) => matchesBusinessError<C>(result, code))));
           invalidFields.set(id, invalid);
         }
-        const failed = () => code !== undefined && mutation.failed(code);
+        const failed = () => codes?.some((code) => mutation.failed(code)) ?? false;
         const invalidState = invalid;
         return {
           input: fieldInputAttributes(contract.input, name, invalidState),
