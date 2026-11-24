@@ -15,6 +15,7 @@ import {
   remoteClient,
   remoteCall,
   remoteApi,
+  setFrom,
   telemetryTransport,
   type RemoteQuery,
 } from "../framework/src/fullstack/client.ts";
@@ -168,6 +169,35 @@ test("page operations use only route parameters declared by the contract", async
   ]);
   for (const node of page.owned ?? []) node.dispose();
   source.dispose();
+});
+
+test("mutation updates can copy a response field into state", async () => {
+  const write = operationContract({
+    id: "selection.write",
+    input: s.object({}),
+    output: s.object({ id: s.string(), count: s.int() }),
+  });
+  const selected = state({ id: "selection.id", initial: "" });
+  const count = state({ id: "selection.count", initial: "" });
+  if (false) {
+    // @ts-expect-error The response does not contain an email.
+    mutation(write, { update: setFrom(selected, "email") });
+    // @ts-expect-error The response count cannot be written to string state.
+    mutation(write, { update: setFrom(count, "count") });
+  }
+  const save = mutation(write, {
+    update: [setFrom(selected, "id"), setFrom(count, (output) => String(output.count))],
+    fetch: async () => Response.json({ ok: true, value: { id: "first", count: 3 } }),
+  });
+  try {
+    assert.equal((await save.run({})).ok, true);
+    assert.equal(selected(), "first");
+    assert.equal(count(), "3");
+  } finally {
+    save.dispose();
+    selected.dispose();
+    count.dispose();
+  }
 });
 
 test("query selections react to data and share the query lifetime", async () => {

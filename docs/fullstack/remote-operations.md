@@ -192,7 +192,7 @@ const updateOrder = orderClient.mutation(UpdateOrder, {
 
 Це підходить, коли одна й та сама операція має оновити detail і список. Для запитів із різними output contracts використовуйте окремі мутації або `refresh`.
 
-`setFrom` із `@arc/framework/fullstack` записує в локальний або спільний стан значення з відповіді. Наприклад, `update: [users.insertBy(), setFrom(selectedUser, (user) => user.id)]` додає підтверджений профіль і вибирає його в одному batch. У графі обидві цілі отримують зв’язок `UPDATES`.
+`setFrom` із `@arc/framework/fullstack` записує в локальний або спільний стан значення з відповіді. Наприклад, `update: [users.insertBy(), setFrom(selectedUser, "id")]` додає підтверджений профіль і вибирає його в одному batch. У графі обидві цілі отримують зв’язок `UPDATES`. Значення вибраного поля має бути сумісним із типом стану. Для обчислюваного значення передайте функцію.
 
 ```ts
 const cancelOrder = orderClient.mutation(CancelOrder, {

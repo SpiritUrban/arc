@@ -8,7 +8,7 @@ import { activeUser, selectedUser, users } from "../user-selection.ts";
 
 // CreateUser — спільний контракт. На сервері його виконує createUser у ./server.ts.
 export const addUser = mutation(CreateUser, {
-  update: [users.insertBy(), setFrom(selectedUser, (user) => user.id)],
+  update: [users.insertBy(), setFrom(selectedUser, "id")],
   fieldErrors: { email: "EMAIL_EXISTS" },
 });
 const updateUser = mutation(UpdateUser, {

@@ -1014,11 +1014,21 @@ type MutationUpdate<Row> = {
 export function setFrom<Output, Value>(
   target: Writable<Value>,
   select: (output: Output) => NoInfer<Value>,
+): MutationUpdate<Output>;
+export function setFrom<Value, const Field extends string>(
+  target: Writable<Value>,
+  field: string extends Field ? never : Field,
+): MutationUpdate<Record<Field, Value>>;
+export function setFrom<Output, Value, Field extends string>(
+  target: Writable<Value>,
+  select: ((output: Output) => Value) | Field,
 ): MutationUpdate<Output> {
   return {
     target,
     capture: () => (output, trace) => {
-      const value = select(output);
+      const value = typeof select === "function"
+        ? select(output)
+        : (output as Record<Field, Value>)[select];
       target._trace = trace;
       target.set(value);
     },
