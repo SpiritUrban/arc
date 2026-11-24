@@ -649,13 +649,17 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     assert.match(await denied.text(), /ORDER_NOT_FOUND/);
     const firstButton = firstRow.querySelector<HTMLButtonElement>("[data-cancel-order]")!;
     const secondButton = secondRow.querySelector<HTMLButtonElement>("[data-cancel-order]")!;
+    assert.equal(firstButton.getAttribute("aria-busy"), "false");
+    assert.equal(secondButton.getAttribute("aria-busy"), "false");
     const click = (button: HTMLButtonElement) =>
       button.dispatchEvent(new window.Event("click"));
     click(firstButton);
     click(firstButton);
     await waitFor(() => firstButton.disabled && releaseCancellations.has(orderId));
     assert.match(firstButton.textContent!, /Скасовуємо/);
+    assert.equal(firstButton.getAttribute("aria-busy"), "true");
     assert.equal(secondButton.disabled, false);
+    assert.equal(secondButton.getAttribute("aria-busy"), "false");
     assert.equal(cancelOrderRequests, 1);
     click(secondButton);
     await waitFor(() => secondButton.disabled && releaseCancellations.has(secondId));
@@ -672,6 +676,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     await waitFor(() => status(orderId)?.includes("Скасовано") === true);
     assert.equal(document.querySelector(`[data-order="${orderId}"] [data-cancel-order]`), null);
     assert.equal(secondButton.disabled, true);
+    assert.equal(secondButton.getAttribute("aria-busy"), "true");
     assert.match(secondButton.textContent!, /Скасовуємо/);
     assert.equal(rowError(secondId), "");
     releaseCancellations.get(secondId)!();

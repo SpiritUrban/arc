@@ -430,6 +430,7 @@ type BoundMutation<C extends OperationContract> = {
   buttonProps: {
     onClick: () => Promise<RemoteResult<C>>;
     disabled: ReturnType<typeof reactiveAttribute>;
+    "aria-busy": ReturnType<typeof reactiveAttribute>;
   };
 };
 
@@ -789,12 +790,13 @@ function bindMutation(defaults: RemoteFormDefaults) {
           : input) as MutationInput<C>;
         const run = withEventTrigger(() => mutation.run(payload), submit);
         const pending = () => mutation.pending(keyOf(payload));
+        const pendingAttribute = reactiveAttribute(pending, () => [revision]);
         return withEventTrigger({
           run,
           pending,
           outcome: () => mutation.outcome(keyOf(payload)),
           failed: (code: keyof C["errors"] & string) => mutation.failed(code, keyOf(payload)),
-          buttonProps: { onClick: run, disabled: reactiveAttribute(pending, () => [revision]) },
+          buttonProps: { onClick: run, disabled: pendingAttribute, "aria-busy": pendingAttribute },
         }, submit);
       },
       run(payload: Infer<C["input"]>) {
