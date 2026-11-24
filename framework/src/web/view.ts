@@ -143,7 +143,7 @@ export function binding(
 ): Binding {
   const handler = def.handler as unknown as GraphDefinition | undefined;
   const trigger = def.trigger ?? (handler?.id ? handler : undefined);
-  const needs = graphNeeds(def.block?.needs);
+  const needs = graphNeeds(def.block?.needs ?? def.list?.needs);
   const dependencies = (sources: readonly Readable<unknown>[]) =>
     [...sources, ...needs, ...(trigger ? [trigger] : [])];
   const relations = (sources: readonly Readable<unknown>[]) => [

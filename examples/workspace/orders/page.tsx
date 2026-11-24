@@ -50,7 +50,6 @@ export const visibleOrders = ordersData.dataOr([], "visible");
 
 export const OrdersPage = view({
   id: "orders.page",
-  needs: cancelOrder,
   state: { quantity: String(quantityLimits.min), search: "", status: "all" },
   template({ quantity, search, status }, { derive }) {
     const history = derive([visibleOrders, search, status], (orders, search, status) => {
@@ -155,7 +154,9 @@ export const OrdersPage = view({
                 </tr>
               </thead>
               <tbody data-rows>
-                {each(history, (order) => (
+                {each(history, {
+                  needs: cancelOrder,
+                  render: (order) => (
                     <tr data-order={order.id}>
                       <td>
                         <strong><a href={`/orders/${order.id}`}>{order.product}</a></strong>
@@ -170,7 +171,8 @@ export const OrdersPage = view({
                         <CancelOrderControl order={order} />
                       </td>
                     </tr>
-                ))}
+                  ),
+                })}
               </tbody>
             </table>
           </div>

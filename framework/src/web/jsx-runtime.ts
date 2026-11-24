@@ -34,6 +34,7 @@ export interface KeyedList {
     | (() => readonly unknown[] | null | undefined);
   readonly empty?: TemplateElement;
   readonly references?: ExpressionReferences;
+  readonly needs?: GraphNeeds;
   key(item: unknown): string | number;
   render(item: unknown): TemplateElement;
 }
@@ -54,6 +55,7 @@ type ListKey = string | number;
 type EachConfig<T> = {
   empty?: TemplateElement;
   references?: ExpressionReferences;
+  needs?: GraphNeeds;
   key?: (item: T) => ListKey;
   render: (item: T) => TemplateElement;
 };
@@ -73,6 +75,7 @@ export function each<T>(
     source,
     empty: config.empty,
     references: config.references,
+    needs: config.needs,
     key: (item) => config.key ? config.key(item as T) : (item as { id: ListKey }).id,
     render: (item) => config.render(item as T),
   };
