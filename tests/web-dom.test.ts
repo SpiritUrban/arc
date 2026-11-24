@@ -216,6 +216,31 @@ test("render tracks only the active JSX branch and unsubscribes on unmount", asy
   assert.equal(show._listeners.size, 0);
 });
 
+test("render.present shows a fallback only for null or undefined", async () => {
+  const { document } = parseHTML('<div id="app"></div>');
+  const target = document.querySelector("#app")!;
+  const value = state<number | null | undefined>({ id: "present.value", initial: undefined });
+  const page = view({
+    id: "present",
+    template: () => jsx("div", {
+      children: render.present(value, (number) => number.toFixed(), "empty"),
+    }),
+  });
+  const mounted = mount(page, target);
+  try {
+    assert.equal(target.textContent, "empty");
+    value.set(0);
+    await tick();
+    assert.equal(target.textContent, "0");
+    value.set(null);
+    await tick();
+    assert.equal(target.textContent, "empty");
+  } finally {
+    mounted.unmount();
+    value.dispose();
+  }
+});
+
 test("render cleans up onClick and traces writes to callable state", async () => {
   const { document, window } = parseHTML('<div id="app"></div>');
   const target = document.querySelector("#app")!;

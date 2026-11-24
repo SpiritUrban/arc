@@ -20,8 +20,7 @@ export default function OrderDetail({ bind }: PageContext<"id">) {
     updateOnError: "ORDER_ALREADY_CANCELLED",
   });
 
-  function renderSummary(saved: ReturnType<typeof order.data>) {
-    if (!saved) return null;
+  function renderSummary(saved: NonNullable<ReturnType<typeof order.data>>) {
     return (
       <div data-order-detail>
         <h2>{saved.product}</h2>
@@ -48,7 +47,7 @@ export default function OrderDetail({ bind }: PageContext<"id">) {
         <section class="panel" aria-label="Замовлення">
           {order.loading() && <p role="status">Завантажуємо замовлення…</p>}
           {order.error() ? <p class="error" role="alert">Замовлення не знайдено або недоступне.</p> : null}
-          {render.from(order.data, renderSummary)}
+          {render.present(order.data, renderSummary)}
           <p class="error" role="alert">
             {orderWriteMessage(cancelOrder(), "Замовлення вже скасовано.",
               () => "Не вдалося скасувати замовлення.",

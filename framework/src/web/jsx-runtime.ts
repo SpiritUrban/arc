@@ -84,6 +84,14 @@ export function render(
 render.from = <T>(source: Readable<T>, template: (value: T) => RenderContent): RenderBlock =>
   render(() => template(source.get()), () => [source]);
 
+/** Render a value when it is present, with optional content while it is absent. */
+render.present = <T>(
+  source: Readable<T>,
+  template: (value: NoInfer<NonNullable<T>>) => RenderContent,
+  fallback?: RenderContent,
+): RenderBlock =>
+  render.from(source, (value) => value == null ? fallback : template(value));
+
 export function isRenderBlock(child: TemplateChild): child is RenderBlock {
   return child != null && typeof child === "object" && reactiveBlock in child;
 }

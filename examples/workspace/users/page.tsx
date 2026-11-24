@@ -1,6 +1,6 @@
 // Браузерна частина користувачів. Мережевий ресурс завантажує записи,
 // локальний пошук фільтрує їх, а вибір рядка змінює список замовлень.
-import { view } from "@arc/framework/web";
+import { render, view } from "@arc/framework/web";
 import { mutation, setFrom } from "@arc/framework/fullstack";
 import { CreateUser, UpdateUser, type User } from "./contracts.ts";
 import { failureMessage } from "../ui.ts";
@@ -81,10 +81,6 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
   );
 }
 
-function editProfile(user: ReturnType<typeof User.parse> | undefined) {
-  return user ? <ProfileForm user={user} /> : null;
-}
-
 export const UsersPage = view({
   id: "users.page",
   needs: [addUser, updateUser],
@@ -146,7 +142,7 @@ export const UsersPage = view({
           ))}
         </div>
         <ProfileForm />
-        {editProfile(activeUser())}
+        {render.present(activeUser, (user) => <ProfileForm user={user} />)}
       </section>
     );
   },

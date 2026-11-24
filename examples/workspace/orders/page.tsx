@@ -116,9 +116,7 @@ export const OrdersPage = view({
             <div>
               <span class="eyebrow">ІСТОРІЯ</span>
               <h2 data-owner>
-                {render.from(activeUser, (user) =>
-                  user ? `Замовлення · ${user.name}` : "Оберіть користувача",
-                )}
+                {render.present(activeUser, (user) => `Замовлення · ${user.name}`, "Оберіть користувача")}
               </h2>
             </div>
             <span
