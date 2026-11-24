@@ -912,6 +912,17 @@ function querySourceKey(values: readonly unknown[]) {
   return JSON.stringify(values.map((value) => encodeCacheValue(value)));
 }
 
+function bindQueryKey<Values extends readonly unknown[]>(
+  key: true | ((...values: Values) => string | number) | undefined,
+  sources: readonly Readable<unknown>[],
+): (() => string | number) | undefined {
+  if (key === undefined) return undefined;
+  return () => {
+    const values = sources.map((source) => source.get());
+    return key === true ? querySourceKey(values) : key(...values as unknown as Values);
+  };
+}
+
 type ClientQueryOptions<C extends OperationContract, Sources extends RemoteSources> = {
   id?: string;
   /** Override the cache context. By default, cached queries use all `from` values. */
@@ -965,14 +976,13 @@ export function remoteApi<const Sources extends RemoteSources = readonly []>(
         : [options: ClientQueryOptions<C, Sources>]
     ): RemoteQuery<C> {
       const keyOption = query?.key ?? options.key ?? (query?.cache ? true : undefined);
-      const key = keyOption === true ? (...values: SourceValues<Sources>) => querySourceKey(values) : keyOption;
       return createRemoteResource(contract, {
         id: query?.id ?? `${contract.id}.query`,
         from,
         input: query && "input" in query ? query.input : query && "params" in query
           ? () => query.params as Infer<C["input"]>
           : undefined,
-        key: key && (() => key(...from.map((source) => source.get()) as SourceValues<Sources>)),
+        key: bindQueryKey(keyOption, from),
         cache: query?.cache,
         baseUrl,
         fetch: fetchWithHeaders,
@@ -1064,14 +1074,21 @@ type RemoteResourceOptions<C extends OperationContract> = {
   fetch?: typeof globalThis.fetch;
 };
 
+// Preserve the existing input callback signature when callers provide only the contract type.
+type QuerySourceValues<Sources extends RemoteSources> =
+  RemoteSources extends Sources ? any[] : SourceValues<Sources>;
+
 type QueryProjection<C extends OperationContract, Sources extends RemoteSources> = {
-  // Preserve the existing callback signature when callers provide only the contract type.
-  input?: (...values: RemoteSources extends Sources ? any[] : SourceValues<Sources>) => Infer<C["input"]>;
+  input?: (...values: QuerySourceValues<Sources>) => Infer<C["input"]>;
 };
 
 type QueryOptions<C extends OperationContract, Sources extends RemoteSources> =
-  Omit<RemoteResourceOptions<C>, "id" | "input" | "from"> &
-  { id?: string; from?: Sources } & (
+  Omit<RemoteResourceOptions<C>, "id" | "input" | "from" | "key"> & {
+    id?: string;
+    from?: Sources;
+    /** Use all sources as the key, or select one from their values. */
+    key?: true | ((...values: QuerySourceValues<Sources>) => string | number);
+  } & (
     | (
         ({} extends Infer<C["input"]>
           ? QueryProjection<C, Sources>
@@ -1094,11 +1111,14 @@ export function query<
     ? [options?: QueryOptions<C, Sources>]
     : [options: QueryOptions<C, Sources>]
 ): RemoteQuery<C> {
-  const { params, input, ...settings } = options ?? {};
+  const { params, input, key, from, ...settings } = options ?? {};
+  const sources = from === undefined ? [] : sourceList(from);
   return createRemoteResource(contract, {
     ...settings,
     id: options?.id ?? `${contract.id}.query`,
+    from: sources,
     input: input ?? (options && "params" in options ? () => params as Infer<C["input"]> : undefined),
+    key: bindQueryKey(key, sources),
   }, true);
 }
 

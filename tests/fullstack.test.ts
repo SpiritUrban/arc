@@ -244,6 +244,13 @@ test("standalone queries infer the input projection from reactive sources", asyn
   const requests: unknown[] = [];
   const result = query(read, {
     from: [id, rank],
+    key: (id, rank) => {
+      if (false) {
+        // @ts-expect-error The first key argument comes from the string source.
+        id.toFixed();
+      }
+      return `${id}:${rank.toFixed()}`;
+    },
     input: (id, rank) => {
       if (false) {
         // @ts-expect-error The first source provides a string.
@@ -262,6 +269,7 @@ test("standalone queries infer the input projection from reactive sources", asyn
     await result.refresh();
     id.set("SECOND");
     rank.set(5);
+    assert.equal(result.data(), undefined);
     await result.refresh();
     assert.deepEqual(requests, [{ id: "first", rank: 2 }, { id: "second", rank: 6 }]);
     assert.equal(result.data(), 2);
@@ -269,6 +277,38 @@ test("standalone queries infer the input projection from reactive sources", asyn
     result.dispose();
     id.dispose();
     rank.dispose();
+  }
+});
+
+test("standalone queries can key cached results by their sources", async () => {
+  const read = operationContract({
+    id: "cached.read",
+    input: s.object({ id: s.string() }),
+    output: s.int(),
+  });
+  const id = state({ id: "cached.id", initial: "first" });
+  let reads = 0;
+  const result = query(read, {
+    from: id,
+    input: (id) => ({ id }),
+    key: true,
+    cache: true,
+    fetch: async () => Response.json({ ok: true, value: ++reads }),
+  });
+  try {
+    await result.refresh();
+    id.set("second");
+    assert.equal(result.data(), undefined);
+    await result.refresh();
+    assert.equal(result.data(), 2);
+    id.set("first");
+    const pending = result.refresh();
+    assert.equal(result.data(), 1);
+    await pending;
+    assert.equal(result.data(), 3);
+  } finally {
+    result.dispose();
+    id.dispose();
   }
 });
 
