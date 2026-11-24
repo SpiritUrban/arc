@@ -6,6 +6,8 @@ import { CreateUser, UpdateUser, type User } from "./contracts.ts";
 import { failureMessage } from "../ui.ts";
 import { activeUser, selectedUser, users } from "../user-selection.ts";
 
+const profiles = users.dataOr([], "profiles");
+
 // CreateUser — спільний контракт. На сервері його виконує createUser у ./server.ts.
 export const addUser = mutation(CreateUser, {
   update: [users.insertBy(), setFrom(selectedUser, "id")],
@@ -85,9 +87,9 @@ export const UsersPage = view({
   id: "users.page",
   state: { search: "" },
   template({ search }, { derive }) {
-    const visible = derive([users.data, search], (users, search) => {
+    const visible = derive([profiles, search], (profiles, search) => {
       const term = search.toLowerCase();
-      return (users ?? []).filter((user) =>
+      return profiles.filter((user) =>
         `${user.name} ${user.email}`.toLowerCase().includes(term),
       );
     });
@@ -104,7 +106,7 @@ export const UsersPage = view({
         <p class="muted" data-status>
           {users.loading()
             ? "Оновлюємо список…"
-            : `${users.data()?.length ?? 0} у вашому просторі`}
+            : `${profiles().length} у вашому просторі`}
         </p>
         {render.present(users.error,
           <button type="button" class="button secondary" onClick={users.refresh}>

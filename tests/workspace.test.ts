@@ -275,7 +275,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     assert.ok(edges.some((e) =>
       e.from === "users.list.query" && e.to === "users.list" && e.kind === "REMOTE_CALLS",
     ));
-    for (const from of ["users.list.query.loading", "users.list.query.data"]) {
+    for (const from of ["users.list.query.loading", "users.list.query.select.profiles"]) {
       assert.ok(edges.some((edge) =>
         edge.from === from &&
         edge.to.startsWith("users.page.dom.") &&
