@@ -143,12 +143,14 @@ export function binding(
 ): Binding {
   const handler = def.handler as unknown as GraphDefinition | undefined;
   const trigger = def.trigger ?? (handler?.id ? handler : undefined);
+  const needs = graphNeeds(def.block?.needs);
   const dependencies = (sources: readonly Readable<unknown>[]) =>
-    trigger ? [...sources, trigger] : sources;
-  const relations = (sources: readonly Readable<unknown>[]) => {
-    const links = sources.map((to) => ({ to, kind: "BINDS" as const }));
-    return trigger ? [...links, { to: trigger, kind: "TRIGGERS" as const }] : links;
-  };
+    [...sources, ...needs, ...(trigger ? [trigger] : [])];
+  const relations = (sources: readonly Readable<unknown>[]) => [
+    ...sources.map((to) => ({ to, kind: "BINDS" as const })),
+    ...needs.map((to) => ({ to, kind: "DEPENDS_ON" as const })),
+    ...(trigger ? [{ to: trigger, kind: "TRIGGERS" as const }] : []),
+  ];
   function graphSources() {
     if (!def.references) return def.sources;
     const inferred = def.references().filter((value): value is Readable<unknown> =>

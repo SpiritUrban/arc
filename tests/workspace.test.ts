@@ -234,6 +234,10 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       from.startsWith("users.page.dom.") && from.endsWith(".on:submit") &&
       to === "users.create.submit" && kind === "TRIGGERS",
     ));
+    assert.ok(edges.some(({ from, to, kind }) =>
+      from.startsWith("users.page.dom.") && from.endsWith(".render") &&
+      to === "users.update.submit" && kind === "DEPENDS_ON",
+    ));
     assert.ok(nodes.some(({ id }) => id.startsWith("users.page.dom.") && id.endsWith(".each")));
     assert.equal(nodes.find(({ id }) => id === "orders.page.derived.history")?.scope, "view");
     assert.ok(edges.some(({ from, to, kind }) =>

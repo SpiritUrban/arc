@@ -1,5 +1,5 @@
 import type { Action, FormSubmission } from "./async.js";
-import type { Readable, Writable } from "./reactive.js";
+import type { GraphNeeds, Readable, Writable } from "./reactive.js";
 import type { Binding, EventHandler, Projection, View } from "./view.js";
 export { reactiveEvent } from "./event-trigger.js";
 
@@ -23,6 +23,7 @@ export interface RenderBlock {
   readonly [reactiveBlock]: true;
   readonly template: RenderTemplate;
   readonly references?: ExpressionReferences;
+  readonly needs?: GraphNeeds;
 }
 interface ChildBinding {
   readonly [childBinding]: Binding;
@@ -92,16 +93,23 @@ export function render(
 render.from = <T>(source: Readable<T>, template: (value: T) => RenderContent): RenderBlock =>
   render(() => template(source.get()), () => [source]);
 
+type PresenceOptions = { needs: GraphNeeds; fallback?: RenderContent };
+
 /** Render a value when it is present, with optional content while it is absent. */
 render.present = <T>(
   source: Readable<T>,
   template: RenderContent | ((value: NoInfer<NonNullable<T>>) => RenderContent),
-  fallback?: RenderContent,
-): RenderBlock =>
-  render.from(source, (value) => {
+  options?: RenderContent | PresenceOptions,
+): RenderBlock => {
+  const { fallback, needs } = options && typeof options === "object" && "needs" in options
+    ? options
+    : { fallback: options, needs: undefined };
+  const block = render.from(source, (value) => {
     if (value == null) return fallback;
     return typeof template === "function" ? template(value) : template;
   });
+  return needs ? { ...block, needs } : block;
+};
 
 /** Render the active branch of a boolean source or predicate. */
 render.when = (

@@ -83,7 +83,6 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
 
 export const UsersPage = view({
   id: "users.page",
-  needs: updateUser,
   state: { search: "" },
   template({ search }, { derive }) {
     const visible = derive([users.data, search], (users, search) => {
@@ -143,7 +142,7 @@ export const UsersPage = view({
           })}
         </div>
         <ProfileForm />
-        {render.present(activeUser, (user) => <ProfileForm user={user} />)}
+        {render.present(activeUser, (user) => <ProfileForm user={user} />, { needs: updateUser })}
       </section>
     );
   },
