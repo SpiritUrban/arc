@@ -42,7 +42,6 @@ export const createOrder = orderClient.mutation(CreateOrder, {
 const cancelOrder = orderClient.mutation(CancelOrder, {
   key: "id",
   update: ordersData.replaceBy(),
-  updateOnError: "ORDER_ALREADY_CANCELLED",
 });
 
 export const visibleOrders = ordersData.dataOr([], "visible");

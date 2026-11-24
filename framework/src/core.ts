@@ -30,6 +30,7 @@ import {
   type Result,
   type ErrorContracts,
   type OperationContract,
+  type OperationErrors,
   type OperationResult,
   type Fail,
 } from "./neutral/contracts.js";
@@ -113,7 +114,7 @@ type OperationDefinition<
   C extends Calls,
 > = Omit<Operation<I, O, N, E, C>, "kind" | "needs" | "errors" | "calls"> & {
   needs?: N;
-  errors?: E;
+  errors?: OperationErrors<I, O, E>;
   calls?: C;
 };
 type OperationImplementation<
@@ -1089,6 +1090,9 @@ export class Application {
                         : {}),
                       ...(typeof def !== "number" && def.field !== undefined
                         ? { field: def.field }
+                        : {}),
+                      ...(typeof def !== "number" && def.updateFromDetails
+                        ? { updateFromDetails: true }
                         : {}),
                     },
                   ]),

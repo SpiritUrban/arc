@@ -56,7 +56,7 @@ export const CancelOrder = operationContract({
   output: Order,
   errors: {
     ORDER_NOT_FOUND: 404,
-    ORDER_ALREADY_CANCELLED: { status: 409, details: Order },
+    ORDER_ALREADY_CANCELLED: { status: 409, details: Order, updateFromDetails: true },
   },
   expose: { web: true },
 });

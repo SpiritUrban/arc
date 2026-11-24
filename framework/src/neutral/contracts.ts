@@ -23,7 +23,7 @@ export class Fault extends Error {
   }
 }
 export type ErrorDefinition =
-  number | { status: number; details?: Schema<any>; field?: string };
+  number | { status: number; details?: Schema<any>; field?: string; updateFromDetails?: true };
 export type ErrorContracts = Record<string, ErrorDefinition>;
 export const errorStatus = (definition: ErrorDefinition) =>
   typeof definition === "number" ? definition : definition.status;
@@ -54,6 +54,11 @@ export interface OperationContract<
   errors: E;
   expose?: { web?: boolean };
 }
+export type OperationErrors<I, O, E extends ErrorContracts> = E & {
+  [K in keyof E]: (number | { status: number; field?: Extract<keyof NoInfer<I>, string> }) &
+    (E[K] extends { updateFromDetails: true } ? { details: Schema<NoInfer<O>> } : unknown);
+};
+
 export function operationContract<
   I,
   O,
@@ -62,7 +67,7 @@ export function operationContract<
   id: string;
   input: Schema<I>;
   output: Schema<O>;
-  errors?: E & { [K in keyof E]: number | { status: number; field?: Extract<keyof NoInfer<I>, string> } };
+  errors?: OperationErrors<I, O, E>;
   expose?: { web?: boolean };
 }): OperationContract<I, O, E> {
   return Object.freeze({

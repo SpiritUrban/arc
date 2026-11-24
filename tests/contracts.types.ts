@@ -83,3 +83,11 @@ operationContract({
   // @ts-expect-error The error must refer to a field of this operation's input.
   errors: { EMAIL_EXISTS: { status: 409, field: "name" } },
 });
+
+operationContract({
+  id: "typed.update-from-details",
+  input: s.object({}),
+  output: s.string(),
+  // @ts-expect-error The details used for updates must match the operation output.
+  errors: { CONFLICT: { status: 409, details: s.int(), updateFromDetails: true } },
+});

@@ -183,7 +183,7 @@ type RemoteFormOptions<C extends OperationContract> = {
   /** Restore submitted fields to their initial values after success. Defaults to true. */
   resetOnSuccess?: boolean;
   update?: MutationUpdateTarget<Infer<C["output"]>> | readonly MutationUpdateTarget<Infer<C["output"]>>[];
-  /** Also apply update using the typed details of these business errors. */
+  /** Override the contract errors whose details can drive update. */
   updateOnError?: UpdateErrorCode<NoInfer<C>> | readonly UpdateErrorCode<NoInfer<C>>[];
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
@@ -568,7 +568,11 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
       : [options.update as MutationUpdateTarget<Infer<C["output"]>>];
   const updates = updateTargets.map((target) => "capture" in target ? target : target.replace());
   const updateErrors = new Set<string>(
-    typeof updateOnError === "string" ? [updateOnError] : updateOnError,
+    typeof updateOnError === "string" ? [updateOnError] : updateOnError ??
+      Object.keys(contract.errors).filter((code) => {
+        const definition = contract.errors[code];
+        return typeof definition !== "number" && definition.updateFromDetails;
+      }),
   );
   const fieldOptions = options.fields;
   const properties = callable && !fieldOptions ? contract.input.json.properties : undefined;
