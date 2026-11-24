@@ -525,6 +525,23 @@ test("ORD-04–06 · ownership, detail update and independent cancellation", asy
   await expect(
     orderDetail(page).getByRole("heading", { name: first.product }),
   ).toBeVisible();
+  if (!isReact(info)) {
+    const switched = await hold(
+      page,
+      transport(info, "orders.get"),
+      (req) => req.headers().authorization === `Bearer ${demo}`,
+    );
+    try {
+      await userRow(page, "Demo User").click();
+      await switched.request;
+      await expect(orderDetail(page).getByRole("heading", { name: first.product })).toHaveCount(0);
+    } finally {
+      await switched.release();
+    }
+    await expect(orderDetail(page).getByRole("alert")).toContainText("недоступне");
+    await userRow(page, user.name).click();
+    await expect(orderDetail(page).getByRole("heading", { name: first.product })).toBeVisible();
+  }
   await page.getByRole("link", { name: "← Усі замовлення" }).click();
   await expect(orderRow(page, first.product)).toBeVisible();
   await expect(page.getByText("Завантажуємо замовлення…")).toHaveCount(0);

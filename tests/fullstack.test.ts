@@ -85,7 +85,7 @@ test("page operations use only route parameters declared by the contract", async
         return owner === "Workspace" ? { locale } : { locale, id: "override" };
       },
     }));
-    scoped.query(ranked, { params: { rank: 7 } });
+    scoped.query(ranked, { params: { rank: 7 }, key: true });
     const keyed = scoped.mutation(write, { id: "route.write.default", key: "id" });
     assert.equal(keyed.id, "route.write.default");
     assert.equal(keyed.pending("route"), false);

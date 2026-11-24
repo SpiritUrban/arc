@@ -905,7 +905,7 @@ function querySourceKey(values: readonly unknown[]) {
 type ClientQueryOptions<C extends OperationContract, Sources extends RemoteSources> = {
   id?: string;
   /** Override the cache context. By default, cached queries use all `from` values. */
-  key?: (...values: SourceValues<Sources>) => string | number;
+  key?: true | ((...values: SourceValues<Sources>) => string | number);
   cache?: boolean;
 } & ({} extends Infer<C["input"]>
   ? {
@@ -925,7 +925,7 @@ export function remoteApi<
 >(options: {
   from: Sources;
   headers: (...values: SourceValues<Sources>) => HeadersInit;
-  key?: (...values: SourceValues<Sources>) => string | number;
+  key?: true | ((...values: SourceValues<Sources>) => string | number);
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
 }) {
@@ -950,9 +950,8 @@ export function remoteApi<
         ? [options?: ClientQueryOptions<C, Sources>]
         : [options: ClientQueryOptions<C, Sources>]
     ): RemoteQuery<C> {
-      const key = query?.key ?? options.key ?? (query?.cache
-        ? (...values: SourceValues<Sources>) => querySourceKey(values)
-        : undefined);
+      const keyOption = query?.key ?? options.key ?? (query?.cache ? true : undefined);
+      const key = keyOption === true ? (...values: SourceValues<Sources>) => querySourceKey(values) : keyOption;
       return createRemoteResource(contract, {
         id: query?.id ?? `${contract.id}.query`,
         from,
