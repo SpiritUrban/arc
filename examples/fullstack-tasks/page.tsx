@@ -7,8 +7,12 @@ const addTask = mutation(CreateTask, { refresh: tasks });
 
 export const title = "ARC Tasks";
 
-export default function Page({ local }: PageContext) {
+export default function Page({ local, derive }: PageContext) {
   const search = local("");
+  const visibleTasks = derive([tasks.data, search], (rows, search) => {
+    const term = search.toLowerCase();
+    return rows?.filter((task) => task.title.toLowerCase().includes(term)) ?? [];
+  });
 
   return (
     <main style="font:16px system-ui;max-width:650px;margin:50px auto;padding:24px;background:#f4f7fa;color:#15293d;border-radius:16px">
@@ -32,9 +36,7 @@ export default function Page({ local }: PageContext) {
           : addTask().error || tasks().error ? "Request failed" : ""}
       </p>
       <ul data-tasks>
-        {tasks().data
-          ?.filter((task) => task.title.toLowerCase().includes(search().toLowerCase()))
-          .map((task) => <li key={task.id}>{task.title}</li>)}
+        {visibleTasks().map((task) => <li key={task.id}>{task.title}</li>)}
       </ul>
       {!tasks().loading && !tasks().data?.length && <p>No tasks yet</p>}
     </main>

@@ -57,34 +57,70 @@ export function compileReactiveJsx(
             return expression;
           }
 
-          const localNames = new Map<TS.CallExpression, string>();
+          const localNames = new Map<TS.CallExpression, { name: string; first: boolean }>();
+
+          function collectLocalNames(fn: TS.FunctionLikeDeclaration, contextIndex: number) {
+            const parameter = fn.parameters[contextIndex]?.name;
+            if (!parameter || !fn.body || !ts.isBlock(fn.body)) return;
+            for (const statement of fn.body.statements) {
+              if (!ts.isVariableStatement(statement)) continue;
+              for (const declaration of statement.declarationList.declarations) {
+                if (!declaration.initializer || !ts.isIdentifier(declaration.name)) continue;
+                const call = unwrap(declaration.initializer);
+                if (!ts.isCallExpression(call) || call.arguments.some(ts.isSpreadElement)) continue;
+                const factoryName = call.arguments.length === 1 && contextIndex === 0 ? "local"
+                  : call.arguments.length === 2 ? "derive"
+                  : undefined;
+                if (!factoryName) continue;
+                const callee = call.expression;
+                const binding = ts.isObjectBindingPattern(parameter)
+                  ? parameter.elements.find((field) => (field.propertyName ?? field.name).getText(file) === factoryName)?.name
+                  : undefined;
+                const matches = binding && ts.isIdentifier(binding) && ts.isIdentifier(callee)
+                  ? callee.text === binding.text
+                  : ts.isIdentifier(parameter) && ts.isPropertyAccessExpression(callee) &&
+                    ts.isIdentifier(callee.expression) && callee.expression.text === parameter.text &&
+                    callee.name.text === factoryName;
+                if (matches) localNames.set(call, { name: declaration.name.text, first: factoryName === "derive" });
+              }
+            }
+          }
+
           if (options.reactive) {
-            const exported = file.statements.find((statement) =>
-              (ts.isFunctionDeclaration(statement) &&
-                statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword)) ||
-              (ts.isExportAssignment(statement) && !statement.isExportEquals),
-            );
-            const page = exported && ts.isExportAssignment(exported) ? unwrap(exported.expression) : exported;
-            if (page && (ts.isFunctionDeclaration(page) || ts.isFunctionExpression(page) ||
-                ts.isArrowFunction(page)) && page.body && ts.isBlock(page.body)) {
-              const context = page.parameters[0]?.name;
-              const local = context && ts.isObjectBindingPattern(context)
-                ? context.elements.find((field) => (field.propertyName ?? field.name).getText(file) === "local")?.name
-                : undefined;
-              for (const statement of page.body.statements) {
-                if (!ts.isVariableStatement(statement)) continue;
-                for (const declaration of statement.declarationList.declarations) {
-                  if (!declaration.initializer || !ts.isIdentifier(declaration.name)) continue;
-                  const call = unwrap(declaration.initializer);
-                  if (!ts.isCallExpression(call) || call.arguments.length !== 1) continue;
-                  const callee = call.expression;
-                  const matches = local && ts.isIdentifier(local) && ts.isIdentifier(callee)
-                    ? callee.text === local.text
-                    : context && ts.isIdentifier(context) && ts.isPropertyAccessExpression(callee) &&
-                      ts.isIdentifier(callee.expression) && callee.expression.text === context.text &&
-                      callee.name.text === "local";
-                  if (matches) localNames.set(call, declaration.name.text);
-                }
+            const viewImports = new Set<string>();
+            for (const statement of file.statements) {
+              if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier) ||
+                  statement.moduleSpecifier.text !== "@arc/framework/web") continue;
+              const imports = statement.importClause?.namedBindings;
+              if (imports && ts.isNamedImports(imports))
+                for (const binding of imports.elements)
+                  if ((binding.propertyName ?? binding.name).text === "view") viewImports.add(binding.name.text);
+            }
+            function collectViewTemplate(expression: TS.Expression) {
+              const call = unwrap(expression);
+              if (!ts.isCallExpression(call) || !ts.isIdentifier(call.expression) ||
+                  !viewImports.has(call.expression.text) || call.arguments.length !== 1) return;
+              const config = unwrap(call.arguments[0]);
+              if (!ts.isObjectLiteralExpression(config)) return;
+              if (!config.properties.some((property) => property.name?.getText(file) === "state")) return;
+              const template = config.properties.find((property) => property.name?.getText(file) === "template");
+              if (template && ts.isMethodDeclaration(template)) collectLocalNames(template, 1);
+              if (template && ts.isPropertyAssignment(template)) {
+                const fn = unwrap(template.initializer);
+                if (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) collectLocalNames(fn, 1);
+              }
+            }
+            for (const statement of file.statements) {
+              if (ts.isFunctionDeclaration(statement) &&
+                  statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword)) {
+                collectLocalNames(statement, 0);
+              } else if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
+                const expression = unwrap(statement.expression);
+                if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression)) collectLocalNames(expression, 0);
+                else collectViewTemplate(expression);
+              } else if (ts.isVariableStatement(statement)) {
+                for (const { initializer } of statement.declarationList.declarations)
+                  if (initializer) collectViewTemplate(initializer);
               }
             }
           }
@@ -286,13 +322,13 @@ export function compileReactiveJsx(
           const visit: TS.Visitor = (node) => {
             const transformed = ts.visitEachChild(node, visit, context);
             if (ts.isCallExpression(node)) {
-              const name = localNames.get(node);
-              if (name) {
+              const local = localNames.get(node);
+              if (local) {
                 const call = transformed as TS.CallExpression;
-                return factory.updateCallExpression(call, call.expression, call.typeArguments, [
-                  ...call.arguments,
-                  factory.createStringLiteral(name),
-                ]);
+                const name = factory.createStringLiteral(local.name);
+                return factory.updateCallExpression(call, call.expression, call.typeArguments,
+                  local.first ? [name, ...call.arguments] : [...call.arguments, name],
+                );
               }
             }
             if (

@@ -93,7 +93,7 @@ export const UsersPage = view({
   needs: [addUser, updateUser],
   state: { search: "" },
   template({ search }, { derive }) {
-    const visible = derive("visible", [users.data, search], (users, search) => {
+    const visible = derive([users.data, search], (users, search) => {
       const term = search.toLowerCase();
       return (users ?? []).filter((user) =>
         `${user.name} ${user.email}`.toLowerCase().includes(term),

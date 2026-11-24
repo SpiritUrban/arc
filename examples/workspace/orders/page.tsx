@@ -53,7 +53,7 @@ export const OrdersPage = view({
   needs: cancelOrder,
   state: { quantity: String(quantityLimits.min), search: "", status: "all" },
   template({ quantity, search, status }, { derive }) {
-    const history = derive("history", [visibleOrders, search, status], (orders, search, status) => {
+    const history = derive([visibleOrders, search, status], (orders, search, status) => {
       const term = search.trim().toLowerCase();
       return {
         filtering: Boolean(term) || status !== "all",

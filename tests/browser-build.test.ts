@@ -36,7 +36,10 @@ test("pure Web and Fullstack build manifests have no Node/server implementation 
     assert.ok(tasks.graph().partitions?.browser.includes("page:page"));
     assert.ok(tasks.graph().partitions?.browser.includes("page:page.state.search"));
     assert.ok(tasks.graph().edges.some((edge) =>
-      edge.from === "tasks.list.query" && edge.kind === "BINDS" && edge.to.endsWith(".each"),
+      edge.from === "page:page.derived.visibleTasks" && edge.kind === "BINDS" && edge.to.endsWith(".each"),
+    ));
+    assert.ok(tasks.graph().edges.some((edge) =>
+      edge.from === "tasks.list.query.data" && edge.kind === "DERIVES" && edge.to === "page:page.derived.visibleTasks",
     ));
     assert.equal(counter.graph().partitions?.server.length, 0);
   } finally {

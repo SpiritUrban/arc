@@ -60,7 +60,7 @@ test("view-local state and derived values have stable IDs and independent mounts
     id: "search-page",
     state: () => ({ search: "" }),
     template({ search }, { derive }) {
-      const result = derive("result", search, (value) => value.toUpperCase());
+      const result = derive(search, (value) => value.toUpperCase());
       return jsx("section", {
         children: [
           jsx("input", { "bind:value": search }),
@@ -74,7 +74,7 @@ test("view-local state and derived values have stable IDs and independent mounts
     edge.kind === "BINDS" && edge.from === "search-page.state.search",
   ));
   assert.ok(graph.edges.some((edge) =>
-    edge.kind === "BINDS" && edge.from === "search-page.derived.result",
+    edge.kind === "BINDS" && edge.from === "search-page.derived.0",
   ));
 
   const first = mount(page, target);

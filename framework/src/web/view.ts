@@ -708,6 +708,9 @@ export interface PageContext<Param extends string = string> {
   derive<const From extends DerivedFrom, T>(
     name: string, from: From, compute: (...values: DerivedValues<From>) => T,
   ): Computed<T>;
+  derive<const From extends DerivedFrom, T>(
+    from: From, compute: (...values: DerivedValues<From>) => T,
+  ): Computed<T>;
   query<T extends OwnedNode, Contract>(
     client: { query(contract: Contract, options?: { params?: Readonly<Record<Param, string>> }): T },
     contract: Contract,
@@ -825,8 +828,12 @@ function scopedView(
       }
       return node;
     };
-    const deriveLocal: PageContext["derive"] = (name, from, compute) => {
+    const deriveLocal: PageContext["derive"] = <const From extends DerivedFrom, T>(
+      ...args: [string, From, (...values: DerivedValues<From>) => T]
+        | [From, (...values: DerivedValues<From>) => T]
+    ) => {
       if (!building) throw new Error(`Declare derived values while building ${def.id}`);
+      const [name, from, compute] = args.length === 3 ? args : [String(derivedNames.size), ...args] as const;
       if (derivedNames.has(name)) throw new Error(`Duplicate derived value ${name} in ${def.id}`);
       const node = own(derive(`${def.id}.derived.${name}`, from, compute));
       derivedNames.add(name);
