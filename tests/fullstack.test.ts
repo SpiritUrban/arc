@@ -131,7 +131,11 @@ test("page operations use only route parameters declared by the contract", async
       // @ts-expect-error An input projection still supplies required non-route fields.
       scoped.query(detail, { input: () => ({}) });
     }
-    scoped.mutation(publish, { params: { locale: "uk" } });
+    const localizedWrite = scoped.mutation(publish, { key: "id", params: { locale: "uk" } });
+    if (false) {
+      // @ts-expect-error The direct binding also requires locale.
+      localizedWrite.for("route");
+    }
     scoped.mutation(publish, {
       id: "route.publish.override",
       params: { id: "override", locale: "uk" },
@@ -388,13 +392,16 @@ test("bound mutation inputs share keyed requests and outcomes", async () => {
   });
   const save = mutation(write, {
     key: "id",
-    fetch: async () => Response.json(
-      { ok: false, kind: "business_error", error: "CONFLICT" },
-      { status: 409 },
-    ),
+    fetch: async (_url, init) => {
+      assert.deepEqual(JSON.parse(String(init?.body)), { id: "first" });
+      return Response.json(
+        { ok: false, kind: "business_error", error: "CONFLICT" },
+        { status: 409 },
+      );
+    },
   });
   try {
-    const first = save.for({ id: "first" });
+    const first = save.for("first");
     const control = view({
       id: "row.control",
       template: () => jsx("div", {

@@ -754,11 +754,11 @@ export interface PageContext<Param extends string = string> {
     client: {
       mutation<Contract extends OperationContract, K extends MutationKeyField<NoInfer<Contract>>>(
         contract: Contract, options: FieldKeyMutationOptions<NoInfer<Contract>, K>,
-      ): Mutation<Contract, never, MutationFieldKey<Contract, K>>;
+      ): Mutation<Contract, never, MutationFieldKey<Contract, K>, K>;
     },
     contract: C,
     options: FieldKeyMutationOptions<NoInfer<C>, Field>,
-  ): Mutation<C, never, MutationFieldKey<C, Field>>;
+  ): Mutation<C, never, MutationFieldKey<C, Field>, Field>;
   mutation<C extends OperationContract, Key extends string | number = string | number>(
     client: {
       mutation<Contract extends OperationContract, K extends string | number>(

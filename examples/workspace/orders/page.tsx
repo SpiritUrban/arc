@@ -9,7 +9,7 @@ import { orderWriteMessage } from "./messages.ts";
 import { money, failureMessage } from "../ui.ts";
 
 function CancelOrderControl({ order: { id, cancelled } }: { order: ReturnType<typeof Order.parse> }) {
-  const cancel = cancelOrder.for({ id });
+  const cancel = cancelOrder.for(id);
   return (
     <>
       {!cancelled && (

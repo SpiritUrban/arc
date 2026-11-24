@@ -410,10 +410,15 @@ export type MutationFieldKey<C extends OperationContract, Field extends Mutation
 export type FieldKeyMutationOptions<C extends OperationContract, Field extends MutationKeyField<C>> =
   NamedFormOptions<C> & MutationFieldErrors<C> & { key: Field };
 
+type ScalarMutationInput<Input, Field extends keyof Input> = {
+  [Name in Field]: Pick<Input, Name> extends Input ? never : Name;
+}[Field] extends never ? Input[Field] : never;
+
 export type Mutation<
   C extends OperationContract,
   Field extends string = never,
   Key extends MutationKey = MutationKey,
+  KeyField extends string = never,
 > =
   CallableAction<void, RemoteResult<C>> & {
     fields: RemoteForm<C, Field>["fields"];
@@ -427,7 +432,7 @@ export type Mutation<
       failed(): boolean;
     };
     run(input: Infer<C["input"]>): Promise<RemoteResult<C>>;
-    for(input: Infer<C["input"]>): {
+    for(input: MutationInput<C> | ScalarMutationInput<MutationInput<C>, KeyField & keyof MutationInput<C>>): {
       run(): Promise<RemoteResult<C>>;
       pending(): boolean;
       outcome(): MutationOutcome<C> | undefined;
@@ -690,13 +695,13 @@ function bindRemoteForm(defaults: RemoteFormDefaults) {
 function bindMutation(defaults: RemoteFormDefaults) {
   function mutate<C extends OperationContract, Field extends MutationKeyField<NoInfer<C>>>(
     contract: C, options: FieldKeyMutationOptions<NoInfer<C>, Field>,
-  ): Mutation<C, never, MutationFieldKey<C, Field>>;
+  ): Mutation<C, never, MutationFieldKey<C, Field>, Field>;
   function mutate<C extends OperationContract, Field extends MutationKeyField<NoInfer<C>>>(
     contract: C, options: ReactiveFormOptions<C> & MutationFieldErrors<C> & { key: Field },
-  ): Mutation<C, Extract<keyof MutationInput<C>, string>, MutationFieldKey<C, Field>>;
+  ): Mutation<C, Extract<keyof MutationInput<C>, string>, MutationFieldKey<C, Field>, Field>;
   function mutate<C extends OperationContract, Field extends string, Name extends MutationKeyField<NoInfer<C>>>(
     contract: C, options: MappedFormOptions<C, Field> & MutationFieldErrors<C> & { key: Name },
-  ): Mutation<C, Field, MutationFieldKey<C, Name>>;
+  ): Mutation<C, Field, MutationFieldKey<C, Name>, Name>;
   function mutate<C extends OperationContract, Key extends MutationKey = MutationKey>(
     contract: C, options?: NamedMutationOptions<C, Key>,
   ): Mutation<C, never, Key>;
@@ -748,8 +753,11 @@ function bindMutation(defaults: RemoteFormDefaults) {
     const mutation = Object.assign(submit, {
       fields,
       with: (options.fields ? undefined : bindForm) as Mutation<C, Field, Key>["with"],
-      for(payload: Infer<C["input"]>) {
+      for(input: MutationInput<C> | MutationKey) {
         if (!keyOf) throw new TypeError("mutation.for requires a mutation key");
+        const payload = (typeof key === "string" && (typeof input === "string" || typeof input === "number")
+          ? { [key]: input }
+          : input) as MutationInput<C>;
         return withEventTrigger({
           run: withEventTrigger(() => mutation.run(payload), submit),
           pending: () => mutation.pending(keyOf(payload)),
