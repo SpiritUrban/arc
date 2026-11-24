@@ -10,11 +10,12 @@ import { money } from "../../ui.ts";
 
 export const title = "Деталі замовлення — ARC Workspace";
 
-export default function OrderDetail({ mutation, query }: PageContext<"id">) {
-  const order = query(orderClient, GetOrder);
+export default function OrderDetail({ bind }: PageContext<"id">) {
+  const { query, mutation } = bind(orderClient);
+  const order = query(GetOrder);
   const update = [order.replace(), ordersData.replaceBy("id")];
-  const updateOrder = mutation(orderClient, UpdateOrder, { update });
-  const cancelOrder = mutation(orderClient, CancelOrder, {
+  const updateOrder = mutation(UpdateOrder, { update });
+  const cancelOrder = mutation(CancelOrder, {
     id: "orders.detail-cancel.submit",
     update,
     updateOnError: "ORDER_ALREADY_CANCELLED",

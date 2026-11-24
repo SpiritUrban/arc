@@ -6,6 +6,7 @@ import type {
   MutationFieldKey,
   MutationKeyField,
   NamedMutationOptions,
+  RemoteQuery,
 } from "../fullstack/client.js";
 import {
   browserEvent,
@@ -677,10 +678,22 @@ function ownedNodes(owned?: OwnedNodes): OwnedNode[] {
   return Array.isArray(owned) ? owned : [owned as OwnedNode];
 }
 
+type PageRemoteClient = {
+  query<C extends OperationContract>(contract: C, ...args: any[]): RemoteQuery<C>;
+  mutation<C extends OperationContract>(contract: C, ...args: any[]): Mutation<C>;
+};
+
+type BoundPageClient<Client extends PageRemoteClient> = {
+  query: Client["query"] & (<C extends OperationContract>(contract: C) => RemoteQuery<C>);
+  mutation: Client["mutation"];
+};
+
 export interface PageContext<Param extends string = string> {
   params: Readonly<Record<Param, string>>;
   local<T>(initial: T, name?: string): Signal<T>;
   own<T extends OwnedNode>(node: T): T;
+  /** Bind a remote client to the current page and its route parameters. */
+  bind<Client extends PageRemoteClient>(client: Client): BoundPageClient<Client>;
   /** Create a derived value owned by this view instance. */
   derive<const From extends DerivedFrom, T>(
     name: string, from: From, compute: (...values: DerivedValues<From>) => T,
@@ -739,6 +752,16 @@ export function pageView(
     local,
     derive,
     own,
+    bind<Client extends PageRemoteClient>(client: Client): BoundPageClient<Client> {
+      return {
+        query: ((contract: OperationContract, options?: { params?: unknown }) =>
+          own(client.query(contract, withRouteParams(contract, options)))
+        ) as BoundPageClient<Client>["query"],
+        mutation: ((contract: OperationContract, options?: { params?: unknown }) =>
+          own(client.mutation(contract, withRouteParams(contract, options)))
+        ) as Client["mutation"],
+      };
+    },
     query: ((client: { query(...args: any[]): OwnedNode }, ...args: unknown[]) =>
       own(client.query(args[0], withRouteParams(args[0], args[1] as { params?: unknown } | undefined)))
     ) as PageContext["query"],

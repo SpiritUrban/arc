@@ -24,6 +24,7 @@ import { pageView } from "../framework/src/web/view.ts";
 test("page operations use only route parameters declared by the contract", () => {
   const input = s.object({ id: s.string() });
   const read = operationContract({ id: "route.read", input, output: s.string() });
+  const detail = operationContract({ id: "route.detail", input, output: s.string() });
   const write = operationContract({ id: "route.write", input, output: s.string() });
   const source = state({ id: "route.source", initial: "" });
   const remote = remoteApi({ from: source, headers: () => ({}) });
@@ -37,9 +38,12 @@ test("page operations use only route parameters declared by the contract", () =>
       };
     },
   });
-  const page = pageView("route.page", ({ query, mutation }) => {
+  const page = pageView("route.page", ({ bind, query, mutation }) => {
     query(client, read);
-    const keyed = mutation(client, write, { id: "route.write.default", key: "id" });
+    const scoped = bind(client);
+    const details = scoped.query(detail);
+    assert.equal(details.id, "route.detail.query");
+    const keyed = scoped.mutation(write, { id: "route.write.default", key: "id" });
     assert.equal(keyed.pending("route"), false);
     if (false) {
       // @ts-expect-error The selected input field contains a string key.
@@ -49,8 +53,8 @@ test("page operations use only route parameters declared by the contract", () =>
     return jsx("div", {});
   }, { owner: "workspace", id: "route" });
 
-  assert.deepEqual(calls, [{ id: "route" }, { id: "route" }, { id: "explicit" }]);
-  assert.equal(page.owned?.length, 3);
+  assert.deepEqual(calls, [{ id: "route" }, { id: "route" }, { id: "route" }, { id: "explicit" }]);
+  assert.equal(page.owned?.length, 4);
   for (const node of page.owned ?? []) node.dispose();
   source.dispose();
 });
