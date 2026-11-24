@@ -252,12 +252,13 @@ test("render cleans up onClick and traces writes to callable state", async () =>
     template: () => jsx("div", {
       children: render(() => {
         const id = row();
-        return jsx("button", { children: id, onClick: () => selected.set(id) });
+        return jsx("button", { children: id, onClick: selected.setTo(id) });
       }),
     }),
   });
   const mounted = mount(page, target);
   const first = target.querySelector("button")!;
+  assert.equal(selected(), "");
   row.set("second");
   await tick();
   first.dispatchEvent(new window.Event("click"));

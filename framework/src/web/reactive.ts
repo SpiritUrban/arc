@@ -12,7 +12,10 @@ export interface Writable<T> extends Readable<T> {
   set(value: T): void;
   update(fn: (value: T) => T): void;
 }
-export type Signal<T> = Writable<T> & (() => T);
+export type Signal<T> = Writable<T> & (() => T) & {
+  /** Create a callback that writes this value when invoked. */
+  setTo(value: T): () => void;
+};
 
 export type GraphNeeds = GraphDefinition | readonly GraphDefinition[] | Readonly<Record<string, GraphDefinition>>;
 
@@ -123,7 +126,9 @@ type StateOptions<T> = {
 
 export function state<T>(def: StateOptions<T>): Signal<T> {
   let node!: Signal<T>;
-  node = createState(def, () => node.get());
+  node = createState(def, Object.assign(() => node.get(), {
+    setTo: (value: T) => () => node.set(value),
+  }));
   return node;
 }
 

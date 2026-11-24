@@ -130,7 +130,7 @@ export const UsersPage = view({
                 class="user-row"
                 data-user={user.id}
                 aria-pressed={selectedUser() === user.id}
-                onClick={() => selectedUser.set(user.id)}
+                onClick={selectedUser.setTo(user.id)}
               >
                 <span class="avatar">{user.name.slice(0, 2).toUpperCase()}</span>
                 <span class="user-info">
