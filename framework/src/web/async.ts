@@ -12,6 +12,7 @@ import {
   signal,
   derive,
   batch,
+  currentWriteTrace,
   graphNeeds,
   type Computed,
   type GraphNeeds,
@@ -35,7 +36,7 @@ export interface WebResource<T, I = unknown> extends Readable<
   loading: Computed<boolean>;
   error: Computed<unknown>;
   stale: Computed<boolean>;
-  refresh(trace?: TraceToken): Promise<void>;
+  refresh(trigger?: TraceToken | Event): Promise<void>;
   invalidate(trace?: TraceToken): Promise<void>;
   activate(telemetry?: WebTelemetry): void;
   dispose(): void;
@@ -193,8 +194,11 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
         }
       };
     },
-    async refresh(trace: TraceToken = { traceId: identity() }) {
+    async refresh(trigger?: TraceToken | Event) {
       if (disposed) return;
+      const trace = trigger && "traceId" in trigger
+        ? trigger
+        : currentWriteTrace() ?? { traceId: identity() };
       const current = ++generation;
       controller?.abort();
       controller = new AbortController();

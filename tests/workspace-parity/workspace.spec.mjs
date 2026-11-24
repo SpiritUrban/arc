@@ -375,6 +375,21 @@ test("ORD-01–03 · form, filters, totals and a delayed owner query", async ({
   await expect(orderRow(page, "Блокнот А5")).toHaveCount(0);
 });
 
+test("ARC reloads the user list from its retry button", async ({ page }, info) => {
+  test.skip(isReact(info), "ARC direct resource refresh binding");
+  const list = transport(info, "users.list");
+  await page.route((url) => url.pathname === list, (route) => route.fulfill({
+    status: 503,
+    json: { ok: false, kind: "fault", fault: { code: "UNAVAILABLE", status: 503 } },
+  }), { times: 1 });
+  await page.goto("/");
+  const retry = page.getByRole("button", { name: "Повторити завантаження" });
+  await expect(retry).toBeVisible();
+  await retry.click();
+  await expect(userRow(page, "Demo User")).toBeVisible();
+  await expect(retry).toHaveCount(0);
+});
+
 test("ARC shows a created profile after retrying a failed first list read", async ({ page }, info) => {
   test.skip(isReact(info));
   const list = transport(info, "users.list");

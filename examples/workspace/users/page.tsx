@@ -111,6 +111,11 @@ export const UsersPage = view({
             ? "Оновлюємо список…"
             : `${users.data()?.length ?? 0} у вашому просторі`}
         </p>
+        {users.error() ? (
+          <button type="button" class="button secondary" onClick={users.refresh}>
+            Повторити завантаження
+          </button>
+        ) : null}
         <label class="search-label">
           <span>Пошук</span>
           <input

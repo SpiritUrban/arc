@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { parseHTML } from "linkedom";
 import { jsx } from "@arc/framework/web/jsx-runtime";
 import { compileArchitecture } from "@arc/framework/core";
+import type { BrowserEvent } from "../framework/src/neutral/protocol.ts";
 import {
   state,
   signal,
@@ -51,6 +52,39 @@ test("JSX references add resource dependencies without running the expression", 
   await tick();
   assert.equal(target.textContent, "ready");
   app.dispose();
+});
+
+test("a resource refresh used as a click handler continues the browser trace", async () => {
+  const { document, window } = parseHTML('<div id="app"></div>');
+  const target = document.querySelector("#app")!;
+  const events: BrowserEvent[] = [];
+  const reads: string[] = [];
+  const resource = webResource({
+    id: "retry.resource",
+    async load(_input, { trace }) {
+      reads.push(trace.traceId);
+      return "ready";
+    },
+  });
+  const page = view({
+    id: "retry.page",
+    needs: resource,
+    template: () => jsx("button", { onClick: resource.refresh, children: "Retry" }),
+  });
+  const app = startWeb(page, target, { telemetry: { emit: (event) => events.push(event) } });
+  try {
+    await tick();
+    const beforeClick = events.length;
+    target.querySelector("button")!.dispatchEvent(new window.Event("click"));
+    await tick();
+    const click = events.slice(beforeClick).find(({ type }) => type === "binding.event");
+    const refresh = events.slice(beforeClick).find(({ type }) => type === "resource.started");
+    assert.ok(click?.traceId);
+    assert.equal(refresh?.traceId, click.traceId);
+    assert.deepEqual(reads.slice(1), [click.traceId]);
+  } finally {
+    app.dispose();
+  }
 });
 
 test("view-local state and derived values have stable IDs and independent mounts", async () => {
