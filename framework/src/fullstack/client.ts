@@ -4,7 +4,7 @@ import {
   type BusinessError,
 } from "../neutral/contracts.js";
 import { ValidationError, type Infer, type Schema } from "../schema.js";
-import { isNumericInputType } from "../neutral/input-scalar.js";
+import { decodeInputScalar, isNumericInputType } from "../neutral/input-scalar.js";
 import { formValue } from "../web/form-value.js";
 import { withEventTrigger } from "../web/event-trigger.js";
 import { reactiveAttribute } from "../web/jsx-runtime.js";
@@ -263,6 +263,10 @@ function readNamedSubmission(
     )
       throw new TypeError(`Expected one checkbox for form field ${checkbox.name}`);
     values[checkbox.name] = checkbox.checked;
+  }
+  for (const name of booleanFields) {
+    const value = values[name];
+    if (typeof value === "string") values[name] = decodeInputScalar(value, "boolean");
   }
 
   const arrayControls = controls.filter(

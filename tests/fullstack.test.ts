@@ -651,6 +651,7 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
       checked: s.boolean(),
       unchecked: s.boolean(),
       disabled: s.boolean().optional(),
+      choice: s.boolean(),
       quantity: s.int().optional(),
       contact: s.email().optional(),
       note: s.string().optional(),
@@ -668,11 +669,13 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
   let quantity = "";
   let requiredCount = "1";
   let secondCount = "2e1";
+  let choice = "false";
   const validity = { badInput: false };
   class FieldsFormData extends NativeFormData {
     constructor() {
       super();
-      this.set("checked", "on");
+      this.set("checked", "true");
+      this.set("choice", choice);
       this.set("quantity", quantity);
       this.set("contact", " ");
       this.set("note", "");
@@ -714,13 +717,14 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
         unchecked,
         checkbox("disabled", true, true),
         checkbox("checked", false, true),
+        { localName: "input", type: "radio", name: "choice", matches: () => false },
         { localName: "input", name: "quantity", validity, matches: () => false },
       ],
     } as unknown as HTMLFormElement;
     const result = await save.submitForm!(form, { trace: { traceId: "checkbox-submit" } });
     assert.equal(result.ok, true);
     const expected = {
-      checked: true, unchecked: false, note: "", confirmed: "yes", empty: "", spaced: " ",
+      checked: true, unchecked: false, choice: false, note: "", confirmed: "yes", empty: "", spaced: " ",
       labels: [" tag "],
       requiredCount: 1, counts: [1, 20],
     };
@@ -734,6 +738,11 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
     quantity = "0";
     await save.submitForm!(form, { trace: { traceId: "zero-number" } });
     assert.deepEqual(requests, [expected, { ...expected, quantity: 0 }]);
+
+    choice = "yes";
+    await assert.rejects(save.submitForm!(form, { trace: { traceId: "invalid-boolean-choice" } }));
+    assert.equal(save.invalid("choice"), true);
+    choice = "false";
 
     secondCount = "0x10";
     await assert.rejects(save.submitForm!(form, { trace: { traceId: "invalid-number-item" } }));
