@@ -5,6 +5,7 @@ import {
 } from "../neutral/contracts.js";
 import { ValidationError, type Infer, type Schema } from "../schema.js";
 import { decodeInputScalar, isNumericInputType, isScalarInputType, type ScalarInputType } from "../neutral/input-scalar.js";
+import { uuidPattern } from "../neutral/uuid-pattern.js";
 import { formValue } from "../web/form-value.js";
 import { withEventTrigger } from "../web/event-trigger.js";
 import { reactiveAttribute } from "../web/jsx-runtime.js";
@@ -513,6 +514,7 @@ type FieldInputAttributes = {
   required?: boolean;
   minlength?: number;
   maxlength?: number;
+  pattern?: string;
   min?: number;
   max?: number;
   step?: number | "any";
@@ -546,6 +548,7 @@ function fieldInputAttributes(
       required: required && requiresNonEmptyText(field),
       minlength: field.minLength,
       maxlength: field.maxLength,
+      ...(format === "uuid" ? { pattern: uuidPattern.source } : {}),
     };
   }
   if (isNumericInputType(field?.type)) {

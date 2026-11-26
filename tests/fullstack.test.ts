@@ -561,6 +561,7 @@ test("mutation field validation shares one reactive value per field", async () =
       rate: s.literal(0.25).optional(),
       email: s.email().optional(),
       title: s.string({ max: 80 }).optional(),
+      ownerId: s.uuid().optional(),
     }),
     output: s.int(),
     errors: { EMAIL_EXISTS: 409, CONFLICT: 409 },
@@ -610,6 +611,12 @@ test("mutation field validation shares one reactive value per field", async () =
     assert.equal(rate.step, "any");
     assert.equal(email.input.type, "email");
     assert.equal(email.invalid, save.field("email").invalid);
+    const { input: ownerId } = save.field("ownerId");
+    assert.equal(ownerId.type, "text");
+    assert.ok(ownerId.pattern);
+    const uuid = new RegExp(ownerId.pattern);
+    assert.equal(uuid.test("ABCDEF00-0000-4000-A000-000000000001"), true);
+    assert.equal(uuid.test("ABCDEF00-0000-4000-A000-00000000000G"), false);
     const messages = { invalid: "Invalid email", failed: "Email exists" };
     const sharedMessage = "Check the email address";
     assert.equal(email.errorMessage(messages), undefined);

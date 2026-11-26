@@ -1,3 +1,5 @@
+import { uuidPattern } from "./neutral/uuid-pattern.js";
+
 export class ValidationError extends Error {
   constructor(public issues: string[], public readonly fields: readonly string[] = []) {
     super(issues.join("; "));
@@ -43,9 +45,7 @@ export const string = (
         return fail(p, "invalid length");
       if (
         options.format === "uuid" &&
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-          v,
-        )
+        !uuidPattern.test(v)
       )
         return fail(p, "expected UUID");
       if (options.format === "email" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v))
