@@ -1,11 +1,11 @@
 import { s, operationContract } from "@arc/framework/core";
 // Поля профілю мають одне визначення для output і обох write-контрактів.
-const userFields = {
+export const User = s.object({
+  id: s.uuid(),
   name: s.string({ min: 2, max: 100 }),
   email: s.email(),
-};
-export const UserProfile = s.object(userFields);
-export const User = s.object({ id: s.uuid(), ...userFields });
+});
+export const UserProfile = User.pick("name", "email");
 // Сервер і браузер використовують ті самі схеми. Реалізація операцій знаходиться в server.ts.
 export const ListUsers = operationContract({
   id: "users.list",
@@ -26,7 +26,7 @@ export const CreateUser = operationContract({
 
 export const UpdateUser = operationContract({
   id: "users.update",
-  input: s.object({ id: s.uuid(), ...userFields }),
+  input: User.pick("id", "name", "email"),
   output: User,
   errors: { USER_NOT_FOUND: 404, EMAIL_EXISTS: emailExists },
   expose: { web: true },

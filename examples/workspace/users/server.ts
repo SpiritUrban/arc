@@ -2,7 +2,6 @@
 // виконуються операції та визначаються HTTP-маршрути.
 import { randomUUID } from "node:crypto";
 import {
-  s,
   resource,
   operation,
   module,
@@ -56,7 +55,7 @@ export const usersRepository = resource({
 // REST-маршрут GET /users/:id передає ID у цю операцію. Відсутній запис дає HTTP 404.
 export const getUser = operation({
   id: "users.get",
-  input: s.object({ id: s.uuid() }),
+  input: User.pick("id"),
   output: User,
   needs: { users: usersRepository },
   errors: { USER_NOT_FOUND: 404 },
