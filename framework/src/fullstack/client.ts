@@ -530,8 +530,14 @@ function fieldInputAttributes(
 ): FieldInputAttributes {
   const input = { name, "aria-invalid": invalid };
   const field = schema.json.properties?.[name];
-  if (field?.type === "boolean") return { ...input, type: "checkbox" };
   const required = Array.isArray(schema.json.required) && schema.json.required.includes(name);
+  if (field?.type === "boolean") {
+    return {
+      ...input,
+      type: "checkbox",
+      ...(required && field.const === true ? { required: true } : {}),
+    };
+  }
   if (field?.type === "string") {
     const format = field.format;
     return {

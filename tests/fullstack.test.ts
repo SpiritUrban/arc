@@ -652,6 +652,8 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
       unchecked: s.boolean(),
       disabled: s.boolean().optional(),
       choice: s.boolean(),
+      accepted: s.literal(true),
+      declined: s.literal(false),
       quantity: s.int().optional(),
       contact: s.email().optional(),
       note: s.string().optional(),
@@ -678,6 +680,7 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
       super();
       this.set("checked", "true");
       this.set("choice", choice);
+      this.set("accepted", "on");
       this.set("quantity", quantity);
       this.set("contact", " ");
       this.set("note", "");
@@ -703,7 +706,11 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
   });
   globalThis.FormData = FieldsFormData;
   try {
-    const checkbox = (name: "checked" | "unchecked" | "disabled", checked: boolean, disabled = false) => ({
+    const checkbox = (
+      name: "checked" | "unchecked" | "disabled" | "accepted" | "declined",
+      checked: boolean,
+      disabled = false,
+    ) => ({
       ...save.field(name).input,
       localName: "input",
       checked,
@@ -712,6 +719,10 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
     const unchecked = checkbox("unchecked", false);
     assert.equal(unchecked.type, "checkbox");
     assert.equal(unchecked.required, undefined);
+    const accepted = checkbox("accepted", true);
+    const declined = checkbox("declined", false);
+    assert.equal(accepted.required, true);
+    assert.equal(declined.required, undefined);
     assert.equal(save.field("channel").input.required, false);
     assert.equal(save.field("confirmed").input.required, true);
     assert.equal(save.field("empty").input.required, false);
@@ -719,6 +730,8 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
       elements: [
         checkbox("checked", true),
         unchecked,
+        accepted,
+        declined,
         checkbox("disabled", true, true),
         checkbox("checked", false, true),
         { localName: "input", type: "radio", name: "choice", matches: () => false },
@@ -728,7 +741,8 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
     const result = await save.submitForm!(form, { trace: { traceId: "checkbox-submit" } });
     assert.equal(result.ok, true);
     const expected = {
-      checked: true, unchecked: false, choice: false, note: "", confirmed: "yes", empty: "", spaced: " ",
+      checked: true, unchecked: false, choice: false, accepted: true, declined: false,
+      note: "", confirmed: "yes", empty: "", spaced: " ",
       labels: [" tag "],
       requiredCount: 1, counts: [1, 20], flags: [true, false],
     };
