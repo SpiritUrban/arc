@@ -9,9 +9,10 @@ import {
   ok,
   error,
 } from "@arc/framework";
-import { User, ListUsers, CreateUser, UpdateUser, demoUserId } from "./contracts.ts";
+import { User, UserProfile, ListUsers, CreateUser, UpdateUser, demoUserId } from "./contracts.ts";
 export { User } from "./contracts.ts";
 type User = ReturnType<typeof User.parse>;
+type UserProfile = ReturnType<typeof UserProfile.parse>;
 // Сховище живе в пам’яті одного запуску. Початковий запис дає Workspace демо-користувача.
 export const usersRepository = resource({
   id: "users.repository",
@@ -32,18 +33,16 @@ export const usersRepository = resource({
       find: async (id: string) => users.get(id),
       list: async () => [...users.values()],
       // Пошту перевіряємо серед записів. undefined дає операції сигнал повернути EMAIL_EXISTS.
-      create: async (name: string, email: string) => {
-        if (emailExists(email)) return undefined;
-        const user = { id: randomUUID(), name, email };
+      create: async (profile: UserProfile) => {
+        if (emailExists(profile.email)) return undefined;
+        const user = { id: randomUUID(), ...profile };
         users.set(user.id, user);
         return user;
       },
-      update: async (id: string, name: string, email: string) => {
-        const current = users.get(id);
-        if (!current) return "USER_NOT_FOUND" as const;
-        if (emailExists(email, id)) return "EMAIL_EXISTS" as const;
-        const user = { id, name, email };
-        users.set(id, user);
+      update: async (user: User) => {
+        if (!users.has(user.id)) return "USER_NOT_FOUND" as const;
+        if (emailExists(user.email, user.id)) return "EMAIL_EXISTS" as const;
+        users.set(user.id, user);
         return user;
       },
     };
@@ -66,7 +65,7 @@ export const getUser = operation({
 export const createUser = operation(CreateUser, {
   needs: { users: usersRepository },
   run: async ({ input, users }) => {
-    const user = await users.create(input.name, input.email);
+    const user = await users.create(input);
     // Дублікат пошти повертаємо як бізнес-помилку, яку форма може показати користувачу.
     return user ? ok(user) : error("EMAIL_EXISTS");
   },
@@ -75,7 +74,7 @@ export const createUser = operation(CreateUser, {
 export const updateUser = operation(UpdateUser, {
   needs: { users: usersRepository },
   run: async ({ input, users }) => {
-    const result = await users.update(input.id, input.name, input.email);
+    const result = await users.update(input);
     return typeof result === "string" ? error(result) : ok(result);
   },
 });
