@@ -47,8 +47,10 @@ export const usersRepository = resource({
   },
 });
 const needs = { users: usersRepository };
+const usersPath = "/users";
+const userDetailPath = `${usersPath}/:id`;
 
-const getUser = http.get("/users/:id", GetUser, {
+const getUser = http.get(userDetailPath, GetUser, {
   needs,
   run: async ({ input, users, fail }) => {
     const user = await users.find(input.id);
@@ -56,7 +58,7 @@ const getUser = http.get("/users/:id", GetUser, {
   },
 });
 
-const createUser = http.post("/users", CreateUser, {
+const createUser = http.post(usersPath, CreateUser, {
   status: 201,
   needs,
   run: async ({ input, users, fail }) => {
@@ -66,7 +68,7 @@ const createUser = http.post("/users", CreateUser, {
   },
 });
 
-const updateUser = http.put("/users/:id", UpdateUser, {
+const updateUser = http.put(userDetailPath, UpdateUser, {
   needs,
   run: async ({ input, users, fail }) => {
     const result = await users.update(input);
@@ -74,7 +76,7 @@ const updateUser = http.put("/users/:id", UpdateUser, {
   },
 });
 
-const listUsers = http.get("/users", ListUsers, {
+const listUsers = http.get(usersPath, ListUsers, {
   needs,
   run: async ({ users }) => ok(await users.list()),
 });
