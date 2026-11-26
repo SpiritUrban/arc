@@ -10,6 +10,7 @@ export const User = s.object({
 });
 export const userProfileFields = ["name", "email"] as const;
 export const UserProfile = User.pick(...userProfileFields);
+const userNotFound = { USER_NOT_FOUND: 404 } as const;
 // Сервер і браузер використовують ті самі схеми. Реалізація операцій знаходиться в server.ts.
 export const ListUsers = operationContract({
   id: "users.list",
@@ -22,7 +23,7 @@ export const GetUser = operationContract({
   id: "users.get",
   input: User.pick("id"),
   output: User,
-  errors: { USER_NOT_FOUND: 404 },
+  errors: userNotFound,
 });
 // Клієнт передає ім’я й пошту. Під час створення сервер генерує ID
 // і повертає оголошену тут помилку EMAIL_EXISTS із HTTP 409, якщо пошта зайнята.
@@ -39,6 +40,6 @@ export const UpdateUser = operationContract({
   id: "users.update",
   input: User.pick("id", ...userProfileFields),
   output: User,
-  errors: { USER_NOT_FOUND: 404, EMAIL_EXISTS: emailExists },
+  errors: { ...userNotFound, EMAIL_EXISTS: emailExists },
   expose: { web: true },
 });
