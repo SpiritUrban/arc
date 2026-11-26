@@ -3,7 +3,6 @@
 // ARC знаходить реалізацію за ID зі спільного контракту.
 import { randomUUID } from "node:crypto";
 import {
-  error,
   handlerModule,
   handles,
   http,
@@ -69,9 +68,9 @@ const ordersRepository = resource({
 const needs = { user: currentUser, orders: ordersRepository };
 const getOrder = http.get("/orders/:id", GetOrder, {
   needs,
-  async run({ input, user, orders }) {
+  async run({ input, user, orders, fail }) {
     const order = await orders.find(input.id, user.id);
-    return order ? ok(order) : error("ORDER_NOT_FOUND");
+    return order ? ok(order) : fail("ORDER_NOT_FOUND");
   },
 });
 const createOrder = http.post("/orders", CreateOrder, {
@@ -92,9 +91,9 @@ const createOrder = http.post("/orders", CreateOrder, {
 const updateOrder = http.put("/orders/:id", UpdateOrder, {
   needs,
   effects: ["orders.write"],
-  async run({ input, user, orders }) {
+  async run({ input, user, orders, fail }) {
     const result = await orders.update(input, user.id);
-    return typeof result === "string" ? error(result) : ok(result);
+    return typeof result === "string" ? fail(result) : ok(result);
   },
 });
 

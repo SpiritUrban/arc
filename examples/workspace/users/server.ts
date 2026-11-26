@@ -6,7 +6,6 @@ import {
   module,
   http,
   ok,
-  error,
 } from "@arc/framework";
 import { User, UserProfile, ListUsers, GetUser, CreateUser, UpdateUser, demoUserId } from "./contracts.ts";
 export { User } from "./contracts.ts";
@@ -51,27 +50,27 @@ const needs = { users: usersRepository };
 
 const getUser = http.get("/users/:id", GetUser, {
   needs,
-  run: async ({ input, users }) => {
+  run: async ({ input, users, fail }) => {
     const user = await users.find(input.id);
-    return user ? ok(user) : error("USER_NOT_FOUND");
+    return user ? ok(user) : fail("USER_NOT_FOUND");
   },
 });
 
 const createUser = http.post("/users", CreateUser, {
   status: 201,
   needs,
-  run: async ({ input, users }) => {
+  run: async ({ input, users, fail }) => {
     const user = await users.create(input);
     // Дублікат пошти повертаємо як бізнес-помилку, яку форма може показати користувачу.
-    return user ? ok(user) : error("EMAIL_EXISTS");
+    return user ? ok(user) : fail("EMAIL_EXISTS");
   },
 });
 
 const updateUser = http.put("/users/:id", UpdateUser, {
   needs,
-  run: async ({ input, users }) => {
+  run: async ({ input, users, fail }) => {
     const result = await users.update(input);
-    return typeof result === "string" ? error(result) : ok(result);
+    return typeof result === "string" ? fail(result) : ok(result);
   },
 });
 
