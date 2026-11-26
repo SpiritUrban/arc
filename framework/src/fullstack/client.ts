@@ -527,6 +527,13 @@ function requiresNonEmptyText(
     (typeof constant === "string" && constant !== "");
 }
 
+function literalTextPattern(value: string): string {
+  const pattern = Array.from(value, (character) =>
+    `\\u{${character.codePointAt(0)!.toString(16)}}`,
+  ).join("");
+  return value.trim() === value ? `\\s*${pattern}\\s*` : pattern;
+}
+
 function fieldInputAttributes(
   schema: Schema<unknown>, name: string, invalid: Computed<boolean>,
 ): FieldInputAttributes {
@@ -542,13 +549,16 @@ function fieldInputAttributes(
   }
   if (field?.type === "string") {
     const format = field.format;
+    const pattern = format === "uuid" ? uuidPattern.source
+      : typeof field.const === "string" ? literalTextPattern(field.const)
+      : undefined;
     return {
       ...input,
       type: format === "email" ? "email" : "text",
       required: required && requiresNonEmptyText(field),
       minlength: field.minLength,
       maxlength: field.maxLength,
-      ...(format === "uuid" ? { pattern: uuidPattern.source } : {}),
+      ...(pattern ? { pattern } : {}),
     };
   }
   if (isNumericInputType(field?.type)) {

@@ -672,7 +672,7 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
       contact: s.email().optional(),
       note: s.string().optional(),
       channel: s.literal("web").optional(),
-      confirmed: s.literal("yes"),
+      confirmed: s.literal("yes+?"),
       empty: s.literal(""),
       spaced: s.literal(" ").optional(),
       labels: s.literal(" tag ").array(),
@@ -699,7 +699,7 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
       this.set("contact", " ");
       this.set("note", "");
       this.set("channel", " ");
-      this.set("confirmed", "yes");
+      this.set("confirmed", "yes+?");
       this.set("empty", "");
       this.set("spaced", " ");
       this.append("labels", " tag ");
@@ -741,6 +741,9 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
     assert.equal(optionalConsent.required, undefined);
     assert.equal(save.field("channel").input.required, false);
     assert.equal(save.field("confirmed").input.required, true);
+    const confirmedPattern = new RegExp(`^(?:${save.field("confirmed").input.pattern})$`, "v");
+    assert.equal(confirmedPattern.test("  yes+?  "), true);
+    assert.equal(confirmedPattern.test("yes"), false);
     assert.equal(save.field("empty").input.required, false);
     const form = {
       elements: [
@@ -759,7 +762,7 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
     assert.equal(result.ok, true);
     const expected = {
       checked: true, unchecked: false, choice: false, accepted: true, declined: false,
-      note: "", confirmed: "yes", empty: "", spaced: " ",
+      note: "", confirmed: "yes+?", empty: "", spaced: " ",
       labels: [" tag "],
       requiredCount: 1, counts: [1, 20], flags: [true, false],
     };
