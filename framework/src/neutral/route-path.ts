@@ -1,3 +1,5 @@
+import type { OperationContract } from "./contracts.js";
+
 type RouteParam<Segment extends string> = Segment extends `:${infer Name}` ? Name : never;
 export type RouteParamNames<Pattern extends string> =
   string extends Pattern ? string :
@@ -44,4 +46,13 @@ function routeParameterName(segment: string): string | undefined {
 
 export function routeParameterNames(pattern: string): string[] {
   return pattern.split("/").map(routeParameterName).filter((name) => name !== undefined);
+}
+
+export function validateContractRoutePath(path: string, contract: OperationContract): void {
+  const properties = contract.input.json.properties ?? {};
+  for (const name of routeParameterNames(path)) {
+    if (!Object.hasOwn(properties, name)) {
+      throw new TypeError(`HTTP route ${path} parameter "${name}" is missing from ${contract.id} input`);
+    }
+  }
 }

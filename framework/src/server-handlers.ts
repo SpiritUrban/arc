@@ -7,6 +7,7 @@ import {
   type Route,
 } from "./core.js";
 import type { Infer } from "./schema.js";
+import { validateContractRoutePath } from "./neutral/route-path.js";
 
 type Handler<C extends OperationContract, N extends Needs> = Operation<
   Infer<C["input"]>,
@@ -48,6 +49,7 @@ export function handles<C extends OperationContract, N extends Needs = {}>(
     }
 
     const { needs, effects, route } = options;
+    if (route) validateContractRoutePath(route.path, contract);
     handlerDefinitions.set(method, (owner) => {
       const op = operation(contract, {
         needs,

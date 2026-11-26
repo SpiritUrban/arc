@@ -8,7 +8,7 @@ import { discoverPageDirectory } from "./fullstack/page-directory.js";
 import { emptyRouteView, routerOutlet } from "./fullstack/router-outlet.js";
 import { layoutView, rootView } from "./neutral/page-root.js";
 import { pageParamNames } from "./neutral/page-path.js";
-import { routeParameterNames, type RouteParamNames } from "./neutral/route-path.js";
+import { validateContractRoutePath, type RouteParamNames } from "./neutral/route-path.js";
 import { describeBusinessError } from "./neutral/descriptor.js";
 import {
   Schema,
@@ -239,11 +239,7 @@ function routeFor(method: string) {
 
     if (!("run" in options))
       throw new TypeError("A route contract requires an implementation");
-    for (const name of routeParameterNames(path)) {
-      if (!Object.hasOwn(target.input.json.properties ?? {}, name)) {
-        throw new TypeError(`HTTP route ${path} parameter "${name}" is missing from ${target.id} input`);
-      }
-    }
+    validateContractRoutePath(path, target);
     const { status, ...implementation } = options;
     return { method, path, operation: operation(target, implementation), status };
   }

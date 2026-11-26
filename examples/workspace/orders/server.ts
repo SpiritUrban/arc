@@ -67,13 +67,6 @@ const ordersRepository = resource({
 
 const needs = { user: currentUser, orders: ordersRepository };
 const orderWrite = { needs, effects: ["orders.write"] };
-const getOrder = http.get(orderDetailPattern, GetOrder, {
-  needs,
-  async run({ input, user, orders, fail }) {
-    const order = await orders.find(input.id, user.id);
-    return order ? ok(order) : fail("ORDER_NOT_FOUND");
-  },
-});
 const createOrder = http.post(ordersPath, CreateOrder, {
   ...orderWrite,
   status: 201,
@@ -106,6 +99,15 @@ const cancelOrder = http.post(`${ordersPath}/cancel`, CancelOrder, {
 });
 
 class Orders {
+  @handles(GetOrder, {
+    needs,
+    route: { method: "GET", path: orderDetailPattern },
+  })
+  static async getOrder({ input, user, orders, fail }: HandlerContext<typeof GetOrder, typeof needs>) {
+    const order = await orders.find(input.id, user.id);
+    return order ? ok(order) : fail("ORDER_NOT_FOUND");
+  }
+
   @handles(ListOrders, {
     needs,
     route: { method: "GET", path: ordersPath },
@@ -116,5 +118,5 @@ class Orders {
 }
 
 export const orders = handlerModule("orders", Orders, {
-  routes: [getOrder, createOrder, updateOrder, cancelOrder],
+  routes: [createOrder, updateOrder, cancelOrder],
 });

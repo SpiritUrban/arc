@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { operationContract, routePath } from "@arc/framework/core";
+import { handles } from "../framework/src/server-handlers.ts";
 import {
   application,
   operation,
@@ -72,6 +73,15 @@ test("HTTP contract routes validate dynamically supplied parameter names", () =>
     http.get(path, lookup, { run: ({ input }) => ok(input.id) });
   assert.equal(bind("/orders/:id").path, "/orders/:id");
   assert.throws(() => bind("/orders/:wrong"), /parameter "wrong" is missing from lookup input/);
+  assert.throws(() => {
+    class Orders {
+      @handles(lookup, { route: { method: "GET", path: "/orders/:wrong" } })
+      static get() {
+        return ok("unused");
+      }
+    }
+    return Orders;
+  }, /parameter "wrong" is missing from lookup input/);
 });
 test("compiler checks business error metadata from dynamic contracts", async () => {
   for (const metadata of [
