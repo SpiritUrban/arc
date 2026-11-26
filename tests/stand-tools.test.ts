@@ -324,7 +324,7 @@ test("real network Stand load and SSE streaming pass through Node HTTP bridge", 
     output: s.int(),
     run: () => ok(1),
   });
-  const app = application({ routes: [http.get("/ping/:id", op)] });
+  const app = application({ routes: [http.get("/ping/:id/:id", op)] });
   await app.compile();
   await app.start();
   const applicationServer = await serve(
