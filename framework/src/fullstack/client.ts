@@ -5,7 +5,7 @@ import {
 } from "../neutral/contracts.js";
 import { ValidationError, type Infer, type Schema } from "../schema.js";
 import { decodeInputScalar, isNumericInputType, isScalarInputType, type ScalarInputType } from "../neutral/input-scalar.js";
-import { uuidPattern } from "../neutral/uuid-pattern.js";
+import { uuidPatternSource } from "../neutral/uuid-pattern.js";
 import { formValue } from "../web/form-value.js";
 import { withEventTrigger } from "../web/event-trigger.js";
 import { reactiveAttribute } from "../web/jsx-runtime.js";
@@ -527,11 +527,15 @@ function requiresNonEmptyText(
     (typeof constant === "string" && constant !== "");
 }
 
+function trimAwarePattern(pattern: string): string {
+  return `\\s*${pattern}\\s*`;
+}
+
 function literalTextPattern(value: string): string {
   const pattern = Array.from(value, (character) =>
     `\\u{${character.codePointAt(0)!.toString(16)}}`,
   ).join("");
-  return value.trim() === value ? `\\s*${pattern}\\s*` : pattern;
+  return value.trim() === value ? trimAwarePattern(pattern) : pattern;
 }
 
 function fieldInputAttributes(
@@ -549,7 +553,7 @@ function fieldInputAttributes(
   }
   if (field?.type === "string") {
     const format = field.format;
-    const pattern = format === "uuid" ? uuidPattern.source
+    const pattern = format === "uuid" ? trimAwarePattern(uuidPatternSource)
       : typeof field.const === "string" ? literalTextPattern(field.const)
       : undefined;
     return {

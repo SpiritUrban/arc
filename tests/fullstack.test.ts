@@ -614,8 +614,9 @@ test("mutation field validation shares one reactive value per field", async () =
     const { input: ownerId } = save.field("ownerId");
     assert.equal(ownerId.type, "text");
     assert.ok(ownerId.pattern);
-    const uuid = new RegExp(ownerId.pattern);
+    const uuid = new RegExp(`^(?:${ownerId.pattern})$`, "v");
     assert.equal(uuid.test("ABCDEF00-0000-4000-A000-000000000001"), true);
+    assert.equal(uuid.test(" ABCDEF00-0000-4000-A000-000000000001 "), true);
     assert.equal(uuid.test("ABCDEF00-0000-4000-A000-00000000000G"), false);
     const messages = { invalid: "Invalid email", failed: "Email exists" };
     const sharedMessage = "Check the email address";
