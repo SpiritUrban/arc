@@ -11,6 +11,9 @@ import { buildWeb, staticWeb } from "../framework/src/fullstack/build.ts";
 import { internalTransport } from "../framework/src/fullstack/server.ts";
 import { serve, closeServer, handler } from "../framework/src/http.ts";
 import { stand } from "../framework/src/stand.ts";
+import { wireContract } from "../framework/src/neutral/descriptor.ts";
+import { CancelOrder } from "../examples/workspace/orders/contracts.ts";
+import { UpdateUser } from "../examples/workspace/users/contracts.ts";
 
 async function workspaceScript(outDir: string) {
   // Inline split chunks so this DOM harness can execute the built router.
@@ -171,6 +174,16 @@ test("Workspace order update has consistent identities and impact in build and S
     const standGraph = await response.json();
     const artifact = JSON.parse(await readFile(join(dir, "architecture.json"), "utf8"));
     assert.deepEqual(artifact, standGraph);
+    for (const contract of [CancelOrder, UpdateUser]) {
+      const graphErrors = graph.nodes.find((node) => node.id === contract.id)?.errors;
+      const wireErrors = wireContract(contract).errors;
+      assert.deepEqual(graphErrors, Object.fromEntries(
+        Object.entries(wireErrors).map(([code, definition]) => [
+          code,
+          typeof definition === "number" ? { status: definition } : definition,
+        ]),
+      ));
+    }
     const mutation = detailUpdate;
     const operation = "orders.update";
     for (const id of [detailQuery, mutation, detailCancel]) {

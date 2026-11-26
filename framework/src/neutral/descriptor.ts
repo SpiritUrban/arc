@@ -1,5 +1,5 @@
 import { s, Schema } from "../schema.js";
-import { operationContract, type OperationContract } from "./contracts.js";
+import { errorDetailsSchema, errorStatus, operationContract, type ErrorDefinition, type OperationContract } from "./contracts.js";
 export function schemaFromJSON(json: Record<string, any>): Schema<any> {
   let schema: Schema<any>;
   if (Object.hasOwn(json, "const")) schema = s.literal(json.const);
@@ -41,6 +41,20 @@ export function schemaFromJSON(json: Record<string, any>): Schema<any> {
     }
   return schema;
 }
+export function describeBusinessError(definition: ErrorDefinition) {
+  const details = errorDetailsSchema(definition);
+  return {
+    status: errorStatus(definition),
+    ...(details ? { details: details.json } : {}),
+    ...(typeof definition !== "number" && definition.field !== undefined
+      ? { field: definition.field }
+      : {}),
+    ...(typeof definition !== "number" && definition.updateFromDetails
+      ? { updateFromDetails: true as const }
+      : {}),
+  };
+}
+
 export function wireContract(contract: OperationContract) {
   return {
     id: contract.id,
@@ -49,14 +63,7 @@ export function wireContract(contract: OperationContract) {
     errors: Object.fromEntries(
       Object.entries(contract.errors).map(([code, def]) => [
         code,
-        typeof def === "number"
-          ? def
-          : {
-              status: def.status,
-              ...(def.field !== undefined ? { field: def.field } : {}),
-              ...(def.updateFromDetails ? { updateFromDetails: true as const } : {}),
-              ...(def.details ? { details: def.details.json } : {}),
-            },
+        typeof def === "number" ? def : describeBusinessError(def),
       ]),
     ),
     expose: contract.expose,

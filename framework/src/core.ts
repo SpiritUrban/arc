@@ -9,6 +9,7 @@ import { emptyRouteView, routerOutlet } from "./fullstack/router-outlet.js";
 import { layoutView, rootView } from "./neutral/page-root.js";
 import { pageParamNames } from "./neutral/page-path.js";
 import type { RouteParamNames } from "./neutral/route-path.js";
+import { describeBusinessError } from "./neutral/descriptor.js";
 import {
   Schema,
   ValidationError,
@@ -1089,18 +1090,7 @@ export class Application {
                 errors: Object.fromEntries(
                   Object.entries(n.errors).map(([code, def]) => [
                     code,
-                    {
-                      status: errorStatus(def),
-                      ...(typeof def !== "number" && def.details
-                        ? { details: def.details.json }
-                        : {}),
-                      ...(typeof def !== "number" && def.field !== undefined
-                        ? { field: def.field }
-                        : {}),
-                      ...(typeof def !== "number" && def.updateFromDetails
-                        ? { updateFromDetails: true }
-                        : {}),
-                    },
+                    describeBusinessError(def),
                   ]),
                 ),
                 budgetMs: n.budgetMs ?? null,
