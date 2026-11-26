@@ -19,7 +19,7 @@ type WriteOutcome = {
 export function orderWriteMessage(
   outcome: WriteOutcome | undefined,
   conflict: string,
-  fallback: (error: unknown) => string = failureMessage,
+  fallback?: string,
 ) {
   const { result, error } = outcome ?? {};
   if (!error) return "";
@@ -27,5 +27,5 @@ export function orderWriteMessage(
     if (result.error === "ORDER_ALREADY_CANCELLED") return conflict;
     if (result.error === "ORDER_NOT_FOUND") return "Замовлення не знайдено.";
   }
-  return fallback(error);
+  return fallback ?? failureMessage(error);
 }

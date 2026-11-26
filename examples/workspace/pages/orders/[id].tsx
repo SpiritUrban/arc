@@ -1,4 +1,3 @@
-import { ValidationError } from "@arc/framework/core";
 import { render, type PageContext } from "@arc/framework/web";
 import { CancelOrder, GetOrder, UpdateOrder, isOrderActive } from "../../orders/contracts.ts";
 import { orderClient, replaceListedOrder } from "../../orders/client.ts";
@@ -48,7 +47,7 @@ export default function OrderDetail({ bind }: PageContext<"id">) {
           {render.present(order.data, renderSummary)}
           <p class="error" role="alert">
             {orderWriteMessage(cancelOrder(), "Замовлення вже скасовано.",
-              () => "Не вдалося скасувати замовлення.",
+              "Не вдалося скасувати замовлення.",
             )}
           </p>
           {isOrderActive(order.data()) && (
@@ -59,8 +58,10 @@ export default function OrderDetail({ bind }: PageContext<"id">) {
                 {render.when(updateOrder.running, "Зберігаємо…", "Зберегти зміни")}
               </button>
               <p class="error" role="alert">
-                {orderWriteMessage(updateOrder(), "Скасоване замовлення не можна редагувати.",
-                  (error) => error instanceof ValidationError ? "" : "Не вдалося зберегти замовлення.",
+                {updateOrder.invalid() ? "" : orderWriteMessage(
+                  updateOrder(),
+                  "Скасоване замовлення не можна редагувати.",
+                  "Не вдалося зберегти замовлення.",
                 )}
               </p>
             </form>
