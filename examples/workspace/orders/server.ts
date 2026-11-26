@@ -39,6 +39,16 @@ const ordersRepository = resource({
     const findOrderIndex = (id: string, userId: string) =>
       orders.findIndex((order) => order.id === id && belongsToUser(order, userId));
 
+    function changeOrder(id: string, userId: string, apply: (current: Order) => Order): OrderChange {
+      const index = findOrderIndex(id, userId);
+      if (index < 0) return "ORDER_NOT_FOUND";
+      const current = orders[index];
+      if (!isOrderActive(current)) return { order: current, alreadyCancelled: true };
+      const order = apply(current);
+      orders[index] = order;
+      return { order, alreadyCancelled: false };
+    }
+
     return {
       save: async (order: Order) => {
         orders.push(order);
@@ -51,22 +61,14 @@ const ordersRepository = resource({
         return index < 0 ? undefined : orders[index];
       },
       async update({ id, ...changes }: OrderEdit, userId: string) {
-        const index = findOrderIndex(id, userId);
-        if (index < 0) return "ORDER_NOT_FOUND" as const;
-        const current = orders[index];
-        if (!isOrderActive(current)) return { order: current, alreadyCancelled: true };
-        const order = { ...current, ...changes, total: orderTotal(changes.quantity) };
-        orders[index] = order;
-        return { order, alreadyCancelled: false };
+        return changeOrder(id, userId, (current) => ({
+          ...current,
+          ...changes,
+          total: orderTotal(changes.quantity),
+        }));
       },
       async cancel(id: string, userId: string) {
-        const index = findOrderIndex(id, userId);
-        if (index < 0) return "ORDER_NOT_FOUND" as const;
-        const current = orders[index];
-        if (!isOrderActive(current)) return { order: current, alreadyCancelled: true } as const;
-        const order = { ...current, cancelled: true };
-        orders[index] = order;
-        return { order, alreadyCancelled: false } as const;
+        return changeOrder(id, userId, (current) => ({ ...current, cancelled: true }));
       },
     };
   },
