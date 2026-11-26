@@ -510,6 +510,10 @@ type FieldInputAttributes = {
   step?: number | "any";
 };
 
+function requiresNonEmptyText({ minLength = 0, format }: { minLength?: number; format?: string }): boolean {
+  return minLength > 0 || format === "email" || format === "uuid";
+}
+
 function fieldInputAttributes(
   schema: Schema<unknown>, name: string, invalid: Computed<boolean>,
 ): FieldInputAttributes {
@@ -522,7 +526,7 @@ function fieldInputAttributes(
     return {
       ...input,
       type: format === "email" ? "email" : "text",
-      required: required && (field.minLength > 0 || format === "email" || format === "uuid"),
+      required: required && requiresNonEmptyText(field),
       minlength: field.minLength,
       maxlength: field.maxLength,
     };
@@ -604,8 +608,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
         arrayFields.set(name, isNumericInputType(itemType));
       }
     }
-    if (schema.optional && (numeric || (schema.type === "string" &&
-        (schema.format === "email" || schema.format === "uuid" || (schema.minLength ?? 0) > 0)))) {
+    if (schema.optional && (numeric || (schema.type === "string" && requiresNonEmptyText(schema)))) {
       blankOptionalFields.add(name);
     }
   }
