@@ -654,6 +654,9 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
       quantity: s.int().optional(),
       contact: s.email().optional(),
       note: s.string().optional(),
+      channel: s.literal("web").optional(),
+      confirmed: s.literal("yes"),
+      empty: s.literal(""),
       requiredCount: s.int(),
       counts: s.int().array(),
     }),
@@ -671,6 +674,9 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
       this.set("quantity", quantity);
       this.set("contact", " ");
       this.set("note", "");
+      this.set("channel", " ");
+      this.set("confirmed", "yes");
+      this.set("empty", "");
       this.set("requiredCount", requiredCount);
       this.append("counts", " 1 ");
       this.append("counts", secondCount);
@@ -695,6 +701,9 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
     const unchecked = checkbox("unchecked", false);
     assert.equal(unchecked.type, "checkbox");
     assert.equal(unchecked.required, undefined);
+    assert.equal(save.field("channel").input.required, false);
+    assert.equal(save.field("confirmed").input.required, true);
+    assert.equal(save.field("empty").input.required, false);
     const form = {
       elements: [
         checkbox("checked", true),
@@ -706,7 +715,10 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
     } as unknown as HTMLFormElement;
     const result = await save.submitForm!(form, { trace: { traceId: "checkbox-submit" } });
     assert.equal(result.ok, true);
-    const expected = { checked: true, unchecked: false, note: "", requiredCount: 1, counts: [1, 20] };
+    const expected = {
+      checked: true, unchecked: false, note: "", confirmed: "yes", empty: "",
+      requiredCount: 1, counts: [1, 20],
+    };
     assert.deepEqual(requests, [expected]);
 
     validity.badInput = true;

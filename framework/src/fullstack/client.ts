@@ -510,8 +510,11 @@ type FieldInputAttributes = {
   step?: number | "any";
 };
 
-function requiresNonEmptyText({ minLength = 0, format }: { minLength?: number; format?: string }): boolean {
-  return minLength > 0 || format === "email" || format === "uuid";
+function requiresNonEmptyText(
+  { minLength = 0, format, const: constant }: { minLength?: number; format?: string; const?: unknown },
+): boolean {
+  return minLength > 0 || format === "email" || format === "uuid" ||
+    (typeof constant === "string" && constant !== "");
 }
 
 function fieldInputAttributes(
@@ -593,6 +596,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     optional?: boolean;
     format?: string;
     minLength?: number;
+    const?: unknown;
   }>(properties ?? {});
   const numericFields = new Set<string>();
   const booleanFields = new Set<string>();
