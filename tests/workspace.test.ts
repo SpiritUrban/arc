@@ -650,6 +650,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     const [firstRow, secondRow] = document.querySelectorAll("[data-order]");
     const orderId = firstRow.getAttribute("data-order")!;
     const secondId = secondRow.getAttribute("data-order")!;
+    assert.equal(firstRow.querySelector("a")?.getAttribute("href"), `/orders/${orderId}`);
     const cancelOverRest = (actor: string, id = orderId) => handler(app)(
       new Request("http://localhost/orders/cancel", {
         method: "POST",
