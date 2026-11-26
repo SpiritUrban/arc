@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { routePath } from "@arc/framework/core";
+import { operationContract, routePath } from "@arc/framework/core";
 import {
   application,
   operation,
@@ -56,6 +56,10 @@ test("routePath encodes each parameter as one URL segment", () => {
   if (false) {
     // @ts-expect-error The literal pattern requires an id.
     routePath("/orders/:id", {});
+    const lookup = operationContract({ id: "lookup", input: s.object({ id: s.uuid() }), output: s.string() });
+    http.get("/orders/:id", lookup, { run: ({ input }) => ok(input.id) });
+    // @ts-expect-error The literal route parameter must be declared by the contract.
+    http.get("/orders/:wrong", lookup, { run: () => ok("unused") });
   }
 });
 test("compiler rejects cycles, scope leaks, duplicate ids and ambiguous routes", async () => {

@@ -8,6 +8,7 @@ import { discoverPageDirectory } from "./fullstack/page-directory.js";
 import { emptyRouteView, routerOutlet } from "./fullstack/router-outlet.js";
 import { layoutView, rootView } from "./neutral/page-root.js";
 import { pageParamNames } from "./neutral/page-path.js";
+import type { RouteParamNames } from "./neutral/route-path.js";
 import {
   Schema,
   ValidationError,
@@ -202,16 +203,20 @@ export interface Route {
   status?: number;
 }
 type RouteOptions = { status?: number };
+type ContractRoutePath<Path extends string, Input> =
+  string extends Path ? Path :
+  Exclude<RouteParamNames<Path>, keyof Input> extends never ? Path : never;
 
 function routeFor(method: string) {
   function route<
+    const Path extends string,
     I,
     O,
     const E extends ErrorContracts,
     N extends Needs = {},
     C extends Calls = {},
   >(
-    path: string,
+    path: Path & ContractRoutePath<NoInfer<Path>, NoInfer<I>>,
     contract: OperationContract<I, O, E>,
     implementation: OperationImplementation<
       NoInfer<I>,
