@@ -19,21 +19,20 @@ export function routePath<const Pattern extends string>(
   params: Record<RouteParamNames<Pattern>, RouteParamValue>,
 ): string {
   const values: Readonly<Record<string, RouteParamValue | undefined>> = params;
-  return interpolateRoutePath(pattern, (name) => {
-    const value = Object.hasOwn(values, name) ? values[name] : undefined;
-    if (value === undefined || value === "") {
-      throw new TypeError(`Missing route parameter: ${name}`);
-    }
-    return value;
-  });
+  return interpolateRoutePath(pattern, (name) =>
+    Object.hasOwn(values, name) ? values[name] : undefined,
+  );
 }
 
 export function interpolateRoutePath(
   pattern: string,
-  readParam: (name: string) => RouteParamValue,
+  readParam: (name: string) => RouteParamValue | undefined,
 ): string {
   return mapRoutePath(pattern, (name) => {
     const value = readParam(name);
+    if (value === undefined || value === "") {
+      throw new TypeError(`Missing route parameter: ${name}`);
+    }
     if (value === "." || value === "..") {
       throw new TypeError(`Invalid route parameter: ${name} is a dot segment`);
     }

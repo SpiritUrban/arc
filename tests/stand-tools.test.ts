@@ -355,13 +355,15 @@ test("real network Stand load and SSE streaming pass through Node HTTP bridge", 
     assert.equal(result.completed, 3);
     assert.equal(result.errors, 0);
     assert.equal(result.mode, "network");
-    const invalidPath = await web(new Request("http://localhost/api/run", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ operation: "network", mode: "network", input: { id: "..", label: "example label" } }),
-    }));
-    assert.equal(invalidPath.status, 400);
-    assert.equal((await invalidPath.json()).error, "INVALID_PATH");
+    for (const id of ["..", "", undefined]) {
+      const invalidPath = await web(new Request("http://localhost/api/run", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ operation: "network", mode: "network", input: { id, label: "example label" } }),
+      }));
+      assert.equal(invalidPath.status, 400);
+      assert.equal((await invalidPath.json()).error, "INVALID_PATH");
+    }
     const controller = new AbortController();
     const response = await fetch(
       `http://127.0.0.1:${standAddress.port}/api/events`,
