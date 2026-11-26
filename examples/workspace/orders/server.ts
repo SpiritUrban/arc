@@ -18,6 +18,7 @@ import { Order, ListOrders, GetOrder, CreateOrder, UpdateOrder, CancelOrder, ord
 
 // Імпортований Order є схемою перевірки. Локальний тип Order описує дані після parse.
 type Order = ReturnType<typeof Order.parse>;
+type OrderEdit = ReturnType<typeof UpdateOrder.input.parse>;
 
 // Типовий scope ресурсу — application. ARC створює один масив у open,
 // а методи працюють із ним під час усіх запитів цього запуску.
@@ -44,11 +45,11 @@ const ordersRepository = resource({
         const index = findOrderIndex(id, userId);
         return index < 0 ? undefined : orders[index];
       },
-      async update(id: string, userId: string, product: string, quantity: number) {
+      async update({ id, ...changes }: OrderEdit, userId: string) {
         const index = findOrderIndex(id, userId);
         if (index < 0) return "ORDER_NOT_FOUND" as const;
         if (orders[index].cancelled) return "ORDER_ALREADY_CANCELLED" as const;
-        const order = { ...orders[index], product, quantity, total: orderTotal(quantity) };
+        const order = { ...orders[index], ...changes, total: orderTotal(changes.quantity) };
         orders[index] = order;
         return order;
       },
@@ -92,7 +93,7 @@ const updateOrder = http.put("/orders/:id", UpdateOrder, {
   needs,
   effects: ["orders.write"],
   async run({ input, user, orders }) {
-    const result = await orders.update(input.id, user.id, input.product, input.quantity);
+    const result = await orders.update(input, user.id);
     return typeof result === "string" ? error(result) : ok(result);
   },
 });
