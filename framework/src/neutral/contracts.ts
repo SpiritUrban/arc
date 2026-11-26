@@ -27,6 +27,8 @@ export type ErrorDefinition =
 export type ErrorContracts = Record<string, ErrorDefinition>;
 export const errorStatus = (definition: ErrorDefinition) =>
   typeof definition === "number" ? definition : definition.status;
+export const errorDetailsSchema = (definition: ErrorDefinition) =>
+  typeof definition === "number" ? undefined : definition.details;
 export type BusinessError<E extends ErrorContracts> = {
   [K in keyof E & string]: E[K] extends { details: Schema<infer D> }
     ? { ok: false; error: K; details: D }

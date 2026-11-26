@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { Application, Fault, errorStatus } from "./core.js";
+import { Application, Fault, errorDetailsSchema, errorStatus } from "./core.js";
 import { mapRoutePath } from "./neutral/route-path.js";
 import { acceptsJsonBody } from "./neutral/http-method.js";
 export function problem(e: unknown): Response {
@@ -89,20 +89,19 @@ function errorResponses(errors: import("./core.js").ErrorContracts) {
   for (const [code, def] of Object.entries(errors)) {
     const status = errorStatus(def),
       group = groups.get(status) ?? { codes: [], schemas: [] };
+    const details = errorDetailsSchema(def);
     group.codes.push(code);
     group.schemas.push({
       type: "object",
       properties: {
         ok: { const: false },
         error: { const: code },
-        ...(typeof def !== "number" && def.details
-          ? { details: def.details.json }
-          : {}),
+        ...(details ? { details: details.json } : {}),
       },
       required: [
         "ok",
         "error",
-        ...(typeof def !== "number" && def.details ? ["details"] : []),
+        ...(details ? ["details"] : []),
       ],
     });
     groups.set(status, group);

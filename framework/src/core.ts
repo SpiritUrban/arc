@@ -27,6 +27,7 @@ import {
   ok,
   error,
   Fault,
+  errorDetailsSchema,
   errorStatus,
   type Result,
   type ErrorContracts,
@@ -1044,10 +1045,10 @@ export class Application {
               }
               if (!Object.hasOwn(op.errors, result.error))
                 throw new Fault("UNDECLARED_ERROR", 500);
-              const definition = op.errors[result.error];
-              if (typeof definition !== "number" && definition.details) {
+              const details = errorDetailsSchema(op.errors[result.error]);
+              if (details) {
                 try {
-                  result.details = definition.details.parse(result.details);
+                  result.details = details.parse(result.details);
                 } catch {
                   throw new Fault("INVALID_ERROR_DETAILS", 500);
                 }

@@ -769,6 +769,11 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       [name, location]), [["id", "path"]]);
     assert.deepEqual(updateSpec.requestBody.content["application/json"].schema.required, ["product", "quantity"]);
     assert.deepEqual(Object.keys(updateSpec.responses), ["200", "404", "409"]);
+    const cancelResponses = api.paths["/orders/cancel"].post.responses;
+    const conflictSchema = cancelResponses[duplicate.status].content["application/json"].schema;
+    assert.deepEqual(conflictSchema.required, ["ok", "error", "details"]);
+    assert.equal(conflictSchema.properties.error.const, conflict.error);
+    assert.deepEqual(conflictSchema.properties.details, cancelResponses["200"].content["application/json"].schema);
     const createdOverRest = await handler(app)(
       new Request("http://localhost/orders", {
         method: "POST",

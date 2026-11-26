@@ -1,4 +1,5 @@
 import {
+  errorDetailsSchema,
   type OperationContract,
   type BusinessError,
 } from "../neutral/contracts.js";
@@ -88,9 +89,8 @@ export async function remoteCall<C extends OperationContract>(
       result.kind === "business_error" &&
       Object.hasOwn(contract.errors, result.error)
     ) {
-      const definition = contract.errors[result.error];
-      if (typeof definition !== "number" && definition.details)
-        result.details = definition.details.parse(result.details);
+      const details = errorDetailsSchema(contract.errors[result.error]);
+      if (details) result.details = details.parse(result.details);
       outcome = "business_error";
       return result;
     }
