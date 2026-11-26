@@ -54,6 +54,11 @@ test("schemas validate, strip no unknowns, generate valid samples", () => {
 test("routePath encodes each parameter as one URL segment", () => {
   assert.equal(routePath("/users/:id/orders/:order", { id: "a/b ?#", order: 0 }), "/users/a%2Fb%20%3F%23/orders/0");
   assert.throws(() => routePath("/orders/:id", { id: "" }), /Missing route parameter: id/);
+  for (const id of [".", ".."]) {
+    assert.throws(() => routePath("/orders/:id", { id }), /Invalid route parameter: id is a dot segment/);
+  }
+  const literalPercent = routePath("/orders/:id", { id: "%2e" });
+  assert.equal(new URL(literalPercent, "http://local").pathname, "/orders/%252e");
   const lookup = operationContract({ id: "lookup", input: s.object({ id: s.uuid() }), output: s.string() });
   if (false) {
     // @ts-expect-error The literal pattern requires an id.

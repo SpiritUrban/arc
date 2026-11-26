@@ -24,6 +24,9 @@ export function routePath<const Pattern extends string>(
     if (value === undefined || value === "") {
       throw new TypeError(`Missing route parameter: ${name}`);
     }
+    if (value === "." || value === "..") {
+      throw new TypeError(`Invalid route parameter: ${name} is a dot segment`);
+    }
     return value;
   });
 }
