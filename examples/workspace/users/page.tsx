@@ -3,7 +3,7 @@
 import { each, render, view } from "@arc/framework/web";
 import { mutation, setFrom } from "@arc/framework/fullstack";
 import { CreateUser, UpdateUser, userProfileFields, type User } from "./contracts.ts";
-import { failureMessage } from "../ui.ts";
+import { editFormOptions, failureMessage } from "../ui.ts";
 import { activeUser, selectedUser, users } from "../user-selection.ts";
 
 const profiles = users.dataOr([], "profiles");
@@ -13,8 +13,8 @@ export const addUser = mutation(CreateUser, {
   update: [users.insertBy(), setFrom(selectedUser, "id")],
 });
 const updateUser = mutation(UpdateUser, {
+  ...editFormOptions,
   update: users.replaceBy(),
-  resetOnSuccess: false,
 });
 
 function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {

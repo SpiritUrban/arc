@@ -1,3 +1,5 @@
+export const editFormOptions = { resetOnSuccess: false } as const;
+
 export const money = (value: number) =>
   new Intl.NumberFormat("uk-UA", {
     style: "currency",

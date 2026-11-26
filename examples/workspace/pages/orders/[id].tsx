@@ -5,7 +5,7 @@ import { orderClient, replaceListedOrder } from "../../orders/client.ts";
 import { OrderFields } from "../../orders/fields.tsx";
 import { orderWriteMessage } from "../../orders/messages.ts";
 import { UsersPage } from "../../users/page.tsx";
-import { money } from "../../ui.ts";
+import { editFormOptions, money } from "../../ui.ts";
 
 export const title = "Деталі замовлення — ARC Workspace";
 
@@ -13,7 +13,7 @@ export default function OrderDetail({ bind }: PageContext<"id">) {
   const { query, mutation } = bind(orderClient);
   const order = query(GetOrder);
   const update = [order, replaceListedOrder];
-  const updateOrder = mutation(UpdateOrder, { update, resetOnSuccess: false });
+  const updateOrder = mutation(UpdateOrder, { ...editFormOptions, update });
   const cancelOrder = mutation(CancelOrder, { update });
 
   function renderSummary(saved: NonNullable<ReturnType<typeof order.data>>) {
