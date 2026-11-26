@@ -194,7 +194,7 @@ export function stand(app: Application, options: StandOptions = {}) {
             path = interpolateRoutePath(route.path, (key) => {
               const value = Object.hasOwn(values, key) ? values[key] : undefined;
               pathKeys.add(key);
-              return value === undefined ? undefined : String(value);
+              return value;
             });
           } catch (error) {
             if (error instanceof TypeError || error instanceof URIError)

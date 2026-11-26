@@ -26,12 +26,15 @@ export function routePath<const Pattern extends string>(
 
 export function interpolateRoutePath(
   pattern: string,
-  readParam: (name: string) => RouteParamValue | undefined,
+  readParam: (name: string) => unknown,
 ): string {
   return mapRoutePath(pattern, (name) => {
     const value = readParam(name);
     if (value === undefined || value === "") {
       throw new TypeError(`Missing route parameter: ${name}`);
+    }
+    if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
+      throw new TypeError(`Invalid route parameter: ${name} must be a string, number or boolean`);
     }
     if (value === "." || value === "..") {
       throw new TypeError(`Invalid route parameter: ${name} is a dot segment`);
