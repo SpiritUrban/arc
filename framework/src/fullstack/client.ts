@@ -202,7 +202,7 @@ type NamedSubmission = {
 type NamedFieldRules = {
   numericFields: ReadonlySet<string>;
   booleanFields: ReadonlySet<string>;
-  arrayFields: ReadonlyMap<string, string>;
+  arrayFields: ReadonlyMap<string, boolean>;
   blankOptionalFields: ReadonlySet<string>;
 };
 
@@ -223,15 +223,13 @@ function readNamedSubmission(
   const controls = Array.from(form.elements).filter((element) => !element.matches(":disabled"));
   const values = Object.create(null) as NamedSubmission["values"];
   for (const [name, value] of entries) {
-    const arrayItemType = arrayFields.get(name);
-    if (arrayItemType) {
+    const numericItems = arrayFields.get(name);
+    if (numericItems !== undefined) {
       if (typeof value !== "string")
         throw new TypeError(`Expected text values for form field ${name}`);
       const valuesForField =
         (values[name] as (string | number)[] | undefined) ?? [];
-      valuesForField.push(
-        readNamedFormText(value, isNumericInputType(arrayItemType)),
-      );
+      valuesForField.push(readNamedFormText(value, numericItems));
       values[name] = valuesForField;
       continue;
     }
@@ -592,33 +590,25 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     format?: string;
     minLength?: number;
   }>(properties ?? {});
-  const numericFields = new Set(
-    namedSchemas
-      .filter(([, schema]) => isNumericInputType(schema.type))
-      .map(([name]) => name),
-  );
-  const booleanFields = new Set(
-    namedSchemas
-      .filter(([, schema]) => schema.type === "boolean")
-      .map(([name]) => name),
-  );
-  const arrayFields = new Map(
-    namedSchemas
-      .filter(([, schema]) =>
-        schema.type === "array" &&
-        (schema.items?.type === "string" || isNumericInputType(schema.items?.type)),
-      )
-      .map(([name, schema]) => [name, schema.items!.type!]),
-  );
-  const blankOptionalFields = new Set(
-    namedSchemas
-      .filter(([name, schema]) => schema.optional && (
-        numericFields.has(name) ||
-        (schema.type === "string" &&
-          (schema.format === "email" || schema.format === "uuid" || (schema.minLength ?? 0) > 0))
-      ))
-      .map(([name]) => name),
-  );
+  const numericFields = new Set<string>();
+  const booleanFields = new Set<string>();
+  const arrayFields = new Map<string, boolean>();
+  const blankOptionalFields = new Set<string>();
+  for (const [name, schema] of namedSchemas) {
+    const numeric = isNumericInputType(schema.type);
+    if (numeric) numericFields.add(name);
+    if (schema.type === "boolean") booleanFields.add(name);
+    if (schema.type === "array") {
+      const itemType = schema.items?.type;
+      if (itemType === "string" || isNumericInputType(itemType)) {
+        arrayFields.set(name, isNumericInputType(itemType));
+      }
+    }
+    if (schema.optional && (numeric || (schema.type === "string" &&
+        (schema.format === "email" || schema.format === "uuid" || (schema.minLength ?? 0) > 0)))) {
+      blankOptionalFields.add(name);
+    }
+  }
   const namedFieldRules = { numericFields, booleanFields, arrayFields, blankOptionalFields };
   const names = Object.keys(fieldOptions ?? {}) as Field[];
   const definitions = names.map((name) => {
