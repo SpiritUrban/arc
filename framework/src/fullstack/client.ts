@@ -204,9 +204,11 @@ type NamedFieldRules = {
   booleanFields: ReadonlySet<string>;
   arrayFields: ReadonlyMap<string, boolean>;
   blankOptionalFields: ReadonlySet<string>;
+  spacedLiterals: ReadonlyMap<string, string>;
 };
 
-function readNamedFormText(value: string, numeric: boolean): string | number {
+function readNamedFormText(value: string, numeric: boolean, spacedLiteral?: string): string | number {
+  if (value === spacedLiteral) return value;
   const text = value.trim();
   return numeric && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)
     ? Number(text)
@@ -216,7 +218,7 @@ function readNamedFormText(value: string, numeric: boolean): string | number {
 function readNamedSubmission(
   form: HTMLFormElement,
   submitter: HTMLElement | null | undefined,
-  { numericFields, booleanFields, arrayFields, blankOptionalFields }: NamedFieldRules,
+  { numericFields, booleanFields, arrayFields, blankOptionalFields, spacedLiterals }: NamedFieldRules,
   resetOnSuccess: boolean,
 ): NamedSubmission {
   const entries = new FormData(form, submitter ?? undefined);
@@ -224,18 +226,19 @@ function readNamedSubmission(
   const values = Object.create(null) as NamedSubmission["values"];
   for (const [name, value] of entries) {
     const numericItems = arrayFields.get(name);
+    const spacedLiteral = spacedLiterals.get(name);
     if (numericItems !== undefined) {
       if (typeof value !== "string")
         throw new TypeError(`Expected text values for form field ${name}`);
       const valuesForField =
         (values[name] as (string | number)[] | undefined) ?? [];
-      valuesForField.push(readNamedFormText(value, numericItems));
+      valuesForField.push(readNamedFormText(value, numericItems, spacedLiteral));
       values[name] = valuesForField;
       continue;
     }
     if (typeof value !== "string" || Object.hasOwn(values, name))
       throw new TypeError(`Expected one text value for form field ${name}`);
-    values[name] = readNamedFormText(value, numericFields.has(name));
+    values[name] = readNamedFormText(value, numericFields.has(name), spacedLiteral);
   }
 
   for (const name of blankOptionalFields) {
@@ -592,7 +595,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
   const properties = callable && !fieldOptions ? contract.input.json.properties : undefined;
   const namedSchemas = Object.entries<{
     type?: string;
-    items?: { type?: string };
+    items?: { type?: string; const?: unknown };
     optional?: boolean;
     format?: string;
     minLength?: number;
@@ -602,6 +605,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
   const booleanFields = new Set<string>();
   const arrayFields = new Map<string, boolean>();
   const blankOptionalFields = new Set<string>();
+  const spacedLiterals = new Map<string, string>();
   for (const [name, schema] of namedSchemas) {
     const numeric = isNumericInputType(schema.type);
     if (numeric) numericFields.add(name);
@@ -615,8 +619,12 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     if (schema.optional && (numeric || (schema.type === "string" && requiresNonEmptyText(schema)))) {
       blankOptionalFields.add(name);
     }
+    const constant = schema.type === "array" ? schema.items?.const : schema.const;
+    if (typeof constant === "string" && constant.trim() !== constant) {
+      spacedLiterals.set(name, constant);
+    }
   }
-  const namedFieldRules = { numericFields, booleanFields, arrayFields, blankOptionalFields };
+  const namedFieldRules = { numericFields, booleanFields, arrayFields, blankOptionalFields, spacedLiterals };
   const names = Object.keys(fieldOptions ?? {}) as Field[];
   const definitions = names.map((name) => {
     const field = fieldOptions![name];
