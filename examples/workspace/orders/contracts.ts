@@ -52,7 +52,7 @@ export const CreateOrder = operationContract({
 
 export const UpdateOrder = operationContract({
   id: "orders.update",
-  input: Order.pick("id", ...OrderFormInput.keys),
+  input: Order.pick("id", OrderFormInput),
   output: Order,
   errors: { ...orderNotFound, ORDER_ALREADY_CANCELLED: 409 },
   expose: { web: true },

@@ -38,9 +38,15 @@ test("schemas validate, strip no unknowns, generate valid samples", () => {
   assert.deepEqual(subset.parse({ count: 3, flag: false }), { count: 3, flag: false });
   assert.throws(() => subset.parse({ count: 6 }), ValidationError);
   assert.throws(() => subset.parse({ count: 3, name: "Extra" }), ValidationError);
+  const combined = schema.pick("name", subset);
+  assert.deepEqual(combined.keys, ["name", "count", "flag"]);
+  assert.deepEqual(combined.parse({ name: "Valid", count: 3 }), { name: "Valid", count: 3 });
+  assert.throws(() => schema.pick(s.object({ count: s.number() })).parse({ count: 1.5 }), ValidationError);
   if (false) {
     // @ts-expect-error Only fields declared in the source schema can be selected.
     schema.pick("missing");
+    // @ts-expect-error A selector schema can only name fields from the source.
+    schema.pick(s.object({ missing: s.string() }));
   }
 });
 test("compiler rejects cycles, scope leaks, duplicate ids and ambiguous routes", async () => {

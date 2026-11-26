@@ -12,7 +12,7 @@ interface OrderFieldsProps {
 }
 
 export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
-  const { product, quantity: quantityField } = mutation.fieldsFor(...OrderFormInput.keys);
+  const { product, quantity: quantityField } = mutation.fieldsFor(OrderFormInput);
   const { min, max } = quantityField.input;
   const quantityError = min !== undefined && max !== undefined
     ? `Введіть ціле число від ${min} до ${max}.`

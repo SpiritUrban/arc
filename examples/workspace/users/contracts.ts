@@ -37,7 +37,7 @@ export const CreateUser = operationContract({
 
 export const UpdateUser = operationContract({
   id: "users.update",
-  input: User.pick("id", ...UserProfile.keys),
+  input: User.pick("id", UserProfile),
   output: User,
   errors: { ...userNotFound, EMAIL_EXISTS: emailExists },
   expose: { web: true },

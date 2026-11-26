@@ -111,9 +111,12 @@ type ObjectType<S extends Shape> = {
 } & {
   [K in keyof S as undefined extends Infer<S[K]> ? K : never]?: Infer<S[K]>;
 };
+type FieldSelector<Key extends string> =
+  Key | (Schema<unknown> & { readonly keys: readonly Key[] });
+
 type ObjectSchema<S extends Shape> = Schema<ObjectType<S>> & {
   readonly keys: readonly (keyof S & string)[];
-  pick<Key extends keyof S & string>(...keys: Key[]): ObjectSchema<Pick<S, Key>>;
+  pick<Key extends keyof S & string>(...fields: FieldSelector<Key>[]): ObjectSchema<Pick<S, Key>>;
 };
 
 export const object = <S extends Shape>(shape: S): ObjectSchema<S> => {
@@ -159,7 +162,8 @@ export const object = <S extends Shape>(shape: S): ObjectSchema<S> => {
   );
   return Object.assign(schema, {
     keys,
-    pick<Key extends keyof S & string>(...keys: Key[]): ObjectSchema<Pick<S, Key>> {
+    pick<Key extends keyof S & string>(...fields: FieldSelector<Key>[]): ObjectSchema<Pick<S, Key>> {
+      const keys = fields.flatMap((field) => typeof field === "string" ? [field] : field.keys);
       const entries = keys.map((key) => {
         if (!Object.hasOwn(shape, key)) throw new TypeError(`Unknown schema field: ${key}`);
         return [key, shape[key]] as const;
