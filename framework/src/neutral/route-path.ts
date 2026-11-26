@@ -10,13 +10,21 @@ export function routePath<const Pattern extends string>(
   params: Record<string extends Pattern ? string : RouteParams<Pattern>, string | number>,
 ): string {
   const values: Readonly<Record<string, string | number | undefined>> = params;
-  return pattern.split("/").map((segment) => {
-    if (!segment.startsWith(":")) return segment;
-    const name = segment.slice(1);
+  return interpolateRoutePath(pattern, (name) => {
     const value = Object.hasOwn(values, name) ? values[name] : undefined;
     if (value === undefined || value === "") {
       throw new TypeError(`Missing route parameter: ${name}`);
     }
-    return encodeURIComponent(value);
+    return value;
+  });
+}
+
+export function interpolateRoutePath(
+  pattern: string,
+  readParam: (name: string) => string | number,
+): string {
+  return pattern.split("/").map((segment) => {
+    if (!segment.startsWith(":")) return segment;
+    return encodeURIComponent(readParam(segment.slice(1)));
   }).join("/");
 }

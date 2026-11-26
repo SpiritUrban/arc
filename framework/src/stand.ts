@@ -5,6 +5,7 @@ import { standLayouts } from "./stand-layout.js";
 import { generateCases } from "./generator.js";
 import { runLoad, findBreakingPoint, type LoadOutcome } from "./load.js";
 import { runTestSpec, type StandTestSpec } from "./test-spec.js";
+import { interpolateRoutePath } from "./neutral/route-path.js";
 import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
 import { dirname } from "node:path";
 export interface StandOptions {
@@ -186,10 +187,10 @@ export function stand(app: Application, options: StandOptions = {}) {
           const route = app.routes.find((r) => r.operation === op);
           if (!route) throw new Fault("ROUTE_NOT_FOUND", 404);
           const values = { ...input };
-          const path = route.path.replace(/:([^/]+)/g, (_, key) => {
+          const path = interpolateRoutePath(route.path, (key) => {
             const value = values[key];
             delete values[key];
-            return encodeURIComponent(value);
+            return String(value);
           });
           const target = new URL(
             path,

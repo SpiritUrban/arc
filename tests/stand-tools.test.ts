@@ -320,11 +320,11 @@ test("real network Stand load and SSE streaming pass through Node HTTP bridge", 
     await import("../framework/src/index.ts");
   const op = operation({
     id: "network",
-    input: empty,
+    input: s.object({ id: s.literal("part/segment?#"), label: s.literal("example label") }),
     output: s.int(),
     run: () => ok(1),
   });
-  const app = application({ routes: [http.get("/ping", op)] });
+  const app = application({ routes: [http.get("/ping/:id", op)] });
   await app.compile();
   await app.start();
   const applicationServer = await serve(
@@ -345,7 +345,7 @@ test("real network Stand load and SSE streaming pass through Node HTTP bridge", 
         body: JSON.stringify({
           operation: "network",
           mode: "network",
-          input: {},
+          input: { id: "part/segment?#", label: "example label" },
           count: 3,
           concurrency: 2,
         }),
@@ -365,7 +365,7 @@ test("real network Stand load and SSE streaming pass through Node HTTP bridge", 
       new TextDecoder().decode((await reader.read()).value),
       /connected/,
     );
-    await app.execute("network", {});
+    await app.execute("network", { id: "part/segment?#", label: "example label" });
     assert.match(
       new TextDecoder().decode((await reader.read()).value),
       /operation.started/,
