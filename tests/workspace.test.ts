@@ -252,7 +252,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       edges.filter((edge) =>
         edge.to.startsWith("orders.page.dom.") &&
         edge.to.endsWith(".render") &&
-        edge.from === "orders.list.query.select.visible" &&
+        edge.from === "orders.list.query.select.summary" &&
         edge.kind === "BINDS",
       ).length,
       2,

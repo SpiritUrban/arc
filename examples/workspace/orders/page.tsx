@@ -30,6 +30,10 @@ function CancelOrderControl({ order: { id, cancelled } }: { order: ReturnType<ty
 }
 
 const visibleOrders = ordersData.dataOr([], "visible");
+const orderSummary = ordersData.select("summary", (orders) => ({
+  count: orders?.length ?? 0,
+  total: orders?.reduce((sum, order) => sum + order.total, 0) ?? 0,
+}));
 
 export const OrdersPage = view({
   id: "orders.page",
@@ -52,14 +56,14 @@ export const OrdersPage = view({
           <div class="summary-card">
             <span class="muted">Замовлень користувача</span>
             <strong data-count>
-              {String(visibleOrders().length).padStart(2, "0")}
+              {String(orderSummary().count).padStart(2, "0")}
             </strong>
             <span class="summary-note">У поточній сесії</span>
           </div>
           <div class="summary-card accent">
             <span>Загальна сума</span>
             <strong data-amount>
-              {money(visibleOrders().reduce((sum, order) => sum + order.total, 0))}
+              {money(orderSummary().total)}
             </strong>
             <span class="summary-note">{orderUnitPrice} ₴ за одиницю товару</span>
           </div>
