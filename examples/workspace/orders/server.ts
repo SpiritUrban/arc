@@ -68,6 +68,7 @@ const ordersRepository = resource({
 });
 
 const needs = { user: currentUser, orders: ordersRepository };
+const orderWrite = { needs, effects: ["orders.write"] };
 const getOrder = http.get(orderDetailPattern, GetOrder, {
   needs,
   async run({ input, user, orders, fail }) {
@@ -76,9 +77,8 @@ const getOrder = http.get(orderDetailPattern, GetOrder, {
   },
 });
 const createOrder = http.post(ordersPath, CreateOrder, {
+  ...orderWrite,
   status: 201,
-  needs,
-  effects: ["orders.write"],
   async run({ input, user, orders }) {
     const order = {
       ...input,
@@ -91,8 +91,7 @@ const createOrder = http.post(ordersPath, CreateOrder, {
   },
 });
 const updateOrder = http.put(orderDetailPattern, UpdateOrder, {
-  needs,
-  effects: ["orders.write"],
+  ...orderWrite,
   async run({ input, user, orders, fail }) {
     const result = await orders.update(input, user.id);
     return typeof result === "string" ? fail(result) : ok(result);
@@ -100,8 +99,7 @@ const updateOrder = http.put(orderDetailPattern, UpdateOrder, {
 });
 
 const cancelOrder = http.post(`${ordersPath}/cancel`, CancelOrder, {
-  needs,
-  effects: ["orders.write"],
+  ...orderWrite,
   async run({ input, user, orders, fail }) {
     const result = await orders.cancel(input.id, user.id);
     if (typeof result === "string") return fail(result);
