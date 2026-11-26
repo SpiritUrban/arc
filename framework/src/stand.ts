@@ -188,11 +188,18 @@ export function stand(app: Application, options: StandOptions = {}) {
           const route = app.routes.find((r) => r.operation === op);
           if (!route) throw new Fault("ROUTE_NOT_FOUND", 404);
           const values = { ...input };
-          const path = interpolateRoutePath(route.path, (key) => {
-            const value = values[key];
-            delete values[key];
-            return String(value);
-          });
+          let path: string;
+          try {
+            path = interpolateRoutePath(route.path, (key) => {
+              const value = values[key];
+              delete values[key];
+              return String(value);
+            });
+          } catch (error) {
+            if (error instanceof TypeError || error instanceof URIError)
+              throw new Fault("INVALID_PATH", 400);
+            throw error;
+          }
           const target = new URL(
             path,
             body.mode === "network"
