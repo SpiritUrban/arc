@@ -17,6 +17,13 @@ export const ListUsers = operationContract({
   output: User.array(),
   expose: { web: true },
 });
+
+export const GetUser = operationContract({
+  id: "users.get",
+  input: User.pick("id"),
+  output: User,
+  errors: { USER_NOT_FOUND: 404 },
+});
 // Клієнт передає ім’я й пошту. Під час створення сервер генерує ID
 // і повертає оголошену тут помилку EMAIL_EXISTS із HTTP 409, якщо пошта зайнята.
 const emailExists = { status: 409, field: "email" } as const;

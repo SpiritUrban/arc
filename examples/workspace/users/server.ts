@@ -3,13 +3,12 @@
 import { randomUUID } from "node:crypto";
 import {
   resource,
-  operation,
   module,
   http,
   ok,
   error,
 } from "@arc/framework";
-import { User, UserProfile, ListUsers, CreateUser, UpdateUser, demoUserId } from "./contracts.ts";
+import { User, UserProfile, ListUsers, GetUser, CreateUser, UpdateUser, demoUserId } from "./contracts.ts";
 export { User } from "./contracts.ts";
 type User = ReturnType<typeof User.parse>;
 type UserProfile = ReturnType<typeof UserProfile.parse>;
@@ -48,22 +47,19 @@ export const usersRepository = resource({
     };
   },
 });
-// REST-маршрут GET /users/:id передає ID у цю операцію. Відсутній запис дає HTTP 404.
-export const getUser = operation({
-  id: "users.get",
-  input: User.pick("id"),
-  output: User,
-  needs: { users: usersRepository },
-  errors: { USER_NOT_FOUND: 404 },
+const needs = { users: usersRepository };
+
+const getUser = http.get("/users/:id", GetUser, {
+  needs,
   run: async ({ input, users }) => {
     const user = await users.find(input.id);
     return user ? ok(user) : error("USER_NOT_FOUND");
   },
 });
 
-// Контракт описує дані, needs підключає сховище, а run повертає результат операції.
-export const createUser = operation(CreateUser, {
-  needs: { users: usersRepository },
+const createUser = http.post("/users", CreateUser, {
+  status: 201,
+  needs,
   run: async ({ input, users }) => {
     const user = await users.create(input);
     // Дублікат пошти повертаємо як бізнес-помилку, яку форма може показати користувачу.
@@ -71,27 +67,19 @@ export const createUser = operation(CreateUser, {
   },
 });
 
-export const updateUser = operation(UpdateUser, {
-  needs: { users: usersRepository },
+const updateUser = http.put("/users/:id", UpdateUser, {
+  needs,
   run: async ({ input, users }) => {
     const result = await users.update(input);
     return typeof result === "string" ? error(result) : ok(result);
   },
 });
 
-// Список використовують і REST-маршрут GET /users, і браузерний remote(ListUsers).
-export const listUsers = operation(ListUsers, {
-  needs: { users: usersRepository },
+const listUsers = http.get("/users", ListUsers, {
+  needs,
   run: async ({ users }) => ok(await users.list()),
 });
-// Модуль реєструє операції та прив’язує частину з них до звичайних HTTP-маршрутів.
 export const users = module({
   id: "users",
-  operations: [getUser, createUser, updateUser, listUsers],
-  routes: [
-    http.get("/users", listUsers),
-    http.get("/users/:id", getUser),
-    http.post("/users", createUser, { status: 201 }),
-    http.put("/users/:id", updateUser),
-  ],
+  routes: [listUsers, getUser, createUser, updateUser],
 });

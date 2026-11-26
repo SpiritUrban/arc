@@ -41,7 +41,7 @@ examples/workspace/
 
 ## 3. Використовуйте спільний contract
 
-[users/contracts.ts](../../examples/workspace/users/contracts.ts) експортує User, ListUsers та CreateUser. Server [users/server.ts](../../examples/workspace/users/server.ts) створює `operation(CreateUser, { needs, run })`; browser імпортує тільки descriptor. Не дублюйте URL, DTO чи business error enum.
+[users/contracts.ts](../../examples/workspace/users/contracts.ts) експортує User, ListUsers та CreateUser. Сервер підключає реалізацію до контракту через `http.post("/users", CreateUser, { status: 201, needs, run })`, а браузер використовує той самий контракт для мутації. [Реалізація маршруту](../../examples/workspace/users/server.ts)
 
 Сервер відкриває браузерний виклик через `expose: { web: true }` у контракті. REST-маршрут можна оголосити окремо або створити разом з операцією через `http.post(path, contract, implementation)`, як у [замовленнях](../../examples/workspace/orders/server.ts).
 
