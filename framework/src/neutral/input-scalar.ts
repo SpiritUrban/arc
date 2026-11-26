@@ -1,8 +1,10 @@
+export type ScalarInputType = "string" | "number" | "integer" | "boolean";
+
 export function isNumericInputType(type: unknown): type is "number" | "integer" {
   return type === "number" || type === "integer";
 }
 
-export function isScalarInputType(type: unknown): type is "string" | "number" | "integer" | "boolean" {
+export function isScalarInputType(type: unknown): type is ScalarInputType {
   return type === "string" || type === "boolean" || isNumericInputType(type);
 }
 

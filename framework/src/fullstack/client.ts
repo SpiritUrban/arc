@@ -4,7 +4,7 @@ import {
   type BusinessError,
 } from "../neutral/contracts.js";
 import { ValidationError, type Infer, type Schema } from "../schema.js";
-import { decodeInputScalar, isNumericInputType } from "../neutral/input-scalar.js";
+import { decodeInputScalar, isNumericInputType, isScalarInputType, type ScalarInputType } from "../neutral/input-scalar.js";
 import { formValue } from "../web/form-value.js";
 import { withEventTrigger } from "../web/event-trigger.js";
 import { reactiveAttribute } from "../web/jsx-runtime.js";
@@ -195,22 +195,23 @@ type RemoteForm<C extends OperationContract, Field extends string> = {
 };
 
 type NamedSubmission = {
-  values: Record<string, string | number | boolean | readonly (string | number)[]>;
+  values: Record<string, string | number | boolean | readonly (string | number | boolean)[]>;
   reset?(ctx: ActionContext): void;
 };
 
 type NamedFieldRules = {
   numericFields: ReadonlySet<string>;
   booleanFields: ReadonlySet<string>;
-  arrayFields: ReadonlyMap<string, boolean>;
+  arrayFields: ReadonlyMap<string, ScalarInputType>;
   blankOptionalFields: ReadonlySet<string>;
   spacedLiterals: ReadonlyMap<string, string>;
 };
 
-function readNamedFormText(value: string, numeric: boolean, spacedLiteral?: string): string | number {
+function readNamedFormText(value: string, type: ScalarInputType, spacedLiteral?: string): string | number | boolean {
   if (value === spacedLiteral) return value;
   const text = value.trim();
-  return numeric && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)
+  if (type === "boolean") return decodeInputScalar(text, type);
+  return isNumericInputType(type) && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)
     ? Number(text)
     : text;
 }
@@ -225,20 +226,20 @@ function readNamedSubmission(
   const controls = Array.from(form.elements).filter((element) => !element.matches(":disabled"));
   const values = Object.create(null) as NamedSubmission["values"];
   for (const [name, value] of entries) {
-    const numericItems = arrayFields.get(name);
+    const itemType = arrayFields.get(name);
     const spacedLiteral = spacedLiterals.get(name);
-    if (numericItems !== undefined) {
+    if (itemType !== undefined) {
       if (typeof value !== "string")
         throw new TypeError(`Expected text values for form field ${name}`);
       const valuesForField =
-        (values[name] as (string | number)[] | undefined) ?? [];
-      valuesForField.push(readNamedFormText(value, numericItems, spacedLiteral));
+        (values[name] as (string | number | boolean)[] | undefined) ?? [];
+      valuesForField.push(readNamedFormText(value, itemType, spacedLiteral));
       values[name] = valuesForField;
       continue;
     }
     if (typeof value !== "string" || Object.hasOwn(values, name))
       throw new TypeError(`Expected one text value for form field ${name}`);
-    values[name] = readNamedFormText(value, numericFields.has(name), spacedLiteral);
+    values[name] = readNamedFormText(value, numericFields.has(name) ? "number" : "string", spacedLiteral);
   }
 
   for (const name of blankOptionalFields) {
@@ -607,7 +608,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
   }>(properties ?? {});
   const numericFields = new Set<string>();
   const booleanFields = new Set<string>();
-  const arrayFields = new Map<string, boolean>();
+  const arrayFields = new Map<string, ScalarInputType>();
   const blankOptionalFields = new Set<string>();
   const spacedLiterals = new Map<string, string>();
   for (const [name, schema] of namedSchemas) {
@@ -616,9 +617,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     if (schema.type === "boolean") booleanFields.add(name);
     if (schema.type === "array") {
       const itemType = schema.items?.type;
-      if (itemType === "string" || isNumericInputType(itemType)) {
-        arrayFields.set(name, isNumericInputType(itemType));
-      }
+      if (isScalarInputType(itemType)) arrayFields.set(name, itemType);
     }
     if (schema.optional && (numeric || (schema.type === "string" && requiresNonEmptyText(schema)))) {
       blankOptionalFields.add(name);

@@ -662,6 +662,7 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
       labels: s.literal(" tag ").array(),
       requiredCount: s.int(),
       counts: s.int().array(),
+      flags: s.boolean().array(),
     }),
     output: s.boolean(),
   });
@@ -670,6 +671,7 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
   let requiredCount = "1";
   let secondCount = "2e1";
   let choice = "false";
+  let secondFlag = "false";
   const validity = { badInput: false };
   class FieldsFormData extends NativeFormData {
     constructor() {
@@ -687,6 +689,8 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
       this.set("requiredCount", requiredCount);
       this.append("counts", " 1 ");
       this.append("counts", secondCount);
+      this.append("flags", "true");
+      this.append("flags", secondFlag);
     }
   }
   const requests: unknown[] = [];
@@ -726,7 +730,7 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
     const expected = {
       checked: true, unchecked: false, choice: false, note: "", confirmed: "yes", empty: "", spaced: " ",
       labels: [" tag "],
-      requiredCount: 1, counts: [1, 20],
+      requiredCount: 1, counts: [1, 20], flags: [true, false],
     };
     assert.deepEqual(requests, [expected]);
 
@@ -743,6 +747,11 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
     await assert.rejects(save.submitForm!(form, { trace: { traceId: "invalid-boolean-choice" } }));
     assert.equal(save.invalid("choice"), true);
     choice = "false";
+
+    secondFlag = "yes";
+    await assert.rejects(save.submitForm!(form, { trace: { traceId: "invalid-boolean-item" } }));
+    assert.equal(save.invalid("flags"), true);
+    secondFlag = "false";
 
     secondCount = "0x10";
     await assert.rejects(save.submitForm!(form, { trace: { traceId: "invalid-number-item" } }));
