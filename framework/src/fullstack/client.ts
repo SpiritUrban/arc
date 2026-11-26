@@ -434,22 +434,26 @@ type BoundMutation<C extends OperationContract> = {
   };
 };
 
+/** Field bindings that a shared form can use without depending on a specific operation. */
+export type MutationFieldBindings<Input> = {
+  field(name: InputFieldName<Input>): MutationField;
+  fieldsFor<const Names extends readonly string[]>(
+    ...selection: FieldSelection<Input, Names>
+  ): Readonly<Record<Names[number], MutationField>>;
+};
+
 export type Mutation<
   C extends OperationContract,
   Field extends string = never,
   Key extends MutationKey = MutationKey,
   KeyField extends string = never,
 > =
-  CallableAction<void, RemoteResult<C>> & {
+  CallableAction<void, RemoteResult<C>> & MutationFieldBindings<Infer<C["input"]>> & {
     fields: RemoteForm<C, Field>["fields"];
     failed(code: keyof C["errors"] & string, key?: Key): boolean;
     invalid(): boolean;
     invalid(field: InputField<C>): boolean;
     invalidField(field: InputField<C>): Computed<boolean>;
-    field(name: InputField<C>): MutationField;
-    fieldsFor<const Names extends readonly string[]>(
-      ...selection: FieldSelection<C, Names>
-    ): Readonly<Record<Names[number], MutationField>>;
     run(input: Infer<C["input"]>): Promise<RemoteResult<C>>;
     for(input: MutationInput<C> | ScalarMutationInput<MutationInput<C>, KeyField & keyof MutationInput<C>>): BoundMutation<C>;
     with: [Field] extends [never]
@@ -473,14 +477,15 @@ type BoundSubmission<C extends OperationContract> = {
   submitter?: HTMLElement | null;
   params?: Partial<Infer<C["input"]>>;
 };
-type InputField<C extends OperationContract> =
-  Infer<C["input"]> extends Record<string, unknown>
-    ? Extract<keyof Infer<C["input"]>, string>
+type InputFieldName<Input> =
+  [Input] extends [Record<string, unknown>]
+    ? Extract<keyof Input, string>
     : never;
+type InputField<C extends OperationContract> = InputFieldName<Infer<C["input"]>>;
 
-type FieldSelection<C extends OperationContract, Names extends readonly string[]> =
-  (Names & readonly InputField<C>[]) |
-  [schema: Schema<unknown> & { readonly keys: Names & readonly InputField<C>[] }];
+type FieldSelection<Input, Names extends readonly string[]> =
+  (Names & readonly InputFieldName<Input>[]) |
+  [schema: Schema<unknown> & { readonly keys: Names & readonly InputFieldName<Input>[] }];
 
 type FieldErrorMessages = {
   invalid?: string;
@@ -876,7 +881,7 @@ function bindMutation(defaults: RemoteFormDefaults) {
         return invalid;
       },
       fieldsFor<const Names extends readonly string[]>(
-        ...selection: FieldSelection<C, Names>
+        ...selection: FieldSelection<Infer<C["input"]>, Names>
       ) {
         const first = selection[0];
         const fields: readonly InputField<C>[] =

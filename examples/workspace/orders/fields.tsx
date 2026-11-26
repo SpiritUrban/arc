@@ -1,12 +1,12 @@
-import type { Infer, OperationContract } from "@arc/framework/core";
-import type { Mutation } from "@arc/framework/fullstack";
+import type { Infer } from "@arc/framework/core";
+import type { MutationFieldBindings } from "@arc/framework/fullstack";
 import type { Signal } from "@arc/framework/web";
 import { OrderFormInput } from "./contracts.ts";
 
 type OrderInput = Infer<typeof OrderFormInput>;
 
 interface OrderFieldsProps {
-  mutation: Pick<Mutation<OperationContract<OrderInput>>, "fieldsFor">;
+  mutation: MutationFieldBindings<OrderInput>;
   order?: () => OrderInput | undefined;
   quantity?: Signal<string>;
 }
