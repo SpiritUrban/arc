@@ -1,6 +1,4 @@
-export function pageParamNames(pattern: string) {
-  return pattern.split("/").filter((part) => part.startsWith(":")).map((part) => part.slice(1));
-}
+export { routeParameterNames as pageParamNames } from "./route-path.js";
 
 export function matchPagePath(pattern: string, pathname: string): Record<string, string> | undefined {
   const parts = pattern.split("/");

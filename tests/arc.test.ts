@@ -53,14 +53,25 @@ test("schemas validate, strip no unknowns, generate valid samples", () => {
 test("routePath encodes each parameter as one URL segment", () => {
   assert.equal(routePath("/users/:id/orders/:order", { id: "a/b ?#", order: 0 }), "/users/a%2Fb%20%3F%23/orders/0");
   assert.throws(() => routePath("/orders/:id", { id: "" }), /Missing route parameter: id/);
+  const lookup = operationContract({ id: "lookup", input: s.object({ id: s.uuid() }), output: s.string() });
   if (false) {
     // @ts-expect-error The literal pattern requires an id.
     routePath("/orders/:id", {});
-    const lookup = operationContract({ id: "lookup", input: s.object({ id: s.uuid() }), output: s.string() });
     http.get("/orders/:id", lookup, { run: ({ input }) => ok(input.id) });
     // @ts-expect-error The literal route parameter must be declared by the contract.
     http.get("/orders/:wrong", lookup, { run: () => ok("unused") });
   }
+});
+test("HTTP contract routes validate dynamically supplied parameter names", () => {
+  const lookup = operationContract({
+    id: "lookup",
+    input: s.object({ id: s.uuid() }),
+    output: s.string(),
+  });
+  const bind = (path: string) =>
+    http.get(path, lookup, { run: ({ input }) => ok(input.id) });
+  assert.equal(bind("/orders/:id").path, "/orders/:id");
+  assert.throws(() => bind("/orders/:wrong"), /parameter "wrong" is missing from lookup input/);
 });
 test("compiler checks business error metadata from dynamic contracts", async () => {
   for (const metadata of [

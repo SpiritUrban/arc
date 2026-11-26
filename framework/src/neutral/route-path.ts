@@ -32,7 +32,16 @@ export function mapRoutePath(
   mapParam: (name: string) => string,
   mapLiteral?: (segment: string) => string,
 ): string {
-  return pattern.split("/").map((segment) =>
-    segment.startsWith(":") ? mapParam(segment.slice(1)) : (mapLiteral?.(segment) ?? segment),
-  ).join("/");
+  return pattern.split("/").map((segment) => {
+    const name = routeParameterName(segment);
+    return name === undefined ? (mapLiteral?.(segment) ?? segment) : mapParam(name);
+  }).join("/");
+}
+
+function routeParameterName(segment: string): string | undefined {
+  return segment.startsWith(":") ? segment.slice(1) : undefined;
+}
+
+export function routeParameterNames(pattern: string): string[] {
+  return pattern.split("/").map(routeParameterName).filter((name) => name !== undefined);
 }
