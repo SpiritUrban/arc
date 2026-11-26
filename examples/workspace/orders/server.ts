@@ -29,17 +29,23 @@ const ordersRepository = resource({
   effects: ["memory.write"],
   open: () => {
     const orders: Order[] = [];
+    const belongsToUser = (order: Order, userId: string) => order.userId === userId;
+    const findOrderIndex = (id: string, userId: string) =>
+      orders.findIndex((order) => order.id === id && belongsToUser(order, userId));
+
     return {
       save: async (order: Order) => {
         orders.push(order);
         return order;
       },
       // Вибірка обмежена власником, якого передає серверна операція.
-      list: async (userId: string) => orders.filter((o) => o.userId === userId),
-      find: async (id: string, userId: string) =>
-        orders.find((order) => order.id === id && order.userId === userId),
+      list: async (userId: string) => orders.filter((order) => belongsToUser(order, userId)),
+      find: async (id: string, userId: string) => {
+        const index = findOrderIndex(id, userId);
+        return index < 0 ? undefined : orders[index];
+      },
       async update(id: string, userId: string, product: string, quantity: number) {
-        const index = orders.findIndex((order) => order.id === id && order.userId === userId);
+        const index = findOrderIndex(id, userId);
         if (index < 0) return "ORDER_NOT_FOUND" as const;
         if (orders[index].cancelled) return "ORDER_ALREADY_CANCELLED" as const;
         const order = { ...orders[index], product, quantity, total: orderTotal(quantity) };
@@ -47,7 +53,7 @@ const ordersRepository = resource({
         return order;
       },
       async cancel(id: string, userId: string) {
-        const index = orders.findIndex((order) => order.id === id && order.userId === userId);
+        const index = findOrderIndex(id, userId);
         if (index < 0) return "ORDER_NOT_FOUND" as const;
         const current = orders[index];
         if (current.cancelled) return { order: current, alreadyCancelled: true } as const;
