@@ -205,6 +205,13 @@ type NamedFieldRules = {
   blankOptionalFields: ReadonlySet<string>;
 };
 
+function readNamedFormText(value: string, numeric: boolean): string | number {
+  const text = value.trim();
+  return numeric && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)
+    ? Number(text)
+    : text;
+}
+
 function readNamedSubmission(
   form: HTMLFormElement,
   submitter: HTMLElement | null | undefined,
@@ -221,23 +228,15 @@ function readNamedSubmission(
         throw new TypeError(`Expected text values for form field ${name}`);
       const valuesForField =
         (values[name] as (string | number)[] | undefined) ?? [];
-      const text = value.trim();
       valuesForField.push(
-        (arrayItemType === "number" || arrayItemType === "integer") &&
-            /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)
-          ? Number(text)
-          : text,
+        readNamedFormText(value, arrayItemType === "number" || arrayItemType === "integer"),
       );
       values[name] = valuesForField;
       continue;
     }
     if (typeof value !== "string" || Object.hasOwn(values, name))
       throw new TypeError(`Expected one text value for form field ${name}`);
-    const text = value.trim();
-    values[name] =
-      numericFields.has(name) && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(text)
-        ? Number(text)
-        : text;
+    values[name] = readNamedFormText(value, numericFields.has(name));
   }
 
   for (const name of blankOptionalFields) {
