@@ -11,7 +11,7 @@ import { buildWeb, staticWeb } from "../framework/src/fullstack/build.ts";
 import { internalTransport } from "../framework/src/fullstack/server.ts";
 import { serve, closeServer, handler } from "../framework/src/http.ts";
 import { stand } from "../framework/src/stand.ts";
-import { wireContract } from "../framework/src/neutral/descriptor.ts";
+import { descriptor, wireContract } from "../framework/src/neutral/descriptor.ts";
 import { CancelOrder } from "../examples/workspace/orders/contracts.ts";
 import { UpdateUser } from "../examples/workspace/users/contracts.ts";
 
@@ -176,9 +176,12 @@ test("Workspace order update has consistent identities and impact in build and S
     assert.deepEqual(artifact, standGraph);
     for (const contract of [CancelOrder, UpdateUser]) {
       const graphErrors = graph.nodes.find((node) => node.id === contract.id)?.errors;
-      const wireErrors = wireContract(contract).errors;
+      const wire = wireContract(contract);
+      const browserWire = JSON.parse(JSON.stringify(wire));
+      const restoredWire = wireContract(descriptor(browserWire));
+      assert.deepEqual(JSON.parse(JSON.stringify(restoredWire)), browserWire);
       assert.deepEqual(graphErrors, Object.fromEntries(
-        Object.entries(wireErrors).map(([code, definition]) => [
+        Object.entries(wire.errors).map(([code, definition]) => [
           code,
           typeof definition === "number" ? { status: definition } : definition,
         ]),

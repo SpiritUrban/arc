@@ -1,5 +1,5 @@
 import { s, Schema } from "../schema.js";
-import { errorDetailsSchema, errorStatus, operationContract, type ErrorDefinition, type OperationContract } from "./contracts.js";
+import { operationContract, type ErrorDefinition, type OperationContract } from "./contracts.js";
 export function schemaFromJSON(json: Record<string, any>): Schema<any> {
   let schema: Schema<any>;
   if (Object.hasOwn(json, "const")) schema = s.literal(json.const);
@@ -41,18 +41,23 @@ export function schemaFromJSON(json: Record<string, any>): Schema<any> {
     }
   return schema;
 }
-export function describeBusinessError(definition: ErrorDefinition) {
-  const details = errorDetailsSchema(definition);
+function mapErrorDetails<Details, Mapped>(
+  definition: { status: number; details?: Details; field?: string; updateFromDetails?: true },
+  map: (details: Details) => Mapped,
+) {
+  const { status, details, field, updateFromDetails } = definition;
   return {
-    status: errorStatus(definition),
-    ...(details ? { details: details.json } : {}),
-    ...(typeof definition !== "number" && definition.field !== undefined
-      ? { field: definition.field }
-      : {}),
-    ...(typeof definition !== "number" && definition.updateFromDetails
-      ? { updateFromDetails: true as const }
-      : {}),
+    status,
+    ...(details !== undefined ? { details: map(details) } : {}),
+    ...(field !== undefined ? { field } : {}),
+    ...(updateFromDetails ? { updateFromDetails } : {}),
   };
+}
+
+export function describeBusinessError(definition: ErrorDefinition) {
+  return typeof definition === "number"
+    ? { status: definition }
+    : mapErrorDetails(definition, (details) => details.json);
 }
 
 export function wireContract(contract: OperationContract) {
@@ -79,14 +84,7 @@ export function descriptor(
     errors: Object.fromEntries(
       Object.entries(wire.errors).map(([code, def]) => [
         code,
-        typeof def === "number"
-          ? def
-          : {
-              status: def.status,
-              ...(def.field !== undefined ? { field: def.field } : {}),
-              ...(def.updateFromDetails ? { updateFromDetails: true as const } : {}),
-              ...(def.details ? { details: schemaFromJSON(def.details) } : {}),
-            },
+        typeof def === "number" ? def : mapErrorDetails(def, schemaFromJSON),
       ]),
     ),
   });
