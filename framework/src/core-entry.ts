@@ -7,4 +7,4 @@ export * from "./metrics.js";
 export * from "./neutral/protocol.js";
 export { graphApplication as application } from "./neutral/graph.js";
 export * from "./neutral/descriptor.js";
-export { routePath } from "./neutral/route-path.js";
+export { routePath, type RouteParamNames } from "./neutral/route-path.js";

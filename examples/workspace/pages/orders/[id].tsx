@@ -1,15 +1,16 @@
+import type { RouteParamNames } from "@arc/framework/core";
 import { render, type PageContext } from "@arc/framework/web";
 import { CancelOrder, GetOrder, UpdateOrder, isOrderActive } from "../../orders/contracts.ts";
 import { orderClient, replaceListedOrder } from "../../orders/client.ts";
 import { OrderFields } from "../../orders/fields.tsx";
 import { orderStatus, orderStatuses, orderWriteMessage } from "../../orders/messages.ts";
-import { ordersPath } from "../../orders/paths.ts";
+import { orderDetailPattern, ordersPath } from "../../orders/paths.ts";
 import { UsersPage } from "../../users/page.tsx";
 import { editFormOptions, money } from "../../ui.ts";
 
 export const title = "Деталі замовлення — ARC Workspace";
 
-export default function OrderDetail({ bind }: PageContext<"id">) {
+export default function OrderDetail({ bind }: PageContext<RouteParamNames<typeof orderDetailPattern>>) {
   const { query, mutation } = bind(orderClient);
   const order = query(GetOrder);
   const update = [order, replaceListedOrder];
