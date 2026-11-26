@@ -62,6 +62,25 @@ test("routePath encodes each parameter as one URL segment", () => {
     http.get("/orders/:wrong", lookup, { run: () => ok("unused") });
   }
 });
+test("compiler checks business error metadata from dynamic contracts", async () => {
+  for (const metadata of [
+    { status: 409, field: "missing" },
+    { status: 409, updateFromDetails: true },
+  ]) {
+    const contract = operationContract({
+      id: "profiles.save",
+      input: s.object({ email: s.email() }),
+      output: s.string(),
+    });
+    Object.assign(contract.errors, { CONFLICT: metadata });
+    const app = application({ operations: [operation(contract, { run: () => ok("saved") })] });
+    try {
+      await assert.rejects(app.compile(), /Invalid error mapping: profiles\.save/);
+    } finally {
+      await app.close();
+    }
+  }
+});
 test("compiler rejects cycles, scope leaks, duplicate ids and ambiguous routes", async () => {
   const a = resource({ id: "a", open: () => 1 });
   const b = resource({ id: "b", needs: { a }, open: () => 2 });

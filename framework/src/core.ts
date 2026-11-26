@@ -431,16 +431,22 @@ export class Application {
           throw new Error(`Invalid schema: ${node.id}`);
         validateSchemaMetadata(node.input.json);
         validateSchemaMetadata(node.output.json);
-        for (const definition of Object.values(node.errors))
+        for (const definition of Object.values(node.errors)) {
+          const status = errorStatus(definition);
+          const details = errorDetailsSchema(definition);
           if (
-            !Number.isInteger(errorStatus(definition)) ||
-            errorStatus(definition) < 400 ||
-            errorStatus(definition) > 599 ||
-            (typeof definition !== "number" &&
-              definition.details !== undefined &&
-              !(definition.details instanceof Schema))
+            !Number.isInteger(status) || status < 400 || status > 599 ||
+            (details !== undefined && !(details instanceof Schema)) ||
+            (typeof definition !== "number" && (
+              (definition.field !== undefined &&
+                (typeof definition.field !== "string" ||
+                  !Object.hasOwn(node.input.json.properties ?? {}, definition.field))) ||
+              (definition.updateFromDetails && details === undefined)
+            ))
           )
             throw new Error(`Invalid error mapping: ${node.id}`);
+          if (details) validateSchemaMetadata(details.json);
+        }
       }
       if (
         Object.keys(node.needs).some((k) =>
@@ -468,10 +474,6 @@ export class Application {
           throw new Error(`Scope violation: ${node.id} → ${dep.id}`);
         visit(dep, [...stack, node.id]);
       }
-      if (node.kind === "operation")
-        for (const def of Object.values(node.errors))
-          if (typeof def !== "number" && def.details)
-            validateSchemaMetadata(def.details.json);
       if (node.kind === "operation")
         for (const child of Object.values(node.calls)) {
           if (child?.kind !== "operation")

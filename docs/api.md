@@ -55,7 +55,7 @@ const read = operation({
 
 Зарезервовані needs keys: input, signal, request, call, fail, **proto**, constructor, prototype. ID спільні між усіма node kinds.
 
-Для спільного контракту використовуйте `operation(contract, { needs, calls, run, ...metadata })`. Схеми, помилки й ID беруться з контракту, а `run` отримує їхні типи разом із типами ресурсів.
+Для спільного контракту використовуйте `operation(contract, { needs, calls, run, ...metadata })`. Схеми, помилки й ID беруться з контракту, а `run` отримує їхні типи разом із типами ресурсів. Під час компіляції ARC перевіряє, що `field` бізнес-помилки є полем вхідної схеми, а `updateFromDetails` має схему `details`.
 
 Для HTTP можна оголосити контракт і реалізацію в одному виклику маршруту:
 
