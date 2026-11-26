@@ -181,6 +181,8 @@ test("page operations use only route parameters declared by the contract", async
     scoped.query(ranked, { params: { rank: 7 }, key: true });
     scoped.query(ranked, { id: "route.ranked.from-path" });
     scoped.mutation(ranked, { id: "route.ranked.write" });
+    query(client, ranked);
+    mutation(client, ranked, { id: "route.ranked.direct-write" });
     const keyed = scoped.mutation(write, { id: "route.write.default", key: "id" });
     assert.equal(keyed.id, "route.write.default");
     assert.equal(keyed.pending("route"), false);
@@ -216,12 +218,14 @@ test("page operations use only route parameters declared by the contract", async
     { id: "route", rank: 7, limit: 10, active: false },
     { id: "route", rank: 2, limit: 10, active: false },
     { id: "route", rank: 2, limit: 10, active: false },
+    { id: "route", rank: 2, limit: 10, active: false },
+    { id: "route", rank: 2, limit: 10, active: false },
     { id: "route" },
     { id: "route", locale: "uk" },
     { id: "override", locale: "uk" },
     { id: "explicit" },
   ]);
-  assert.equal(page.owned?.length, 12);
+  assert.equal(page.owned?.length, 14);
   await cachedQueries[0].refresh();
   assert.ok(cacheKeys.includes("workspace"));
   assert.equal(cachedQueries[0].data(), "Ready");

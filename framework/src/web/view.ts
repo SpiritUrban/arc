@@ -810,8 +810,7 @@ export function pageView<Param extends string = string>(
       ? Object.fromEntries(Object.entries<string>(params).flatMap(([name, value]) => {
         if (!Object.hasOwn(fields, name)) return [];
         const type = fields[name]?.type;
-        if (!merge) return [[name, value]];
-        if (!["string", "number", "integer", "boolean"].includes(type)) return [];
+        if (merge && !["string", "number", "integer", "boolean"].includes(type)) return [];
         return [[name, decodeInputScalar(value, type)]];
       }))
       : params;
