@@ -5,7 +5,7 @@ import { orderTotal, orderUnitPrice, quantityLimits, type Order } from "./contra
 import { activeUser } from "../user-selection.ts";
 import { cancelListedOrder, createOrder, ordersData } from "./client.ts";
 import { OrderFields } from "./fields.tsx";
-import { orderWriteMessage } from "./messages.ts";
+import { orderStatus, orderStatuses, orderWriteMessage } from "./messages.ts";
 import { money, failureMessage } from "../ui.ts";
 
 function CancelOrderControl({ order: { id, cancelled } }: { order: ReturnType<typeof Order.parse> }) {
@@ -39,7 +39,7 @@ export const OrdersPage = view({
       const term = search.trim().toLowerCase();
       return orders.filter((order) =>
         order.product.toLowerCase().includes(term) &&
-        (status === "all" || order.cancelled === (status === "cancelled")),
+        (status === "all" || orderStatus(order) === status),
       );
     });
     const filtering = derive([search, status], (search, status) =>
@@ -121,8 +121,9 @@ export const OrdersPage = view({
               Статус
               <select data-order-status bind:value={status}>
                 <option value="all">Усі замовлення</option>
-                <option value="created">Створені</option>
-                <option value="cancelled">Скасовані</option>
+                {Object.entries(orderStatuses).map(([value, { filterLabel }]) => (
+                  <option value={value}>{filterLabel}</option>
+                ))}
               </select>
             </label>
           </div>
@@ -149,7 +150,7 @@ export const OrdersPage = view({
                       <td>{money(order.total)}</td>
                       <td>
                         <span class="order-status">
-                          {order.cancelled ? "Скасовано" : "Створено"}
+                          {orderStatuses[orderStatus(order)].label}
                         </span>
                         <CancelOrderControl order={order} />
                       </td>
