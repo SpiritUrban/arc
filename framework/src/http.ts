@@ -2,12 +2,7 @@ import { createServer, type Server } from "node:http";
 import { Application, Fault, errorDetailsSchema, errorStatus } from "./core.js";
 import { decodeRouteParams, mapRoutePath } from "./neutral/route-path.js";
 import { acceptsJsonBody } from "./neutral/http-method.js";
-
-function httpInputValue(value: string, type: unknown): string | number | boolean {
-  if ((type === "number" || type === "integer") && value.trim() !== "") return Number(value);
-  if (type === "boolean" && (value === "true" || value === "false")) return value === "true";
-  return value;
-}
+import { decodeInputScalar } from "./neutral/input-scalar.js";
 
 export function problem(e: unknown): Response {
   return Response.json(
@@ -57,7 +52,7 @@ export function handler(app: Application) {
         const properties = route.operation.input.json.properties ?? {};
         const query = Object.fromEntries(
           Array.from(url.searchParams, ([name, value]) => [
-            name, httpInputValue(value, properties[name]?.type),
+            name, decodeInputScalar(value, properties[name]?.type),
           ]),
         );
         let decoded: Record<string, string>;
@@ -67,7 +62,7 @@ export function handler(app: Application) {
           throw new Fault("INVALID_PATH", 400);
         }
         const params = Object.fromEntries(Object.entries(decoded).map(([name, value]) => [
-          name, httpInputValue(value, properties[name]?.type),
+          name, decodeInputScalar(value, properties[name]?.type),
         ]));
         const result = await app.execute(
           route.operation.id,

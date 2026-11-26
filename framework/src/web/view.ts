@@ -1,5 +1,6 @@
 import { compileArchitecture, type GraphDefinition } from "../neutral/graph.js";
 import type { OperationContract } from "../neutral/contracts.js";
+import { decodeInputScalar } from "../neutral/input-scalar.js";
 import type { Infer } from "../schema.js";
 import type {
   FieldKeyMutationOptions,
@@ -709,12 +710,12 @@ type PageRemoteClient = {
   mutation<C extends OperationContract>(contract: C, ...args: any[]): Mutation<C>;
 };
 
-type StringRouteFields<Input, Param extends string> = {
-  [Name in Extract<keyof Input, Param>]-?: NonNullable<Input[Name]> extends string ? Name : never;
+type ScalarRouteFields<Input, Param extends string> = {
+  [Name in Extract<keyof Input, Param>]-?: NonNullable<Input[Name]> extends string | number | boolean ? Name : never;
 }[Extract<keyof Input, Param>];
 
 type RouteQueryParams<Input, Param extends string> =
-  Omit<Input, StringRouteFields<Input, Param>> & Partial<Pick<Input, StringRouteFields<Input, Param>>>;
+  Omit<Input, ScalarRouteFields<Input, Param>> & Partial<Pick<Input, ScalarRouteFields<Input, Param>>>;
 
 type ClientQueryOptions<Client extends PageRemoteClient> =
   NonNullable<Parameters<Client["query"]>[1]>;
@@ -806,8 +807,13 @@ export function pageView<Param extends string = string>(
     const operation = contract as Partial<OperationContract> | undefined;
     const fields = operation?.kind === "operation" ? operation.input?.json?.properties : undefined;
     const routeInput = fields
-      ? Object.fromEntries(Object.entries(params).filter(([name]) =>
-        Object.hasOwn(fields, name) && (!merge || fields[name]?.type === "string")))
+      ? Object.fromEntries(Object.entries<string>(params).flatMap(([name, value]) => {
+        if (!Object.hasOwn(fields, name)) return [];
+        const type = fields[name]?.type;
+        if (!merge) return [[name, value]];
+        if (!["string", "number", "integer", "boolean"].includes(type)) return [];
+        return [[name, decodeInputScalar(value, type)]];
+      }))
       : params;
     const explicit = options?.params;
     const input = merge && fields && typeof explicit === "object" && explicit !== null && !Array.isArray(explicit)

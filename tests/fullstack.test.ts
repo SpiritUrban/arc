@@ -121,7 +121,7 @@ test("page operations use only route parameters declared by the contract", async
   const detail = operationContract({ id: "route.detail", input: localized, output: s.string() });
   const ranked = operationContract({
     id: "route.ranked",
-    input: s.object({ id: s.string(), rank: s.int(), limit: s.int().optional() }),
+    input: s.object({ id: s.string(), rank: s.int(), limit: s.int().optional(), active: s.boolean() }),
     output: s.string(),
   });
   const write = operationContract({ id: "route.write", input, output: s.string() });
@@ -179,6 +179,8 @@ test("page operations use only route parameters declared by the contract", async
     }));
     projectedQueries.push(scoped.query(detail, { id: "route.detail.field", input: "locale" }));
     scoped.query(ranked, { params: { rank: 7 }, key: true });
+    scoped.query(ranked, { id: "route.ranked.from-path" });
+    scoped.mutation(ranked, { id: "route.ranked.write" });
     const keyed = scoped.mutation(write, { id: "route.write.default", key: "id" });
     assert.equal(keyed.id, "route.write.default");
     assert.equal(keyed.pending("route"), false);
@@ -187,8 +189,6 @@ test("page operations use only route parameters declared by the contract", async
       keyed.pending(1);
       // @ts-expect-error The route does not supply the required locale.
       scoped.query(detail, { cache: true });
-      // @ts-expect-error The route's string rank cannot supply an integer field.
-      scoped.query(ranked);
       // @ts-expect-error An input projection still supplies required non-route fields.
       scoped.query(detail, { input: () => ({}) });
       // @ts-expect-error An ID projection leaves the required locale missing.
@@ -207,19 +207,21 @@ test("page operations use only route parameters declared by the contract", async
     });
     mutation(client, write, { params: { id: "explicit" } });
     return jsx("div", {});
-  }, { owner: "workspace", id: "route", rank: "2", limit: "10" });
+  }, { owner: "workspace", id: "route", rank: "2", limit: "10", active: "false" });
 
   assert.deepEqual(calls, [
     { id: "route" },
     { id: "route" },
     { id: "route", locale: "uk" },
-    { id: "route", rank: 7 },
+    { id: "route", rank: 7, limit: 10, active: false },
+    { id: "route", rank: 2, limit: 10, active: false },
+    { id: "route", rank: 2, limit: 10, active: false },
     { id: "route" },
     { id: "route", locale: "uk" },
     { id: "override", locale: "uk" },
     { id: "explicit" },
   ]);
-  assert.equal(page.owned?.length, 10);
+  assert.equal(page.owned?.length, 12);
   await cachedQueries[0].refresh();
   assert.ok(cacheKeys.includes("workspace"));
   assert.equal(cachedQueries[0].data(), "Ready");
