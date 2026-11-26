@@ -1,5 +1,6 @@
 import { createServer, type Server } from "node:http";
 import { Application, Fault, errorStatus } from "./core.js";
+import { mapRoutePath } from "./neutral/route-path.js";
 export function problem(e: unknown): Response {
   return Response.json(
     {
@@ -14,14 +15,10 @@ export function handler(app: Application) {
   const routes = app.routes
     .map((route) => {
       const keys: string[] = [];
-      const pattern = route.path
-        .split("/")
-        .map((part) =>
-          part.startsWith(":")
-            ? (keys.push(part.slice(1)), "([^/]+)")
-            : part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-        )
-        .join("/");
+      const pattern = mapRoutePath(route.path, (name) => {
+        keys.push(name);
+        return "([^/]+)";
+      }, (part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
       return { ...route, keys, regex: new RegExp(`^${pattern}/?$`) };
     })
     .sort((a, b) => a.keys.length - b.keys.length);
@@ -129,24 +126,27 @@ function errorResponses(errors: import("./core.js").ErrorContracts) {
 export function openapi(app: Application) {
   const paths: Record<string, any> = {};
   for (const r of app.routes) {
-    const path = r.path.replace(/:([^/]+)/g, "{$1}");
-    const pathKeys = [...r.path.matchAll(/:([^/]+)/g)].map((m) => m[1]);
+    const pathKeys = new Set<string>();
+    const path = mapRoutePath(r.path, (name) => {
+      pathKeys.add(name);
+      return `{${name}}`;
+    });
     const props = r.operation.input.json.properties ?? {};
     const parameters = Object.entries(props)
       .filter(
         ([k]) =>
-          pathKeys.includes(k) || ["GET", "DELETE", "HEAD"].includes(r.method),
+          pathKeys.has(k) || ["GET", "DELETE", "HEAD"].includes(r.method),
       )
       .map(([name, schema]) => ({
         name,
-        in: pathKeys.includes(name) ? "path" : "query",
+        in: pathKeys.has(name) ? "path" : "query",
         required:
-          pathKeys.includes(name) ||
+          pathKeys.has(name) ||
           (r.operation.input.json.required ?? []).includes(name),
         schema,
       }));
     const bodyProps = Object.fromEntries(
-      Object.entries(props).filter(([k]) => !pathKeys.includes(k)),
+      Object.entries(props).filter(([k]) => !pathKeys.has(k)),
     );
     (paths[path] ??= {})[r.method.toLowerCase()] = {
       operationId: r.operation.id,
@@ -161,7 +161,7 @@ export function openapi(app: Application) {
                     ...r.operation.input.json,
                     properties: bodyProps,
                     required: (r.operation.input.json.required ?? []).filter(
-                      (k: string) => !pathKeys.includes(k),
+                      (k: string) => !pathKeys.has(k),
                     ),
                   },
                 },

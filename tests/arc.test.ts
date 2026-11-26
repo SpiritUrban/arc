@@ -241,7 +241,9 @@ test("HTTP adapter validates input, maps errors and exports OpenAPI", async () =
     errors: { MISSING: 404 },
     run: () => error("MISSING"),
   });
-  const app = application({ routes: [http.get("/users/:id", op)] });
+  const app = application({
+    routes: [http.get("/users/:id", op), http.get("/users/by:id/:id", op)],
+  });
   await app.compile();
   await app.start();
   const fetch = handler(app);
@@ -261,6 +263,12 @@ test("HTTP adapter validates input, maps errors and exports OpenAPI", async () =
     await fetch(new Request("http://local/openapi.json"))
   ).json();
   assert.equal(spec.paths["/users/{id}"].get.parameters[0].in, "path");
+  assert.equal(spec.paths["/users/by:id/{id}"].get.parameters[0].in, "path");
+  const literalColon = await fetch(
+    new Request("http://local/users/by:id/00000000-0000-4000-8000-000000000001"),
+  );
+  assert.equal(literalColon.status, 404);
+  assert.equal((await literalColon.json()).error, "MISSING");
   await app.close();
 });
 test("Stand graph, run, saved tests, load and failure injection", async () => {

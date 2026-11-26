@@ -24,8 +24,15 @@ export function interpolateRoutePath(
   pattern: string,
   readParam: (name: string) => string | number,
 ): string {
-  return pattern.split("/").map((segment) => {
-    if (!segment.startsWith(":")) return segment;
-    return encodeURIComponent(readParam(segment.slice(1)));
-  }).join("/");
+  return mapRoutePath(pattern, (name) => encodeURIComponent(readParam(name)));
+}
+
+export function mapRoutePath(
+  pattern: string,
+  mapParam: (name: string) => string,
+  mapLiteral?: (segment: string) => string,
+): string {
+  return pattern.split("/").map((segment) =>
+    segment.startsWith(":") ? mapParam(segment.slice(1)) : (mapLiteral?.(segment) ?? segment),
+  ).join("/");
 }
