@@ -653,6 +653,7 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
       disabled: s.boolean().optional(),
       choice: s.boolean(),
       accepted: s.literal(true),
+      optionalConsent: s.literal(true).optional(),
       declined: s.literal(false),
       quantity: s.int().optional(),
       contact: s.email().optional(),
@@ -707,7 +708,7 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
   globalThis.FormData = FieldsFormData;
   try {
     const checkbox = (
-      name: "checked" | "unchecked" | "disabled" | "accepted" | "declined",
+      name: "checked" | "unchecked" | "disabled" | "accepted" | "declined" | "optionalConsent",
       checked: boolean,
       disabled = false,
     ) => ({
@@ -721,8 +722,10 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
     assert.equal(unchecked.required, undefined);
     const accepted = checkbox("accepted", true);
     const declined = checkbox("declined", false);
+    const optionalConsent = checkbox("optionalConsent", false);
     assert.equal(accepted.required, true);
     assert.equal(declined.required, undefined);
+    assert.equal(optionalConsent.required, undefined);
     assert.equal(save.field("channel").input.required, false);
     assert.equal(save.field("confirmed").input.required, true);
     assert.equal(save.field("empty").input.required, false);
@@ -732,6 +735,7 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
         unchecked,
         accepted,
         declined,
+        optionalConsent,
         checkbox("disabled", true, true),
         checkbox("checked", false, true),
         { localName: "input", type: "radio", name: "choice", matches: () => false },
@@ -754,8 +758,9 @@ test("named forms normalize blank optional fields and read enabled checkboxes", 
     validity.badInput = false;
 
     quantity = "0";
+    optionalConsent.checked = true;
     await save.submitForm!(form, { trace: { traceId: "zero-number" } });
-    assert.deepEqual(requests, [expected, { ...expected, quantity: 0 }]);
+    assert.deepEqual(requests, [expected, { ...expected, quantity: 0, optionalConsent: true }]);
 
     choice = "yes";
     await assert.rejects(save.submitForm!(form, { trace: { traceId: "invalid-boolean-choice" } }));

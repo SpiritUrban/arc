@@ -201,7 +201,7 @@ type NamedSubmission = {
 
 type NamedFieldRules = {
   numericFields: ReadonlySet<string>;
-  booleanFields: ReadonlySet<string>;
+  booleanFields: ReadonlyMap<string, boolean>;
   arrayFields: ReadonlyMap<string, ScalarInputType>;
   blankOptionalFields: ReadonlySet<string>;
   spacedLiterals: ReadonlyMap<string, string>;
@@ -257,15 +257,15 @@ function readNamedSubmission(
       (element as HTMLInputElement).type === "checkbox" &&
       booleanFields.has((element as HTMLInputElement).name),
   );
-  for (const checkbox of checkboxes) {
-    if (
-      Object.hasOwn(values, checkbox.name) &&
-      typeof values[checkbox.name] === "boolean"
-    )
-      throw new TypeError(`Expected one checkbox for form field ${checkbox.name}`);
-    values[checkbox.name] = checkbox.checked;
+  const checkboxNames = new Set<string>();
+  for (const { name, checked } of checkboxes) {
+    if (checkboxNames.has(name))
+      throw new TypeError(`Expected one checkbox for form field ${name}`);
+    checkboxNames.add(name);
+    if (!checked && booleanFields.get(name)) delete values[name];
+    else values[name] = checked;
   }
-  for (const name of booleanFields) {
+  for (const name of booleanFields.keys()) {
     const value = values[name];
     if (typeof value === "string") values[name] = decodeInputScalar(value, "boolean");
   }
@@ -613,14 +613,14 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     const?: unknown;
   }>(properties ?? {});
   const numericFields = new Set<string>();
-  const booleanFields = new Set<string>();
+  const booleanFields = new Map<string, boolean>();
   const arrayFields = new Map<string, ScalarInputType>();
   const blankOptionalFields = new Set<string>();
   const spacedLiterals = new Map<string, string>();
   for (const [name, schema] of namedSchemas) {
     const numeric = isNumericInputType(schema.type);
     if (numeric) numericFields.add(name);
-    if (schema.type === "boolean") booleanFields.add(name);
+    if (schema.type === "boolean") booleanFields.set(name, schema.optional === true && schema.const === true);
     if (schema.type === "array") {
       const itemType = schema.items?.type;
       if (isScalarInputType(itemType)) arrayFields.set(name, itemType);
