@@ -14,6 +14,7 @@ import {
 } from "@arc/framework/server";
 import { currentUser } from "../auth.ts";
 import { Order, ListOrders, GetOrder, CreateOrder, UpdateOrder, CancelOrder, isOrderActive, orderTotal } from "./contracts.ts";
+import { orderDetailPattern, ordersPath } from "./paths.ts";
 
 // Імпортований Order є схемою перевірки. Локальний тип Order описує дані після parse.
 type Order = ReturnType<typeof Order.parse>;
@@ -67,14 +68,14 @@ const ordersRepository = resource({
 });
 
 const needs = { user: currentUser, orders: ordersRepository };
-const getOrder = http.get("/orders/:id", GetOrder, {
+const getOrder = http.get(orderDetailPattern, GetOrder, {
   needs,
   async run({ input, user, orders, fail }) {
     const order = await orders.find(input.id, user.id);
     return order ? ok(order) : fail("ORDER_NOT_FOUND");
   },
 });
-const createOrder = http.post("/orders", CreateOrder, {
+const createOrder = http.post(ordersPath, CreateOrder, {
   status: 201,
   needs,
   effects: ["orders.write"],
@@ -89,7 +90,7 @@ const createOrder = http.post("/orders", CreateOrder, {
     return ok(await orders.save(order));
   },
 });
-const updateOrder = http.put("/orders/:id", UpdateOrder, {
+const updateOrder = http.put(orderDetailPattern, UpdateOrder, {
   needs,
   effects: ["orders.write"],
   async run({ input, user, orders, fail }) {
@@ -98,7 +99,7 @@ const updateOrder = http.put("/orders/:id", UpdateOrder, {
   },
 });
 
-const cancelOrder = http.post("/orders/cancel", CancelOrder, {
+const cancelOrder = http.post(`${ordersPath}/cancel`, CancelOrder, {
   needs,
   effects: ["orders.write"],
   async run({ input, user, orders, fail }) {
@@ -116,7 +117,7 @@ type OrderContext<C extends OperationContract> = HandlerContext<
 class Orders {
   @handles(ListOrders, {
     needs,
-    route: { method: "GET", path: "/orders" },
+    route: { method: "GET", path: ordersPath },
   })
   static async listOrders({ user, orders }: OrderContext<typeof ListOrders>) {
     return ok(await orders.list(user.id));

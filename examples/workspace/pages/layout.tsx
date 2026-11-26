@@ -1,4 +1,5 @@
 import type { PageLayoutContext } from "@arc/framework/web";
+import { ordersPath } from "../orders/paths.ts";
 
 export { styles } from "../styles.ts";
 export const title = "ARC Workspace — користувачі та замовлення";
@@ -18,7 +19,7 @@ export default function Layout({ children }: PageLayoutContext) {
           <a class="nav-item" href="/#users">
             <span>◎</span> Користувачі
           </a>
-          <a class="nav-item" href="/orders">
+          <a class="nav-item" href={ordersPath}>
             <span>▤</span> Замовлення
           </a>
         </nav>

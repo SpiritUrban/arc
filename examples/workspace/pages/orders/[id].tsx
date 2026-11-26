@@ -3,6 +3,7 @@ import { CancelOrder, GetOrder, UpdateOrder, isOrderActive } from "../../orders/
 import { orderClient, replaceListedOrder } from "../../orders/client.ts";
 import { OrderFields } from "../../orders/fields.tsx";
 import { orderStatus, orderStatuses, orderWriteMessage } from "../../orders/messages.ts";
+import { ordersPath } from "../../orders/paths.ts";
 import { UsersPage } from "../../users/page.tsx";
 import { editFormOptions, money } from "../../ui.ts";
 
@@ -35,7 +36,7 @@ export default function OrderDetail({ bind }: PageContext<"id">) {
 
   return (
     <section>
-      <a href="/orders">← Усі замовлення</a>
+      <a href={ordersPath}>← Усі замовлення</a>
       <h1>Деталі замовлення</h1>
       <div class="content-grid">
         <UsersPage />

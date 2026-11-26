@@ -6,6 +6,7 @@ import { activeUser } from "../user-selection.ts";
 import { cancelListedOrder, createOrder, ordersData } from "./client.ts";
 import { OrderFields } from "./fields.tsx";
 import { orderStatus, orderStatuses, orderWriteMessage } from "./messages.ts";
+import { orderDetailPath } from "./paths.ts";
 import { money, failureMessage } from "../ui.ts";
 
 function CancelOrderControl({ order }: { order: ReturnType<typeof Order.parse> }) {
@@ -159,7 +160,7 @@ export const OrdersPage = view({
                   render: (order) => (
                     <tr data-order={order.id}>
                       <td>
-                        <strong><a href={`/orders/${order.id}`}>{order.product}</a></strong>
+                        <strong><a href={orderDetailPath(order.id)}>{order.product}</a></strong>
                         <small>#{order.id.slice(0, 8)}</small>
                       </td>
                       <td>{order.quantity}</td>
