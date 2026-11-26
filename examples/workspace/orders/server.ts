@@ -9,7 +9,6 @@ import {
   ok,
   resource,
   type HandlerContext,
-  type OperationContract,
 } from "@arc/framework/server";
 import { currentUser } from "../auth.ts";
 import { Order, ListOrders, GetOrder, CreateOrder, UpdateOrder, CancelOrder, isOrderActive, orderTotal } from "./contracts.ts";
@@ -106,17 +105,12 @@ const cancelOrder = http.post(`${ordersPath}/cancel`, CancelOrder, {
   },
 });
 
-type OrderContext<C extends OperationContract> = HandlerContext<
-  C,
-  typeof needs
->;
-
 class Orders {
   @handles(ListOrders, {
     needs,
     route: { method: "GET", path: ordersPath },
   })
-  static async listOrders({ user, orders }: OrderContext<typeof ListOrders>) {
+  static async listOrders({ user, orders }: HandlerContext<typeof ListOrders, typeof needs>) {
     return ok(await orders.list(user.id));
   }
 }
