@@ -1,15 +1,15 @@
 // Браузерна частина замовлень. Зміна користувача оновлює список,
 // а надсилання форми викликає серверну операцію створення.
 import { each, render, view } from "@arc/framework/web";
-import { ListOrders, CreateOrder, CancelOrder, orderUnitPrice, quantityLimits, type Order } from "./contracts.ts";
+import { orderUnitPrice, quantityLimits, type Order } from "./contracts.ts";
 import { activeUser } from "../user-selection.ts";
-import { orderClient } from "./client.ts";
+import { cancelListedOrder, createOrder, ordersData } from "./client.ts";
 import { OrderFields } from "./fields.tsx";
 import { orderWriteMessage } from "./messages.ts";
 import { money, failureMessage } from "../ui.ts";
 
 function CancelOrderControl({ order: { id, cancelled } }: { order: ReturnType<typeof Order.parse> }) {
-  const cancel = cancelOrder.for(id);
+  const cancel = cancelListedOrder.for(id);
   return (
     <>
       {!cancelled && (
@@ -29,22 +29,7 @@ function CancelOrderControl({ order: { id, cancelled } }: { order: ReturnType<ty
   );
 }
 
-// Список і форма працюють від імені вибраного демо-користувача.
-export const ordersData = orderClient.query(ListOrders, {
-  cache: true,
-});
-
-// CreateOrder — спільний контракт. На сервері його реалізує маршрут createOrder у ./server.ts.
-export const createOrder = orderClient.mutation(CreateOrder, {
-  update: ordersData.insertBy(),
-});
-
-const cancelOrder = orderClient.mutation(CancelOrder, {
-  key: "id",
-  update: ordersData.replaceBy(),
-});
-
-export const visibleOrders = ordersData.dataOr([], "visible");
+const visibleOrders = ordersData.dataOr([], "visible");
 
 export const OrdersPage = view({
   id: "orders.page",
@@ -153,7 +138,7 @@ export const OrdersPage = view({
               </thead>
               <tbody data-rows aria-busy={ordersData.loading}>
                 {each(history, {
-                  needs: cancelOrder,
+                  needs: cancelListedOrder,
                   render: (order) => (
                     <tr data-order={order.id}>
                       <td>

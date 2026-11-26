@@ -1,10 +1,9 @@
 import { ValidationError } from "@arc/framework/core";
 import { render, type PageContext } from "@arc/framework/web";
 import { CancelOrder, GetOrder, UpdateOrder } from "../../orders/contracts.ts";
-import { orderClient } from "../../orders/client.ts";
+import { orderClient, replaceListedOrder } from "../../orders/client.ts";
 import { OrderFields } from "../../orders/fields.tsx";
 import { orderWriteMessage } from "../../orders/messages.ts";
-import { ordersData } from "../../orders/page.tsx";
 import { UsersPage } from "../../users/page.tsx";
 import { money } from "../../ui.ts";
 
@@ -13,7 +12,7 @@ export const title = "Деталі замовлення — ARC Workspace";
 export default function OrderDetail({ bind }: PageContext<"id">) {
   const { query, mutation } = bind(orderClient);
   const order = query(GetOrder);
-  const update = [order, ordersData.replaceBy()];
+  const update = [order, replaceListedOrder];
   const updateOrder = mutation(UpdateOrder, { update, resetOnSuccess: false });
   const cancelOrder = mutation(CancelOrder, { update });
 
