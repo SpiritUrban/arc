@@ -22,7 +22,7 @@
 
 `generateCases(schema)` повертає `{ label, category, value, valid }[]`: sample, boundary, edge, invalid. Для number/string враховує min/max і сусідні значення, для uuid/email — характерні malformed inputs, для object/array — варіації полів/елементів. Validity визначається через parse. Генерація детермінована; random/property-based strategy ще не реалізована. Undefined не має самостійного JSON-представлення; для HTTP використовуйте object contracts.
 
-Об’єктна схема підтримує `schema.pick(...fields)`. У Workspace `Order.pick("product", "quantity")` задає вхід створення замовлення. Вибрані поля зберігають типи, обмеження й необов’язковість, а схема відхиляє решту полів. Наприклад, `User.pick("name", "email")` задає поля для створення профілю. Контракт редагування додає `id` до свого переліку.
+Об’єктна схема підтримує `schema.pick(...fields)`. Вибрані поля зберігають типи, обмеження й необов’язковість, а схема відхиляє решту полів. Властивість `schema.keys` повертає незмінний список імен полів, включно з необов’язковими. У Workspace `UserProfile = User.pick("name", "email")` задає вхід створення профілю. Контракт редагування використовує `User.pick("id", ...UserProfile.keys)`, а форма підключає ці поля через `mutation.fieldsFor(...UserProfile.keys)`.
 
 ## operation
 

@@ -8,8 +8,7 @@ export const User = s.object({
   name: s.string({ min: 2, max: 100 }),
   email: s.email(),
 });
-export const userProfileFields = ["name", "email"] as const;
-export const UserProfile = User.pick(...userProfileFields);
+export const UserProfile = User.pick("name", "email");
 const userNotFound = { USER_NOT_FOUND: 404 } as const;
 // Сервер і браузер використовують ті самі схеми. Реалізація операцій знаходиться в server.ts.
 export const ListUsers = operationContract({
@@ -38,7 +37,7 @@ export const CreateUser = operationContract({
 
 export const UpdateUser = operationContract({
   id: "users.update",
-  input: User.pick("id", ...userProfileFields),
+  input: User.pick("id", ...UserProfile.keys),
   output: User,
   errors: { ...userNotFound, EMAIL_EXISTS: emailExists },
   expose: { web: true },

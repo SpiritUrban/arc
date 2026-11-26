@@ -17,7 +17,7 @@ export const Order = s.object({
   total: s.number({ min: 0 }),
   cancelled: s.boolean(),
 });
-export const orderFormFields = ["product", "quantity"] as const;
+export const OrderFormInput = Order.pick("product", "quantity");
 const orderIdentity = Order.pick("id");
 const orderNotFound = { ORDER_NOT_FOUND: 404 } as const;
 
@@ -45,14 +45,14 @@ export const GetOrder = operationContract({
 // Браузер передає товар і кількість. Сервер визначає власника за запитом і обчислює суму.
 export const CreateOrder = operationContract({
   id: "orders.create",
-  input: Order.pick(...orderFormFields),
+  input: OrderFormInput,
   output: Order,
   expose: { web: true },
 });
 
 export const UpdateOrder = operationContract({
   id: "orders.update",
-  input: Order.pick("id", ...orderFormFields),
+  input: Order.pick("id", ...OrderFormInput.keys),
   output: Order,
   errors: { ...orderNotFound, ORDER_ALREADY_CANCELLED: 409 },
   expose: { web: true },

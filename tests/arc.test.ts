@@ -31,6 +31,8 @@ test("schemas validate, strip no unknowns, generate valid samples", () => {
   assert.throws(() => schema.parse({ ...schema.sample(), extra: true }));
   assert.throws(() => schema.parse(null));
   const subset = schema.pick("count", "flag");
+  assert.deepEqual(subset.keys, ["count", "flag"]);
+  assert.ok(Object.isFrozen(subset.keys));
   assert.deepEqual(subset.parse(subset.sample()), { count: 1 });
   assert.deepEqual(subset.json.required, ["count"]);
   assert.deepEqual(subset.parse({ count: 3, flag: false }), { count: 3, flag: false });

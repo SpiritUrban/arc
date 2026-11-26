@@ -1,7 +1,7 @@
 import type { Infer } from "@arc/framework/core";
 import type { Mutation } from "@arc/framework/fullstack";
 import type { Signal } from "@arc/framework/web";
-import { orderFormFields, type CreateOrder } from "./contracts.ts";
+import { OrderFormInput, type CreateOrder } from "./contracts.ts";
 
 type OrderInput = Infer<typeof CreateOrder.input>;
 
@@ -12,7 +12,7 @@ interface OrderFieldsProps {
 }
 
 export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
-  const { product, quantity: quantityField } = mutation.fieldsFor(...orderFormFields);
+  const { product, quantity: quantityField } = mutation.fieldsFor(...OrderFormInput.keys);
   const { min, max } = quantityField.input;
   const quantityError = min !== undefined && max !== undefined
     ? `Введіть ціле число від ${min} до ${max}.`
