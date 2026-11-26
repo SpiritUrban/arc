@@ -9,7 +9,7 @@ import {
   ok,
   error,
 } from "@arc/framework";
-import { User, ListUsers, CreateUser, UpdateUser } from "./contracts.ts";
+import { User, ListUsers, CreateUser, UpdateUser, demoUserId } from "./contracts.ts";
 export { User } from "./contracts.ts";
 type User = ReturnType<typeof User.parse>;
 // Сховище живе в пам’яті одного запуску. Початковий запис дає Workspace демо-користувача.
@@ -19,16 +19,12 @@ export const usersRepository = resource({
   instrument: ["find", "list", "create", "update"],
   effects: ["memory.read", "memory.write"],
   open: () => {
-    const users = new Map<string, User>([
-      [
-        "00000000-0000-4000-8000-000000000001",
-        {
-          id: "00000000-0000-4000-8000-000000000001",
-          name: "Demo User",
-          email: "demo@example.com",
-        },
-      ],
-    ]);
+    const demoUser: User = {
+      id: demoUserId,
+      name: "Demo User",
+      email: "demo@example.com",
+    };
+    const users = new Map([[demoUser.id, demoUser]]);
     return {
       find: async (id: string) => users.get(id),
       list: async () => [...users.values()],

@@ -1,4 +1,7 @@
 import { s, operationContract } from "@arc/framework/core";
+
+export const demoUserId = "00000000-0000-4000-8000-000000000001";
+
 // Поля профілю мають одне визначення для output і обох write-контрактів.
 export const User = s.object({
   id: s.uuid(),
