@@ -8,7 +8,7 @@ import { discoverPageDirectory } from "./fullstack/page-directory.js";
 import { emptyRouteView, routerOutlet } from "./fullstack/router-outlet.js";
 import { layoutView, rootView } from "./neutral/page-root.js";
 import { pageParamNames } from "./neutral/page-path.js";
-import { validateContractRoutePath, type RouteParamNames } from "./neutral/route-path.js";
+import { validateContractRoutePath, type ContractRoutePath } from "./neutral/route-path.js";
 import { describeBusinessError } from "./neutral/descriptor.js";
 import {
   Schema,
@@ -205,9 +205,6 @@ export interface Route {
   status?: number;
 }
 type RouteOptions = { status?: number };
-type ContractRoutePath<Path extends string, Input> =
-  string extends Path ? Path :
-  Exclude<RouteParamNames<Path>, keyof Input> extends never ? Path : never;
 
 function routeFor(method: string) {
   function route<

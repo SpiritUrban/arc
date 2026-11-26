@@ -7,6 +7,10 @@ export type RouteParamNames<Pattern extends string> =
     ? RouteParam<Segment> | RouteParamNames<Rest>
     : RouteParam<Pattern>;
 
+export type ContractRoutePath<Path extends string, Input> =
+  string extends Path ? Path :
+  Exclude<RouteParamNames<Path>, keyof Input> extends never ? Path : never;
+
 /** Build a URL path from a route pattern and its raw parameter values. */
 export function routePath<const Pattern extends string>(
   pattern: Pattern,

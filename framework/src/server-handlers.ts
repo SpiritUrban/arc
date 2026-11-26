@@ -7,7 +7,7 @@ import {
   type Route,
 } from "./core.js";
 import type { Infer } from "./schema.js";
-import { validateContractRoutePath } from "./neutral/route-path.js";
+import { validateContractRoutePath, type ContractRoutePath } from "./neutral/route-path.js";
 
 type Handler<C extends OperationContract, N extends Needs> = Operation<
   Infer<C["input"]>,
@@ -29,12 +29,18 @@ const handlerDefinitions = new WeakMap<
 >();
 
 /** Attach a contract and explicit resource dependencies to a public static method. */
-export function handles<C extends OperationContract, N extends Needs = {}>(
+export function handles<
+  C extends OperationContract,
+  N extends Needs = {},
+  const Path extends string = string,
+>(
   contract: C,
   options: {
     needs?: N;
     effects?: string[];
-    route?: Omit<Route, "operation">;
+    route?: Omit<Route, "operation" | "path"> & {
+      path: Path & ContractRoutePath<NoInfer<Path>, Infer<NoInfer<C>["input"]>>;
+    };
   } = {},
 ) {
   return <Owner extends HandlerClass>(

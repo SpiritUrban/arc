@@ -61,6 +61,8 @@ test("routePath encodes each parameter as one URL segment", () => {
     http.get("/orders/:id", lookup, { run: ({ input }) => ok(input.id) });
     // @ts-expect-error The literal route parameter must be declared by the contract.
     http.get("/orders/:wrong", lookup, { run: () => ok("unused") });
+    // @ts-expect-error Decorated routes also require a declared input field.
+    handles(lookup, { route: { method: "GET", path: "/orders/:wrong" } });
   }
 });
 test("HTTP contract routes validate dynamically supplied parameter names", () => {
@@ -74,8 +76,9 @@ test("HTTP contract routes validate dynamically supplied parameter names", () =>
   assert.equal(bind("/orders/:id").path, "/orders/:id");
   assert.throws(() => bind("/orders/:wrong"), /parameter "wrong" is missing from lookup input/);
   assert.throws(() => {
+    const route: { method: string; path: string } = { method: "GET", path: "/orders/:wrong" };
     class Orders {
-      @handles(lookup, { route: { method: "GET", path: "/orders/:wrong" } })
+      @handles(lookup, { route })
       static get() {
         return ok("unused");
       }
