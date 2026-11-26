@@ -1,7 +1,7 @@
 // Браузерна частина замовлень. Зміна користувача оновлює список,
 // а надсилання форми викликає серверну операцію створення.
 import { each, render, view } from "@arc/framework/web";
-import { orderUnitPrice, quantityLimits, type Order } from "./contracts.ts";
+import { orderTotal, orderUnitPrice, quantityLimits, type Order } from "./contracts.ts";
 import { activeUser } from "../user-selection.ts";
 import { cancelListedOrder, createOrder, ordersData } from "./client.ts";
 import { OrderFields } from "./fields.tsx";
@@ -82,7 +82,7 @@ export const OrdersPage = view({
           <div class="form-footer">
             <span>
               Підсумок{" "}
-              <strong data-preview>{money((Number(quantity()) || 0) * orderUnitPrice)}</strong>
+              <strong data-preview>{money(orderTotal(Number(quantity()) || 0))}</strong>
             </span>
             <span>Для вибраного користувача</span>
           </div>

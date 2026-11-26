@@ -1,6 +1,11 @@
 import { s, operationContract } from "@arc/framework/core";
 
 export const orderUnitPrice = 25;
+
+export function orderTotal(quantity: number): number {
+  return quantity * orderUnitPrice;
+}
+
 export const productMaxLength = 100;
 export const quantityLimits = { min: 1, max: 100 } as const;
 // Схема відповіді містить згенерований ID, власника та обчислену сервером суму.
