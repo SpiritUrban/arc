@@ -558,6 +558,7 @@ test("mutation field validation shares one reactive value per field", async () =
     input: s.object({
       quantity: s.int({ min: 0.5, max: 9.5 }),
       price: s.number({ min: 0.25 }).optional(),
+      rate: s.literal(0.25).optional(),
       email: s.email().optional(),
       title: s.string({ max: 80 }).optional(),
     }),
@@ -602,6 +603,11 @@ test("mutation field validation shares one reactive value per field", async () =
     assert.equal(price.required, false);
     assert.equal(price.min, 0.25);
     assert.equal(price.step, "any");
+    const { input: rate } = save.field("rate");
+    assert.equal(rate.type, "number");
+    assert.equal(rate.min, 0.25);
+    assert.equal(rate.max, 0.25);
+    assert.equal(rate.step, "any");
     assert.equal(email.input.type, "email");
     assert.equal(email.invalid, save.field("email").invalid);
     const messages = { invalid: "Invalid email", failed: "Email exists" };

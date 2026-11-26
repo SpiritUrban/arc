@@ -550,12 +550,15 @@ function fieldInputAttributes(
   }
   if (isNumericInputType(field?.type)) {
     const integer = field.type === "integer";
+    const constant = typeof field.const === "number" ? field.const : undefined;
+    const minimum = constant ?? field.minimum;
+    const maximum = constant ?? field.maximum;
     return {
       ...input,
       type: "number",
       required,
-      min: integer && field.minimum !== undefined ? Math.ceil(field.minimum) : field.minimum,
-      max: integer && field.maximum !== undefined ? Math.floor(field.maximum) : field.maximum,
+      min: integer && minimum !== undefined ? Math.ceil(minimum) : minimum,
+      max: integer && maximum !== undefined ? Math.floor(maximum) : maximum,
       step: integer ? 1 : "any",
     };
   }
