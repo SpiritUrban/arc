@@ -8,6 +8,7 @@ import {
   http,
   ok,
   resource,
+  type Fail,
   type HandlerContext,
 } from "@arc/framework/server";
 import { currentUser } from "../auth.ts";
@@ -17,6 +18,12 @@ import { orderDetailPattern, ordersPath } from "./paths.ts";
 // Імпортований Order є схемою перевірки. Локальний тип Order описує дані після parse.
 type Order = ReturnType<typeof Order.parse>;
 type OrderEdit = ReturnType<typeof UpdateOrder.input.parse>;
+type OrderChange = "ORDER_NOT_FOUND" | { order: Order; alreadyCancelled: boolean };
+
+function orderChangeResult(result: OrderChange, fail: Fail<typeof UpdateOrder.errors>) {
+  if (typeof result === "string") return fail(result);
+  return result.alreadyCancelled ? fail("ORDER_ALREADY_CANCELLED", result.order) : ok(result.order);
+}
 
 // Типовий scope ресурсу — application. ARC створює один масив у open,
 // а методи працюють із ним під час усіх запитів цього запуску.
@@ -47,10 +54,10 @@ const ordersRepository = resource({
         const index = findOrderIndex(id, userId);
         if (index < 0) return "ORDER_NOT_FOUND" as const;
         const current = orders[index];
-        if (!isOrderActive(current)) return "ORDER_ALREADY_CANCELLED" as const;
+        if (!isOrderActive(current)) return { order: current, alreadyCancelled: true };
         const order = { ...current, ...changes, total: orderTotal(changes.quantity) };
         orders[index] = order;
-        return order;
+        return { order, alreadyCancelled: false };
       },
       async cancel(id: string, userId: string) {
         const index = findOrderIndex(id, userId);
@@ -85,7 +92,7 @@ const updateOrder = http.put(orderDetailPattern, UpdateOrder, {
   ...orderWrite,
   async run({ input, user, orders, fail }) {
     const result = await orders.update(input, user.id);
-    return typeof result === "string" ? fail(result) : ok(result);
+    return orderChangeResult(result, fail);
   },
 });
 
@@ -93,8 +100,7 @@ const cancelOrder = http.post(`${ordersPath}/cancel`, CancelOrder, {
   ...orderWrite,
   async run({ input, user, orders, fail }) {
     const result = await orders.cancel(input.id, user.id);
-    if (typeof result === "string") return fail(result);
-    return result.alreadyCancelled ? fail("ORDER_ALREADY_CANCELLED", result.order) : ok(result.order);
+    return orderChangeResult(result, fail);
   },
 });
 

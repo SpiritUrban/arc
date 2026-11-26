@@ -20,6 +20,10 @@ export const Order = s.object({
 export const OrderFormInput = Order.pick("product", "quantity");
 const orderIdentity = Order.pick("id");
 const orderNotFound = { ORDER_NOT_FOUND: 404 } as const;
+const orderChangeErrors = {
+  ...orderNotFound,
+  ORDER_ALREADY_CANCELLED: { status: 409, details: Order, updateFromDetails: true },
+} as const;
 
 export function isOrderActive(order: { cancelled: boolean } | undefined): boolean {
   return order?.cancelled === false;
@@ -54,7 +58,7 @@ export const UpdateOrder = operationContract({
   id: "orders.update",
   input: Order.pick("id", OrderFormInput),
   output: Order,
-  errors: { ...orderNotFound, ORDER_ALREADY_CANCELLED: 409 },
+  errors: orderChangeErrors,
   expose: { web: true },
 });
 
@@ -62,9 +66,6 @@ export const CancelOrder = operationContract({
   id: "orders.cancel",
   input: orderIdentity,
   output: Order,
-  errors: {
-    ...orderNotFound,
-    ORDER_ALREADY_CANCELLED: { status: 409, details: Order, updateFromDetails: true },
-  },
+  errors: orderChangeErrors,
   expose: { web: true },
 });

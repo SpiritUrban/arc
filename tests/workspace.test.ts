@@ -132,6 +132,26 @@ test("Workspace order edit carries the submit trace to the server operation in S
       ["orders.list.query", started.spanId],
       [detailQuery, started.spanId],
     ]);
+    const cancelledElsewhere = await handler(app)(new Request("http://localhost/orders/cancel", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer 00000000-0000-4000-8000-000000000001",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ id }),
+    }));
+    assert.equal(cancelledElsewhere.status, 200);
+    const staleForm = document.querySelector("[data-edit-order]")!;
+    const staleFields = [...staleForm.querySelectorAll<HTMLInputElement>("input[name]")];
+    if (staleForm !== form) Object.defineProperty(staleForm, "elements", { value: staleFields });
+    staleForm.querySelector<HTMLInputElement>('input[name="product"]')!.value = "Stale change";
+    staleForm.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+    await waitFor(() =>
+      document.querySelector("[data-edit-order-error]")?.textContent?.includes("Скасоване замовлення не можна редагувати.") === true,
+    "edit conflict remains visible after the cancelled snapshot is applied");
+    assert.equal(document.querySelector("[data-edit-order]"), null);
+    assert.equal(document.querySelector("[data-order-detail] h2")?.textContent, "Revised notebook");
+    assert.match(document.querySelector("[data-order-detail]")!.textContent!, /Скасовано/);
     const outletIds = ["router-outlet:root", "router-outlet:/", "router-outlet:/orders"];
     for (const id of outletIds) {
       assert.ok(bundle.manifest.partitions?.browser.includes(id));
@@ -787,6 +807,7 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     assert.deepEqual(Object.keys(updateSpec.responses), ["200", "404", "409"]);
     const cancelResponses = api.paths["/orders/cancel"].post.responses;
     const conflictSchema = cancelResponses[duplicate.status].content["application/json"].schema;
+    assert.deepEqual(updateSpec.responses["409"], cancelResponses["409"]);
     assert.deepEqual(conflictSchema.required, ["ok", "error", "details"]);
     assert.equal(conflictSchema.properties.error.const, conflict.error);
     assert.deepEqual(conflictSchema.properties.details, cancelResponses["200"].content["application/json"].schema);

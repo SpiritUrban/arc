@@ -59,15 +59,15 @@ export default function OrderDetail({ bind }: PageContext<RouteParamNames<typeof
               <button class="button primary" type="submit">
                 {render.when(updateOrder.running, "Зберігаємо…", "Зберегти зміни")}
               </button>
-              <p class="error" role="alert">
-                {updateOrder.invalid() ? "" : orderWriteMessage(
-                  updateOrder(),
-                  "Скасоване замовлення не можна редагувати.",
-                  "Не вдалося зберегти замовлення.",
-                )}
-              </p>
             </form>
           )}
+          <p class="error" role="alert" data-edit-order-error>
+            {order.data() && !updateOrder.invalid() ? orderWriteMessage(
+              updateOrder(),
+              "Скасоване замовлення не можна редагувати.",
+              "Не вдалося зберегти замовлення.",
+            ) : ""}
+          </p>
         </section>
       </div>
     </section>
