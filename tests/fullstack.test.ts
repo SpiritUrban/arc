@@ -577,9 +577,16 @@ test("mutation field validation shares one reactive value per field", async () =
     }
     assert.equal(save.invalidField("quantity"), invalid);
     const { quantity, email } = save.fieldsFor("quantity", "email");
+    const selection = s.object({ quantity: s.string(), email: s.string() });
+    const selected = save.fieldsFor(selection);
+    assert.deepEqual(Object.keys(selected), ["quantity", "email"]);
+    assert.deepEqual(selected.quantity.input, quantity.input);
+    assert.equal(selected.email.invalid, email.invalid);
     if (false) {
       // @ts-expect-error Only contract input fields can be requested.
       save.fieldsFor("quantity", "missing");
+      // @ts-expect-error A selector can only name fields from the mutation input.
+      save.fieldsFor(s.object({ missing: s.string() }));
     }
     assert.equal(quantity.invalid, invalid);
     assert.deepEqual(quantity.input, {
@@ -614,6 +621,7 @@ test("mutation field validation shares one reactive value per field", async () =
     assert.equal(email.invalid(), true);
     assert.equal(email.failed(), true);
     assert.equal(email.errorMessage(messages), "Email exists");
+    assert.equal(selected.email.errorMessage(messages), "Email exists");
     assert.equal(email.errorMessage(sharedMessage), sharedMessage);
     assert.equal(email.errorMessage({ invalid: "Invalid email" }), undefined);
     assert.equal(quantity.failed(), false);
