@@ -1,18 +1,18 @@
 // Браузерна частина замовлень. Зміна користувача оновлює список,
 // а надсилання форми викликає серверну операцію створення.
 import { each, render, view } from "@arc/framework/web";
-import { orderTotal, orderUnitPrice, quantityLimits, type Order } from "./contracts.ts";
+import { isOrderActive, orderTotal, orderUnitPrice, quantityLimits, type Order } from "./contracts.ts";
 import { activeUser } from "../user-selection.ts";
 import { cancelListedOrder, createOrder, ordersData } from "./client.ts";
 import { OrderFields } from "./fields.tsx";
 import { orderStatus, orderStatuses, orderWriteMessage } from "./messages.ts";
 import { money, failureMessage } from "../ui.ts";
 
-function CancelOrderControl({ order: { id, cancelled } }: { order: ReturnType<typeof Order.parse> }) {
-  const cancel = cancelListedOrder.for(id);
+function CancelOrderControl({ order }: { order: ReturnType<typeof Order.parse> }) {
+  const cancel = cancelListedOrder.for(order.id);
   return (
     <>
-      {!cancelled && (
+      {isOrderActive(order) && (
         <button
           class="button secondary"
           type="button"

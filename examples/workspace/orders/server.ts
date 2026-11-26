@@ -13,7 +13,7 @@ import {
   type OperationContract,
 } from "@arc/framework/server";
 import { currentUser } from "../auth.ts";
-import { Order, ListOrders, GetOrder, CreateOrder, UpdateOrder, CancelOrder, orderTotal } from "./contracts.ts";
+import { Order, ListOrders, GetOrder, CreateOrder, UpdateOrder, CancelOrder, isOrderActive, orderTotal } from "./contracts.ts";
 
 // Імпортований Order є схемою перевірки. Локальний тип Order описує дані після parse.
 type Order = ReturnType<typeof Order.parse>;
@@ -47,8 +47,9 @@ const ordersRepository = resource({
       async update({ id, ...changes }: OrderEdit, userId: string) {
         const index = findOrderIndex(id, userId);
         if (index < 0) return "ORDER_NOT_FOUND" as const;
-        if (orders[index].cancelled) return "ORDER_ALREADY_CANCELLED" as const;
-        const order = { ...orders[index], ...changes, total: orderTotal(changes.quantity) };
+        const current = orders[index];
+        if (!isOrderActive(current)) return "ORDER_ALREADY_CANCELLED" as const;
+        const order = { ...current, ...changes, total: orderTotal(changes.quantity) };
         orders[index] = order;
         return order;
       },
@@ -56,7 +57,7 @@ const ordersRepository = resource({
         const index = findOrderIndex(id, userId);
         if (index < 0) return "ORDER_NOT_FOUND" as const;
         const current = orders[index];
-        if (current.cancelled) return { order: current, alreadyCancelled: true } as const;
+        if (!isOrderActive(current)) return { order: current, alreadyCancelled: true } as const;
         const order = { ...current, cancelled: true };
         orders[index] = order;
         return { order, alreadyCancelled: false } as const;

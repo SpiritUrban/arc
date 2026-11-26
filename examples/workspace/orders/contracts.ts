@@ -19,6 +19,10 @@ export const Order = s.object({
 });
 export const orderFormFields = ["product", "quantity"] as const;
 
+export function isOrderActive(order: { cancelled: boolean } | undefined): boolean {
+  return order?.cancelled === false;
+}
+
 // ID зв’язує браузерний клієнт із серверною реалізацією. expose.web відкриває
 // операцію для внутрішнього HTTP-транспорту ARC.
 export const ListOrders = operationContract({

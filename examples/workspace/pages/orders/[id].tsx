@@ -1,6 +1,6 @@
 import { ValidationError } from "@arc/framework/core";
 import { render, type PageContext } from "@arc/framework/web";
-import { CancelOrder, GetOrder, UpdateOrder } from "../../orders/contracts.ts";
+import { CancelOrder, GetOrder, UpdateOrder, isOrderActive } from "../../orders/contracts.ts";
 import { orderClient, replaceListedOrder } from "../../orders/client.ts";
 import { OrderFields } from "../../orders/fields.tsx";
 import { orderStatus, orderStatuses, orderWriteMessage } from "../../orders/messages.ts";
@@ -23,7 +23,7 @@ export default function OrderDetail({ bind }: PageContext<"id">) {
         <p>Кількість {saved.quantity}</p>
         <p>Сума {money(saved.total)}</p>
         <p>{orderStatuses[orderStatus(saved)].label}</p>
-        {!saved.cancelled && (
+        {isOrderActive(saved) && (
           <form onSubmit={cancelOrder}>
             <button class="button secondary" type="submit">
               {render.when(cancelOrder.running, "Скасовуємо…", "Скасувати замовлення")}
@@ -51,7 +51,7 @@ export default function OrderDetail({ bind }: PageContext<"id">) {
               () => "Не вдалося скасувати замовлення.",
             )}
           </p>
-          {order.data()?.cancelled === false && (
+          {isOrderActive(order.data()) && (
             <form data-edit-order novalidate onSubmit={updateOrder}>
               <h2>Редагувати замовлення</h2>
               <OrderFields mutation={updateOrder} order={order.data} />
