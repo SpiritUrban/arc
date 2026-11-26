@@ -6,6 +6,7 @@ import { generateCases } from "./generator.js";
 import { runLoad, findBreakingPoint, type LoadOutcome } from "./load.js";
 import { runTestSpec, type StandTestSpec } from "./test-spec.js";
 import { interpolateRoutePath } from "./neutral/route-path.js";
+import { acceptsJsonBody } from "./neutral/http-method.js";
 import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
 import { dirname } from "node:path";
 export interface StandOptions {
@@ -200,7 +201,8 @@ export function stand(app: Application, options: StandOptions = {}) {
           );
           if (body.mode === "network" && !options.networkBaseUrl)
             throw new Fault("NETWORK_BASE_NOT_CONFIGURED", 400);
-          if (["GET", "DELETE", "HEAD"].includes(route.method))
+          const hasBody = acceptsJsonBody(route.method);
+          if (!hasBody)
             for (const [k, v] of Object.entries(values))
               target.searchParams.set(k, String(v));
           const req = new Request(target, {
@@ -212,7 +214,7 @@ export function stand(app: Application, options: StandOptions = {}) {
                 ? { authorization: body.authorization }
                 : {}),
             },
-            ...(!["GET", "DELETE", "HEAD"].includes(route.method)
+            ...(hasBody
               ? { body: JSON.stringify(values) }
               : {}),
           });

@@ -1,6 +1,7 @@
 import { createServer, type Server } from "node:http";
 import { Application, Fault, errorStatus } from "./core.js";
 import { mapRoutePath } from "./neutral/route-path.js";
+import { acceptsJsonBody } from "./neutral/http-method.js";
 export function problem(e: unknown): Response {
   return Response.json(
     {
@@ -32,7 +33,7 @@ export function handler(app: Application) {
         const match = route.regex.exec(url.pathname);
         if (!match) continue;
         let body: Record<string, unknown> = {};
-        if (!["GET", "HEAD", "DELETE"].includes(request.method)) {
+        if (acceptsJsonBody(request.method)) {
           if (
             !request.headers.get("content-type")?.includes("application/json")
           )
@@ -126,6 +127,7 @@ function errorResponses(errors: import("./core.js").ErrorContracts) {
 export function openapi(app: Application) {
   const paths: Record<string, any> = {};
   for (const r of app.routes) {
+    const hasBody = acceptsJsonBody(r.method);
     const pathKeys = new Set<string>();
     const path = mapRoutePath(r.path, (name) => {
       pathKeys.add(name);
@@ -135,7 +137,7 @@ export function openapi(app: Application) {
     const parameters = Object.entries(props)
       .filter(
         ([k]) =>
-          pathKeys.has(k) || ["GET", "DELETE", "HEAD"].includes(r.method),
+          pathKeys.has(k) || !hasBody,
       )
       .map(([name, schema]) => ({
         name,
@@ -151,7 +153,7 @@ export function openapi(app: Application) {
     (paths[path] ??= {})[r.method.toLowerCase()] = {
       operationId: r.operation.id,
       parameters,
-      ...(!["GET", "DELETE", "HEAD"].includes(r.method)
+      ...(hasBody
         ? {
             requestBody: {
               required: true,

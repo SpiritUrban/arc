@@ -763,6 +763,12 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     returningOrders.release();
     returningOrders = undefined;
     await waitFor(() => document.querySelector("[data-loading]")!.textContent === "");
+    const api = await (await fetch(`${origin}/openapi.json`)).json();
+    const updateSpec = api.paths["/orders/{id}"].put;
+    assert.deepEqual(updateSpec.parameters.map(({ name, in: location }: { name: string; in: string }) =>
+      [name, location]), [["id", "path"]]);
+    assert.deepEqual(updateSpec.requestBody.content["application/json"].schema.required, ["product", "quantity"]);
+    assert.deepEqual(Object.keys(updateSpec.responses), ["200", "404", "409"]);
     const createdOverRest = await handler(app)(
       new Request("http://localhost/orders", {
         method: "POST",
