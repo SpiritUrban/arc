@@ -126,6 +126,6 @@ class Orders {
 
 const listOrders = handlerModule("orders", Orders);
 export const orders = module({
-  ...listOrders,
+  id: listOrders.id,
   routes: [getOrder, createOrder, updateOrder, cancelOrder, ...(listOrders.routes ?? [])],
 });
