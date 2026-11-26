@@ -35,15 +35,15 @@ export const OrdersPage = view({
   id: "orders.page",
   state: { quantity: String(quantityLimits.min), search: "", status: "all" },
   template({ quantity, search, status }, { derive }) {
-    const history = derive([visibleOrders, search, status], (orders, search, status) => {
-      const term = search.trim().toLowerCase();
-      return orders.filter((order) =>
+    const searchTerm = derive([search], (search) => search.trim().toLowerCase());
+    const history = derive([visibleOrders, searchTerm, status], (orders, term, status) =>
+      orders.filter((order) =>
         order.product.toLowerCase().includes(term) &&
         (status === "all" || orderStatus(order) === status),
-      );
-    });
-    const filtering = derive([search, status], (search, status) =>
-      search.trim() !== "" || status !== "all",
+      ),
+    );
+    const filtering = derive([searchTerm, status], (term, status) =>
+      term !== "" || status !== "all",
     );
 
     return (

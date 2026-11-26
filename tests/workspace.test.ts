@@ -501,6 +501,17 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       document.querySelector("[data-rows] strong")!.textContent,
       "ARC Notebook",
     );
+    const notebookVisible = () => document.querySelector("[data-rows]")!.textContent!.includes("ARC Notebook");
+    const noMatches = () =>
+      document.querySelector("[data-empty]")?.textContent?.includes("Замовлень не знайдено") === true;
+    input("[data-order-search]", "  missing  ");
+    await waitFor(noMatches);
+    input("[data-order-search]", "  NOTEBOOK  ");
+    await waitFor(notebookVisible);
+    input("[data-order-search]", "  missing  ");
+    await waitFor(noMatches);
+    input("[data-order-search]", "   ");
+    await waitFor(notebookVisible);
     const userId = document.querySelector('[data-user][aria-pressed="true"]')!.getAttribute("data-user");
     const ordersResponse = await handler(app)(
       new Request("http://localhost/orders", {
