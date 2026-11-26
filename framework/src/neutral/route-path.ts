@@ -11,12 +11,14 @@ export type ContractRoutePath<Path extends string, Input> =
   string extends Path ? Path :
   Exclude<RouteParamNames<Path>, keyof Input> extends never ? Path : never;
 
+type RouteParamValue = string | number | boolean;
+
 /** Build a URL path from a route pattern and its raw parameter values. */
 export function routePath<const Pattern extends string>(
   pattern: Pattern,
-  params: Record<RouteParamNames<Pattern>, string | number>,
+  params: Record<RouteParamNames<Pattern>, RouteParamValue>,
 ): string {
-  const values: Readonly<Record<string, string | number | undefined>> = params;
+  const values: Readonly<Record<string, RouteParamValue | undefined>> = params;
   return interpolateRoutePath(pattern, (name) => {
     const value = Object.hasOwn(values, name) ? values[name] : undefined;
     if (value === undefined || value === "") {
@@ -28,7 +30,7 @@ export function routePath<const Pattern extends string>(
 
 export function interpolateRoutePath(
   pattern: string,
-  readParam: (name: string) => string | number,
+  readParam: (name: string) => RouteParamValue,
 ): string {
   return mapRoutePath(pattern, (name) => encodeURIComponent(readParam(name)));
 }
