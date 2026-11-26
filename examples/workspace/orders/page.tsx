@@ -46,8 +46,20 @@ export const OrdersPage = view({
         (status === "all" || orderStatus(order) === status),
       ),
     );
-    const filtering = derive([searchTerm, status], (term, status) =>
-      term !== "" || status !== "all",
+    const emptyHistory = derive(
+      [history, ordersData.loading, searchTerm, status],
+      (orders, loading, term, status) => {
+        if (loading || orders.length > 0) return undefined;
+        return term !== "" || status !== "all"
+          ? {
+              title: "Замовлень не знайдено",
+              description: "Змініть пошук або статус замовлення.",
+            }
+          : {
+              title: "Тут з’являться замовлення",
+              description: "Створіть перше замовлення для цього користувача.",
+            };
+      },
     );
 
     return (
@@ -164,21 +176,13 @@ export const OrdersPage = view({
               </tbody>
             </table>
           </div>
-          {history().length === 0 && !ordersData.loading() && (
+          {render.present(emptyHistory, ({ title, description }) => (
             <div class="empty order-empty" data-empty>
               <span class="empty-symbol">▤</span>
-              <strong>
-                {filtering()
-                  ? "Замовлень не знайдено"
-                  : "Тут з’являться замовлення"}
-              </strong>
-              <p>
-                {filtering()
-                  ? "Змініть пошук або статус замовлення."
-                  : "Створіть перше замовлення для цього користувача."}
-              </p>
+              <strong>{title}</strong>
+              <p>{description}</p>
             </div>
-          )}
+          ))}
         </div>
       </section>
     );
