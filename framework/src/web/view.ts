@@ -1,6 +1,6 @@
 import { compileArchitecture, type GraphDefinition } from "../neutral/graph.js";
 import type { OperationContract } from "../neutral/contracts.js";
-import { decodeInputScalar } from "../neutral/input-scalar.js";
+import { decodeInputScalar, isScalarInputType } from "../neutral/input-scalar.js";
 import type { Infer } from "../schema.js";
 import type {
   FieldKeyMutationOptions,
@@ -810,7 +810,7 @@ export function pageView<Param extends string = string>(
       ? Object.fromEntries(Object.entries<string>(params).flatMap(([name, value]) => {
         if (!Object.hasOwn(fields, name)) return [];
         const type = fields[name]?.type;
-        if (merge && !["string", "number", "integer", "boolean"].includes(type)) return [];
+        if (merge && !isScalarInputType(type)) return [];
         return [[name, decodeInputScalar(value, type)]];
       }))
       : params;

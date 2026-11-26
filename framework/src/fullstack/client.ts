@@ -4,6 +4,7 @@ import {
   type BusinessError,
 } from "../neutral/contracts.js";
 import { ValidationError, type Infer, type Schema } from "../schema.js";
+import { isNumericInputType } from "../neutral/input-scalar.js";
 import { formValue } from "../web/form-value.js";
 import { withEventTrigger } from "../web/event-trigger.js";
 import { reactiveAttribute } from "../web/jsx-runtime.js";
@@ -229,7 +230,7 @@ function readNamedSubmission(
       const valuesForField =
         (values[name] as (string | number)[] | undefined) ?? [];
       valuesForField.push(
-        readNamedFormText(value, arrayItemType === "number" || arrayItemType === "integer"),
+        readNamedFormText(value, isNumericInputType(arrayItemType)),
       );
       values[name] = valuesForField;
       continue;
@@ -528,7 +529,7 @@ function fieldInputAttributes(
       maxlength: field.maxLength,
     };
   }
-  if (field?.type === "number" || field?.type === "integer") {
+  if (isNumericInputType(field?.type)) {
     const integer = field.type === "integer";
     return {
       ...input,
@@ -593,7 +594,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
   }>(properties ?? {});
   const numericFields = new Set(
     namedSchemas
-      .filter(([, schema]) => schema.type === "number" || schema.type === "integer")
+      .filter(([, schema]) => isNumericInputType(schema.type))
       .map(([name]) => name),
   );
   const booleanFields = new Set(
@@ -605,7 +606,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     namedSchemas
       .filter(([, schema]) =>
         schema.type === "array" &&
-        ["string", "number", "integer"].includes(schema.items?.type ?? ""),
+        (schema.items?.type === "string" || isNumericInputType(schema.items?.type)),
       )
       .map(([name, schema]) => [name, schema.items!.type!]),
   );
