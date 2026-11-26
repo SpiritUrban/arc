@@ -25,13 +25,15 @@ export const usersRepository = resource({
       email: "demo@example.com",
     };
     const users = new Map([[demoUser.id, demoUser]]);
+    const emailExists = (email: string, exceptId?: string) =>
+      [...users.values()].some((user) => user.email === email && user.id !== exceptId);
+
     return {
       find: async (id: string) => users.get(id),
       list: async () => [...users.values()],
       // Пошту перевіряємо серед записів. undefined дає операції сигнал повернути EMAIL_EXISTS.
       create: async (name: string, email: string) => {
-        if ([...users.values()].some((u) => u.email === email))
-          return undefined;
+        if (emailExists(email)) return undefined;
         const user = { id: randomUUID(), name, email };
         users.set(user.id, user);
         return user;
@@ -39,8 +41,7 @@ export const usersRepository = resource({
       update: async (id: string, name: string, email: string) => {
         const current = users.get(id);
         if (!current) return "USER_NOT_FOUND" as const;
-        if ([...users.values()].some((user) => user.id !== id && user.email === email))
-          return "EMAIL_EXISTS" as const;
+        if (emailExists(email, id)) return "EMAIL_EXISTS" as const;
         const user = { id, name, email };
         users.set(id, user);
         return user;
