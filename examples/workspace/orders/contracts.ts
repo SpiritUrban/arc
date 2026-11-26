@@ -17,6 +17,7 @@ export const Order = s.object({
   total: s.number({ min: 0 }),
   cancelled: s.boolean(),
 });
+export const orderFormFields = ["product", "quantity"] as const;
 
 // ID зв’язує браузерний клієнт із серверною реалізацією. expose.web відкриває
 // операцію для внутрішнього HTTP-транспорту ARC.
@@ -38,14 +39,14 @@ export const GetOrder = operationContract({
 // Браузер передає товар і кількість. Сервер визначає власника за запитом і обчислює суму.
 export const CreateOrder = operationContract({
   id: "orders.create",
-  input: Order.pick("product", "quantity"),
+  input: Order.pick(...orderFormFields),
   output: Order,
   expose: { web: true },
 });
 
 export const UpdateOrder = operationContract({
   id: "orders.update",
-  input: Order.pick("id", "product", "quantity"),
+  input: Order.pick("id", ...orderFormFields),
   output: Order,
   errors: { ORDER_NOT_FOUND: 404, ORDER_ALREADY_CANCELLED: 409 },
   expose: { web: true },
