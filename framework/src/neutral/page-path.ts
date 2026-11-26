@@ -1,4 +1,4 @@
-import { routeParameterName } from "./route-path.js";
+import { decodeRouteParams, routeParameterName } from "./route-path.js";
 
 export { routeParameterNames as pageParamNames } from "./route-path.js";
 
@@ -14,14 +14,14 @@ export function matchPagePath(pattern: string, pathname: string): Record<string,
       if (part !== segment) return;
     } else {
       if (!segment) return;
-      try {
-        params.push([name, decodeURIComponent(segment)]);
-      } catch {
-        return;
-      }
+      params.push([name, segment]);
     }
   }
-  return Object.fromEntries(params);
+  try {
+    return decodeRouteParams(params);
+  } catch {
+    return;
+  }
 }
 
 export function comparePagePaths(left: string, right: string) {

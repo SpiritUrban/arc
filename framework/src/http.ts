@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:http";
 import { Application, Fault, errorDetailsSchema, errorStatus } from "./core.js";
-import { mapRoutePath } from "./neutral/route-path.js";
+import { decodeRouteParams, mapRoutePath } from "./neutral/route-path.js";
 import { acceptsJsonBody } from "./neutral/http-method.js";
 
 function httpInputValue(value: string, type: unknown): string | number | boolean {
@@ -60,15 +60,15 @@ export function handler(app: Application) {
             name, httpInputValue(value, properties[name]?.type),
           ]),
         );
-        const params = Object.fromEntries(
-          route.keys.map((k, i) => {
-            try {
-              return [k, httpInputValue(decodeURIComponent(match[i + 1]), properties[k]?.type)];
-            } catch {
-              throw new Fault("INVALID_PATH", 400);
-            }
-          }),
-        );
+        let decoded: Record<string, string>;
+        try {
+          decoded = decodeRouteParams(route.keys.map((name, index) => [name, match[index + 1]]));
+        } catch {
+          throw new Fault("INVALID_PATH", 400);
+        }
+        const params = Object.fromEntries(Object.entries(decoded).map(([name, value]) => [
+          name, httpInputValue(value, properties[name]?.type),
+        ]));
         const result = await app.execute(
           route.operation.id,
           { ...body, ...query, ...params },

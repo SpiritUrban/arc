@@ -62,6 +62,19 @@ export function routeParameterNames(pattern: string): string[] {
   return pattern.split("/").map(routeParameterName).filter((name) => name !== undefined);
 }
 
+export function decodeRouteParams(entries: Iterable<readonly [string, string]>): Record<string, string> {
+  const params = new Map<string, string>();
+  for (const [name, segment] of entries) {
+    const value = decodeURIComponent(segment);
+    const previous = params.get(name);
+    if (previous !== undefined && previous !== value) {
+      throw new URIError(`Conflicting route parameter: ${name}`);
+    }
+    params.set(name, value);
+  }
+  return Object.fromEntries(params);
+}
+
 export function validateContractRoutePath(path: string, contract: OperationContract): void {
   const properties = contract.input.json.properties ?? {};
   for (const name of routeParameterNames(path)) {

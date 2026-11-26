@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { operationContract, routePath } from "@arc/framework/core";
 import { handles } from "../framework/src/server-handlers.ts";
+import { matchPagePath } from "../framework/src/neutral/page-path.ts";
 import {
   application,
   operation,
@@ -320,7 +321,7 @@ test("HTTP adapter validates input, maps errors and exports OpenAPI", async () =
   await app.close();
 });
 test("HTTP converts scalar path and query parameters using the input schema", async () => {
-  const pattern = "/search/:id/:active";
+  const pattern = "/search/:id/:active/:id";
   const input = s.object({ id: s.int(), active: s.boolean(), limit: s.int() });
   const search = operationContract({ id: "search", input, output: input });
   const app = application({
@@ -334,8 +335,14 @@ test("HTTP converts scalar path and query parameters using the input schema", as
     const result = await fetch(new Request(`http://local${path}?id=99&limit=3`));
     assert.equal(result.status, 200);
     assert.deepEqual(await result.json(), { id: 12, active: false, limit: 3 });
-    const invalid = await fetch(new Request("http://local/search/%20/no?limit=3"));
+    const invalid = await fetch(new Request("http://local/search/%20/no/%20?limit=3"));
     assert.equal(invalid.status, 400);
+    const conflictPath = "/search/12/false/13";
+    const conflict = await fetch(new Request(`http://local${conflictPath}?limit=3`));
+    assert.equal(conflict.status, 400);
+    assert.equal((await conflict.json()).error, "INVALID_PATH");
+    assert.equal(matchPagePath(pattern, conflictPath), undefined);
+    assert.deepEqual(matchPagePath(pattern, "/search/12/false/%31%32"), { id: "12", active: "false" });
   } finally {
     await app.close();
   }
