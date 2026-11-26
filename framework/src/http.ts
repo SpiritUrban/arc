@@ -2,6 +2,13 @@ import { createServer, type Server } from "node:http";
 import { Application, Fault, errorDetailsSchema, errorStatus } from "./core.js";
 import { mapRoutePath } from "./neutral/route-path.js";
 import { acceptsJsonBody } from "./neutral/http-method.js";
+
+function httpInputValue(value: string, type: unknown): string | number | boolean {
+  if ((type === "number" || type === "integer") && value.trim() !== "") return Number(value);
+  if (type === "boolean" && (value === "true" || value === "false")) return value === "true";
+  return value;
+}
+
 export function problem(e: unknown): Response {
   return Response.json(
     {
@@ -47,21 +54,16 @@ export function handler(app: Application) {
             throw new Fault("INVALID_JSON", 400);
           }
         }
-        const query = Object.fromEntries(url.searchParams);
         const properties = route.operation.input.json.properties ?? {};
-        for (const [k, v] of Object.entries(query)) {
-          if (["number", "integer"].includes(properties[k]?.type))
-            (query as any)[k] = v.trim() === "" ? v : Number(v);
-          else if (
-            properties[k]?.type === "boolean" &&
-            ["true", "false"].includes(v)
-          )
-            (query as any)[k] = v === "true";
-        }
+        const query = Object.fromEntries(
+          Array.from(url.searchParams, ([name, value]) => [
+            name, httpInputValue(value, properties[name]?.type),
+          ]),
+        );
         const params = Object.fromEntries(
           route.keys.map((k, i) => {
             try {
-              return [k, decodeURIComponent(match[i + 1])];
+              return [k, httpInputValue(decodeURIComponent(match[i + 1]), properties[k]?.type)];
             } catch {
               throw new Fault("INVALID_PATH", 400);
             }

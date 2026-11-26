@@ -314,6 +314,25 @@ test("HTTP adapter validates input, maps errors and exports OpenAPI", async () =
   assert.equal((await literalColon.json()).error, "MISSING");
   await app.close();
 });
+test("HTTP converts scalar path and query parameters using the input schema", async () => {
+  const input = s.object({ id: s.int(), active: s.boolean(), limit: s.int() });
+  const search = operationContract({ id: "search", input, output: input });
+  const app = application({
+    routes: [http.get("/search/:id/:active", search, { run: ({ input }) => ok(input) })],
+  });
+  await app.compile();
+  await app.start();
+  try {
+    const fetch = handler(app);
+    const result = await fetch(new Request("http://local/search/12/false?id=99&limit=3"));
+    assert.equal(result.status, 200);
+    assert.deepEqual(await result.json(), { id: 12, active: false, limit: 3 });
+    const invalid = await fetch(new Request("http://local/search/%20/no?limit=3"));
+    assert.equal(invalid.status, 400);
+  } finally {
+    await app.close();
+  }
+});
 test("Stand graph, run, saved tests, load and failure injection", async () => {
   const app = application({ operations: [ping()] });
   await app.compile();

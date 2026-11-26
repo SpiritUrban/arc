@@ -145,7 +145,7 @@ Application/module приймають operations/resources/routes/queues/schedul
 
 `http.get/post/put/patch/delete(path, operation, { status? })` створюють декларацію маршруту; success status типовий 200. `handler(app)` повертає Web Request/Response-функцію. `serve(handler, { port, host?, maxBodyBytes? })` повертає Node Server. `closeServer(server)` закриває його; application закривається окремо.
 
-HTTP input: `{ ...body, ...query, ...path }`. GET/HEAD/DELETE використовують path/query; POST/PUT/PATCH очікують JSON-об’єкт і application/json. Query number/integer та true/false приводяться за верхньорівневою схемою, path лишається string. Масиви/вкладені об’єкти query не декодуються. При повторі query-ключа лишається останній. Для заголовків використовуйте request-capability. Немає автоматичного CORS, wildcards чи optional segments.
+HTTP input: `{ ...body, ...query, ...path }`. GET/HEAD/DELETE використовують path/query; POST/PUT/PATCH очікують JSON-об’єкт і application/json. Параметри шляху й запиту приводяться за верхньорівневою схемою: числові поля отримують числа, а булеві приймають `true` і `false`. Масиви/вкладені об’єкти query не декодуються. При повторі query-ключа лишається останній. Для заголовків використовуйте request-capability. Немає автоматичного CORS, wildcards чи optional segments.
 
 Успішна відповідь — output, business error — Result з status контракту. Невалідний input: 400 VALIDATION_ERROR; JSON: 400 INVALID_JSON; Content-Type: 415; відсутній route: 404; невалідний output/error details або невідомий exception: 500. Fault повертає свій status; cancellation через довільний AbortSignal не має окремого стандартного HTTP-коду в цій версії.
 
