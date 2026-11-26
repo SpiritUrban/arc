@@ -69,7 +69,7 @@ const tasks = module({ id: "tasks", routes: [createRoute] });
 
 Такий запис доступний для `get`, `post`, `put`, `patch` і `delete`. ARC знаходить операцію через `routes`. Для повторного використання готової операції підходить `http.post(path, operation, { status })`.
 
-Експериментальний `@handles(contract, { needs, effects, route })` з `@arc/framework/server` позначає публічний статичний метод. `handlerModule(id, Class)` збирає власні декоровані методи класу в операції та маршрути. Контекст методу можна типізувати через `HandlerContext<typeof Contract, typeof needs>`. Використовуйте компіляцію TypeScript або `tsx` для виконання коду з декораторами. [Два варіанти маршруту у Workspace](../examples/workspace/orders/server.ts)
+Експериментальний `@handles(contract, { needs, effects, route })` з `@arc/framework/server` позначає публічний статичний метод. `handlerModule(id, Class)` збирає власні декоровані методи класу в операції та маршрути. Щоб підключити до того самого модуля маршрути, оголошені через `http`, передайте їх у `handlerModule(id, Class, { routes })`. Контекст методу можна типізувати через `HandlerContext<typeof Contract, typeof needs>`. Використовуйте компіляцію TypeScript або `tsx` для виконання коду з декораторами. [Два варіанти маршруту у Workspace](../examples/workspace/orders/server.ts)
 
 ## resource / capability
 

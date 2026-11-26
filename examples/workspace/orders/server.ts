@@ -6,7 +6,6 @@ import {
   handlerModule,
   handles,
   http,
-  module,
   ok,
   resource,
   type HandlerContext,
@@ -122,8 +121,6 @@ class Orders {
   }
 }
 
-const listOrders = handlerModule("orders", Orders);
-export const orders = module({
-  id: listOrders.id,
-  routes: [getOrder, createOrder, updateOrder, cancelOrder, ...(listOrders.routes ?? [])],
+export const orders = handlerModule("orders", Orders, {
+  routes: [getOrder, createOrder, updateOrder, cancelOrder],
 });

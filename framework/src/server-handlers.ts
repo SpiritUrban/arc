@@ -60,9 +60,13 @@ export function handles<C extends OperationContract, N extends Needs = {}>(
 }
 
 /** Collect the decorated methods of a class into an ARC server module. */
-export function handlerModule(id: string, handlers: HandlerClass) {
+export function handlerModule(
+  id: string,
+  handlers: HandlerClass,
+  options: { routes?: readonly Route[] } = {},
+) {
   const operations: Operation[] = [];
-  const routes: Route[] = [];
+  const routes = [...(options.routes ?? [])];
   for (const key of Reflect.ownKeys(handlers)) {
     const method = Object.getOwnPropertyDescriptor(handlers, key)?.value;
     const define = handlerDefinitions.get(method);
