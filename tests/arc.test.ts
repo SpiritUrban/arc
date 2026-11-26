@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { routePath } from "@arc/framework/core";
 import {
   application,
   operation,
@@ -47,6 +48,14 @@ test("schemas validate, strip no unknowns, generate valid samples", () => {
     schema.pick("missing");
     // @ts-expect-error A selector schema can only name fields from the source.
     schema.pick(s.object({ missing: s.string() }));
+  }
+});
+test("routePath encodes each parameter as one URL segment", () => {
+  assert.equal(routePath("/users/:id/orders/:order", { id: "a/b ?#", order: 0 }), "/users/a%2Fb%20%3F%23/orders/0");
+  assert.throws(() => routePath("/orders/:id", { id: "" }), /Missing route parameter: id/);
+  if (false) {
+    // @ts-expect-error The literal pattern requires an id.
+    routePath("/orders/:id", {});
   }
 });
 test("compiler rejects cycles, scope leaks, duplicate ids and ambiguous routes", async () => {
