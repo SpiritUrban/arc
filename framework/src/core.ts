@@ -8,7 +8,7 @@ import { discoverPageDirectory } from "./fullstack/page-directory.js";
 import { emptyRouteView, routerOutlet } from "./fullstack/router-outlet.js";
 import { layoutView, rootView } from "./neutral/page-root.js";
 import { pageParamNames } from "./neutral/page-path.js";
-import { validateContractRoutePath, type ContractRoutePath } from "./neutral/route-path.js";
+import { mapRoutePath, validateContractRoutePath, type ContractRoutePath } from "./neutral/route-path.js";
 import { describeBusinessError } from "./neutral/descriptor.js";
 import {
   Schema,
@@ -1226,7 +1226,7 @@ export class Application {
           path === "/app.js" || path === "/openapi.json" ||
           path.startsWith("/arc-page-") || path.startsWith("/_arc/"))
         throw new Error(`Invalid web page path: ${path}`);
-      const shape = path.split("/").map((part) => part.startsWith(":") ? ":" : part).join("/");
+      const shape = mapRoutePath(path, () => ":");
       if (patterns.has(shape)) throw new Error(`Duplicate web page pattern: ${path}`);
       patterns.add(shape);
 

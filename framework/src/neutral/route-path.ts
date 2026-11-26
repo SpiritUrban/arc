@@ -54,7 +54,7 @@ export function mapRoutePath(
   }).join("/");
 }
 
-function routeParameterName(segment: string): string | undefined {
+export function routeParameterName(segment: string): string | undefined {
   return segment.startsWith(":") ? segment.slice(1) : undefined;
 }
 
