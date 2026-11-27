@@ -27,7 +27,7 @@ export function isOrderActive(order: { cancelled: boolean } | undefined): boolea
 // операцію для внутрішнього HTTP-транспорту ARC.
 export const ListOrders = operationContract({
   id: "orders.list",
-  input: s.object({}),
+  input: s.object({ cancelled: s.boolean().optional() }),
   output: Order.array(),
   expose: { web: true },
 });

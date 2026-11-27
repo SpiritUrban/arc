@@ -67,7 +67,12 @@ const ordersRepository = resource({
 
     return {
       save: async (order: Order) => save(order),
-      list: async (userId: string) => Array.from(ordersByOwner.get(userId)?.values() ?? []),
+      async list(userId: string, cancelled: boolean | undefined) {
+        const orders = Array.from(ordersByOwner.get(userId)?.values() ?? []);
+        return cancelled === undefined
+          ? orders
+          : orders.filter((order) => order.cancelled === cancelled);
+      },
       find: async (id: string, userId: string) => find(id, userId),
       async update({ id, ...changes }: OrderEdit, userId: string) {
         return changeOrder(id, userId, priceOrderFields(changes));
@@ -124,8 +129,8 @@ class Orders {
     needs,
     route: { method: "GET", path: ordersPath },
   })
-  static async listOrders({ user, orders }: HandlerContext<typeof ListOrders, typeof needs>) {
-    return ok(await orders.list(user.id));
+  static async listOrders({ input, user, orders }: HandlerContext<typeof ListOrders, typeof needs>) {
+    return ok(await orders.list(user.id, input.cancelled));
   }
 }
 

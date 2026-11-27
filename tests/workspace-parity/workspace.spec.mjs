@@ -375,6 +375,33 @@ test("ORD-01–03 · form, filters, totals and a delayed owner query", async ({
   await expect(orderRow(page, "Блокнот А5")).toHaveCount(0);
 });
 
+test("ARC filters orders on the server within the authenticated owner", async ({ request }, info) => {
+  test.skip(isReact(info));
+  const { user, rows: [active, cancelled] } = await fixture(request, info, "Filtered", [
+    ["Active notebook", 1],
+    ["Cancelled notebook", 2],
+  ]);
+  const cancellation = await request.post(orderPath(info, "/cancel"), {
+    headers: auth(user.id),
+    data: { id: cancelled.id },
+  });
+  expect(cancellation.ok()).toBeTruthy();
+  const saved = { ...cancelled, cancelled: true };
+
+  for (const [query, expected] of [
+    ["", [active, saved]],
+    ["?cancelled=false", [active]],
+    ["?cancelled=true", [saved]],
+  ]) {
+    const response = await request.get(orderPath(info, query), { headers: auth(user.id) });
+    expect(response.ok()).toBeTruthy();
+    expect(await response.json()).toEqual(expected);
+  }
+  const otherOwner = await request.get(orderPath(info, "?cancelled=true"), { headers: auth(demo) });
+  expect(otherOwner.ok()).toBeTruthy();
+  expect(await otherOwner.json()).not.toContainEqual(saved);
+});
+
 test("ARC reloads the user list from its retry button", async ({ page }, info) => {
   test.skip(isReact(info), "ARC direct resource refresh binding");
   const list = transport(info, "users.list");

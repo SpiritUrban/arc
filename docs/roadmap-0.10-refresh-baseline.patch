@@ -1,0 +1,246 @@
+diff --git a/examples/workspace/orders/client.ts b/examples/workspace/orders/client.ts
+index 990744c..6d5a7d8 100644
+--- a/examples/workspace/orders/client.ts
++++ b/examples/workspace/orders/client.ts
+@@ -1,6 +1,14 @@
+ import { remoteApi } from "@arc/framework/fullstack";
++import { state } from "@arc/framework/web";
+ import { selectedUser } from "../user-selection.ts";
+ import { CancelOrder, CreateOrder, ListOrders } from "./contracts.ts";
++import type { orderStatuses } from "./messages.ts";
++
++export const allStatuses = "all";
++export const orderStatusFilter = state<keyof typeof orderStatuses | typeof allStatuses>({
++  id: "orders.status-filter",
++  initial: allStatuses,
++});
+ 
+ export const orderClient = remoteApi({
+   bearer: selectedUser,
+@@ -10,11 +18,25 @@ export const orderClient = remoteApi({
+ export const ordersData = orderClient.query(ListOrders, { cache: true });
+ export const replaceListedOrder = ordersData.replaceBy();
+ 
++const historyClient = remoteApi({
++  from: [selectedUser, orderStatusFilter],
++  bearer: (owner) => owner,
++  key: true,
++});
++
++export const ordersHistory = historyClient.query(ListOrders, {
++  id: "orders.history",
++  cache: true,
++  input: (_owner, status) => status === allStatuses ? {} : { cancelled: status === "cancelled" },
++});
++
+ export const createOrder = orderClient.mutation(CreateOrder, {
+   update: ordersData.insertBy(),
++  refresh: ordersHistory,
+ });
+ 
+ export const cancelListedOrder = orderClient.mutation(CancelOrder, {
+   key: "id",
+   update: replaceListedOrder,
++  refresh: ordersHistory,
+ });
+diff --git a/examples/workspace/orders/contracts.ts b/examples/workspace/orders/contracts.ts
+index 04264e6..de22cbd 100644
+--- a/examples/workspace/orders/contracts.ts
++++ b/examples/workspace/orders/contracts.ts
+@@ -27,7 +27,7 @@ export function isOrderActive(order: { cancelled: boolean } | undefined): boolea
+ // операцію для внутрішнього HTTP-транспорту ARC.
+ export const ListOrders = operationContract({
+   id: "orders.list",
+-  input: s.object({}),
++  input: s.object({ cancelled: s.boolean().optional() }),
+   output: Order.array(),
+   expose: { web: true },
+ });
+diff --git a/examples/workspace/orders/page.tsx b/examples/workspace/orders/page.tsx
+index 7e24f13..11cb346 100644
+--- a/examples/workspace/orders/page.tsx
++++ b/examples/workspace/orders/page.tsx
+@@ -3,9 +3,9 @@
+ import { each, render, view } from "@arc/framework/web";
+ import { isOrderActive, orderTotal, orderUnitPrice, quantityLimits, type Order } from "./contracts.ts";
+ import { activeUser } from "../user-selection.ts";
+-import { cancelListedOrder, createOrder, ordersData } from "./client.ts";
++import { allStatuses, cancelListedOrder, createOrder, ordersData, ordersHistory, orderStatusFilter } from "./client.ts";
+ import { OrderFields } from "./fields.tsx";
+-import { orderStatus, orderStatuses, orderStatusLabel, orderWriteMessage } from "./messages.ts";
++import { orderStatuses, orderStatusLabel, orderWriteMessage } from "./messages.ts";
+ import { orderDetailPath } from "./paths.ts";
+ import { money, failureMessage } from "../ui.ts";
+ 
+@@ -31,7 +31,7 @@ function CancelOrderControl({ order }: { order: Order }) {
+ }
+ 
+ const visibleOrders = ordersData.dataOr([], "visible");
+-const allStatuses = "all";
++const filteredOrders = ordersHistory.dataOr([], "visible");
+ const orderSummary = ordersData.select("summary", (orders) => ({
+   count: orders?.length ?? 0,
+   total: orders?.reduce((sum, order) => sum + order.total, 0) ?? 0,
+@@ -39,21 +39,20 @@ const orderSummary = ordersData.select("summary", (orders) => ({
+ 
+ export const OrdersPage = view({
+   id: "orders.page",
+-  state: { quantity: String(quantityLimits.min), search: "", status: allStatuses },
+-  template({ quantity, search, status }, { derive }) {
++  state: { quantity: String(quantityLimits.min), search: "" },
++  template({ quantity, search }, { derive }) {
+     const searchTerm = derive([search], (search) => search.trim().toLowerCase());
+-    const statusFilter = derive([status], (status) => status === allStatuses ? undefined : status);
+-    const history = derive([visibleOrders, searchTerm, statusFilter], (orders, term, status) =>
+-      orders.filter((order) =>
+-        order.product.toLowerCase().includes(term) &&
+-        (status === undefined || orderStatus(order) === status),
+-      ),
++    const history = derive([visibleOrders, filteredOrders, searchTerm, orderStatusFilter], (all, filtered, term, status) =>
++      (status === allStatuses ? all : filtered).filter((order) =>
++        order.product.toLowerCase().includes(term)),
+     );
++    const loading = derive([ordersData.loading, ordersHistory.loading, orderStatusFilter],
++      (allLoading, filteredLoading, status) => status === allStatuses ? allLoading : filteredLoading);
+     const emptyHistory = derive(
+-      [history, ordersData.loading, searchTerm, statusFilter],
++      [history, loading, searchTerm, orderStatusFilter],
+       (orders, loading, term, status) => {
+         if (loading || orders.length > 0) return undefined;
+-        return term !== "" || status !== undefined
++        return term !== "" || status !== allStatuses
+           ? {
+               title: "Замовлень не знайдено",
+               description: "Змініть пошук або статус замовлення.",
+@@ -108,7 +107,7 @@ export const OrdersPage = view({
+           <p class="error" role="alert" data-error>
+             {failureMessage(
+               (createOrder.invalid() ? undefined : createOrder.error()) ??
+-                ordersData.error(),
++                ordersData.error() ?? (orderStatusFilter() === allStatuses ? undefined : ordersHistory.error()),
+             )}
+           </p>
+         </div>
+@@ -124,7 +123,7 @@ export const OrdersPage = view({
+               class="muted"
+               data-loading
+               role="status"
+-            >{render.when(ordersData.loading, "Завантажуємо замовлення…")}</span>
++            >{render.when(loading, "Завантажуємо замовлення…")}</span>
+           </div>
+           <div class="order-filters">
+             <label class="search-label">
+@@ -138,7 +137,7 @@ export const OrdersPage = view({
+             </label>
+             <label>
+               Статус
+-              <select data-order-status bind:value={status}>
++              <select data-order-status bind:value={orderStatusFilter}>
+                 <option value={allStatuses}>Усі замовлення</option>
+                 {Object.entries(orderStatuses).map(([value, { filterLabel }]) => (
+                   <option value={value}>{filterLabel}</option>
+@@ -156,7 +155,7 @@ export const OrdersPage = view({
+                   <th>Статус</th>
+                 </tr>
+               </thead>
+-              <tbody data-rows aria-busy={ordersData.loading}>
++              <tbody data-rows aria-busy={loading}>
+                 {each(history, {
+                   needs: cancelListedOrder,
+                   render: (order) => (
+diff --git a/examples/workspace/orders/server.ts b/examples/workspace/orders/server.ts
+index d31a8e0..b4a09fe 100644
+--- a/examples/workspace/orders/server.ts
++++ b/examples/workspace/orders/server.ts
+@@ -67,7 +67,12 @@ const ordersRepository = resource({
+ 
+     return {
+       save: async (order: Order) => save(order),
+-      list: async (userId: string) => Array.from(ordersByOwner.get(userId)?.values() ?? []),
++      async list(userId: string, cancelled: boolean | undefined) {
++        const orders = Array.from(ordersByOwner.get(userId)?.values() ?? []);
++        return cancelled === undefined
++          ? orders
++          : orders.filter((order) => order.cancelled === cancelled);
++      },
+       find: async (id: string, userId: string) => find(id, userId),
+       async update({ id, ...changes }: OrderEdit, userId: string) {
+         return changeOrder(id, userId, priceOrderFields(changes));
+@@ -124,8 +129,8 @@ class Orders {
+     needs,
+     route: { method: "GET", path: ordersPath },
+   })
+-  static async listOrders({ user, orders }: HandlerContext<typeof ListOrders, typeof needs>) {
+-    return ok(await orders.list(user.id));
++  static async listOrders({ input, user, orders }: HandlerContext<typeof ListOrders, typeof needs>) {
++    return ok(await orders.list(user.id, input.cancelled));
+   }
+ }
+ 
+diff --git a/examples/workspace/pages/orders/[id].tsx b/examples/workspace/pages/orders/[id].tsx
+index ebe9196..02adf0e 100644
+--- a/examples/workspace/pages/orders/[id].tsx
++++ b/examples/workspace/pages/orders/[id].tsx
+@@ -1,7 +1,7 @@
+ import type { RouteParamNames } from "@arc/framework/core";
+ import { render, type PageContext } from "@arc/framework/web";
+ import { CancelOrder, GetOrder, UpdateOrder, isOrderActive, type Order } from "../../orders/contracts.ts";
+-import { orderClient, replaceListedOrder } from "../../orders/client.ts";
++import { orderClient, ordersHistory, replaceListedOrder } from "../../orders/client.ts";
+ import { OrderFields } from "../../orders/fields.tsx";
+ import { orderStatusLabel, orderWriteMessage } from "../../orders/messages.ts";
+ import { orderDetailPattern, ordersPath } from "../../orders/paths.ts";
+@@ -14,8 +14,8 @@ export default function OrderDetail({ bind }: PageContext<RouteParamNames<typeof
+   const { query, mutation } = bind(orderClient);
+   const order = query(GetOrder);
+   const update = [order, replaceListedOrder];
+-  const updateOrder = mutation(UpdateOrder, { ...editFormOptions, update });
+-  const cancelOrder = mutation(CancelOrder, { update });
++  const updateOrder = mutation(UpdateOrder, { ...editFormOptions, update, refresh: ordersHistory });
++  const cancelOrder = mutation(CancelOrder, { update, refresh: ordersHistory });
+ 
+   function renderSummary(saved: Order) {
+     return (
+diff --git a/tests/workspace-parity/workspace.spec.mjs b/tests/workspace-parity/workspace.spec.mjs
+index 1c9c02d..0284bd9 100644
+--- a/tests/workspace-parity/workspace.spec.mjs
++++ b/tests/workspace-parity/workspace.spec.mjs
+@@ -375,6 +375,38 @@ test("ORD-01–03 · form, filters, totals and a delayed owner query", async ({
+   await expect(orderRow(page, "Блокнот А5")).toHaveCount(0);
+ });
+ 
++test("ARC server-filtered history and detail agree after cancellation", async ({ page, request }, info) => {
++  test.skip(isReact(info));
++  const product = "Filtered notebook";
++  const { user, rows: [order] } = await fixture(request, info, "Filtered", [[product, 2]]);
++  await page.goto("/orders");
++  await userRow(page, user.name).click();
++  const status = page.getByLabel("Статус");
++  const readActive = page.waitForRequest((req) =>
++    new URL(req.url()).pathname === transport(info, "orders.list") &&
++    req.headers().authorization === `Bearer ${user.id}` &&
++    req.postDataJSON()?.cancelled === false,
++  );
++  await status.selectOption("created");
++  await readActive;
++  const row = orderRow(page, product);
++  await expect(row).toBeVisible();
++  await row.getByRole("button", { name: "Скасувати" }).click();
++  await expect(row).toHaveCount(0);
++  await status.selectOption("cancelled");
++  await expect(row).toContainText("Скасовано");
++  await expect(page.locator(".summary-grid")).toContainText("01");
++  await row.getByRole("link", { name: product }).click();
++  await expect(orderDetail(page)).toContainText("Скасовано");
++
++  const active = await request.get(orderPath(info, "?cancelled=false"), { headers: auth(user.id) });
++  expect(active.ok()).toBeTruthy();
++  expect(await active.json()).toEqual([]);
++  const cancelled = await request.get(orderPath(info, "?cancelled=true"), { headers: auth(user.id) });
++  expect(cancelled.ok()).toBeTruthy();
++  expect(await cancelled.json()).toEqual([{ ...order, cancelled: true }]);
++});
++
+ test("ARC reloads the user list from its retry button", async ({ page }, info) => {
+   test.skip(isReact(info), "ARC direct resource refresh binding");
+   const list = transport(info, "users.list");
