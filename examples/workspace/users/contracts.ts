@@ -9,7 +9,6 @@ export const User = s.object({
   email: s.email(),
 });
 export type User = Infer<typeof User>;
-const userNotFound = { USER_NOT_FOUND: 404 } as const;
 // Сервер і браузер використовують ті самі схеми. Реалізація операцій знаходиться в server.ts.
 export const ListUsers = operationContract({
   id: "users.list",
@@ -22,7 +21,7 @@ export const GetUser = operationContract({
   id: "users.get",
   input: User.pick("id"),
   output: User,
-  errors: userNotFound,
+  errors: { USER_NOT_FOUND: 404 },
 });
 // Клієнт передає ім’я й пошту. Під час створення сервер генерує ID
 // і повертає оголошену тут помилку EMAIL_EXISTS із HTTP 409, якщо пошта зайнята.
@@ -38,8 +37,8 @@ export type UserProfile = Infer<typeof CreateUser.input>;
 
 export const UpdateUser = operationContract({
   id: "users.update",
-  input: CreateUser.output.pick("id", CreateUser.input),
+  input: CreateUser.output.pick(GetUser.input, CreateUser.input),
   output: CreateUser.output,
-  errors: { ...userNotFound, EMAIL_EXISTS: emailExists },
+  errors: { ...GetUser.errors, EMAIL_EXISTS: emailExists },
   expose: { web: true },
 });

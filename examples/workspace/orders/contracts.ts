@@ -56,7 +56,7 @@ export type OrderFormInput = Infer<typeof CreateOrder.input>;
 
 export const UpdateOrder = operationContract({
   id: "orders.update",
-  input: CreateOrder.output.pick("id", CreateOrder.input),
+  input: CreateOrder.output.pick(GetOrder.input, CreateOrder.input),
   output: CreateOrder.output,
   errors: orderChangeErrors,
   expose: { web: true },
