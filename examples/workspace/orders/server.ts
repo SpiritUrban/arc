@@ -34,36 +34,30 @@ const ordersRepository = resource({
   // effects описує побічні ефекти в метаданих ARC. Сам запис виконує метод save.
   effects: ["memory.write"],
   open: () => {
-    const orders = new Map<string, Order>();
-    const belongsToUser = (order: Order, userId: string) => order.userId === userId;
-    const findOwnedOrder = (id: string, userId: string) => {
-      const order = orders.get(id);
-      return order && belongsToUser(order, userId) ? order : undefined;
-    };
+    const ordersByOwner = new Map<string, Map<string, Order>>();
 
     function changeOrder(id: string, userId: string, apply: (current: Order) => Order): OrderChange {
-      const current = findOwnedOrder(id, userId);
-      if (!current) return "ORDER_NOT_FOUND";
+      const owned = ordersByOwner.get(userId);
+      const current = owned?.get(id);
+      if (!owned || !current) return "ORDER_NOT_FOUND";
       if (!isOrderActive(current)) return { order: current, alreadyCancelled: true };
       const order = apply(current);
-      orders.set(id, order);
+      owned.set(id, order);
       return { order, alreadyCancelled: false };
     }
 
     return {
       save: async (order: Order) => {
-        orders.set(order.id, order);
+        let owned = ordersByOwner.get(order.userId);
+        if (!owned) {
+          owned = new Map();
+          ordersByOwner.set(order.userId, owned);
+        }
+        owned.set(order.id, order);
         return order;
       },
-      // Вибірка обмежена власником, якого передає серверна операція.
-      list: async (userId: string) => {
-        const owned: Order[] = [];
-        for (const order of orders.values()) {
-          if (belongsToUser(order, userId)) owned.push(order);
-        }
-        return owned;
-      },
-      find: async (id: string, userId: string) => findOwnedOrder(id, userId),
+      list: async (userId: string) => Array.from(ordersByOwner.get(userId)?.values() ?? []),
+      find: async (id: string, userId: string) => ordersByOwner.get(userId)?.get(id),
       async update({ id, ...changes }: OrderEdit, userId: string) {
         return changeOrder(id, userId, (current) => ({
           ...current,
