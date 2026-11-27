@@ -24,8 +24,19 @@ export const usersRepository = resource({
       email: "demo@example.com",
     };
     const users = new Map([[demoUser.id, demoUser]]);
-    const emailExists = (email: string, exceptId?: string) =>
-      [...users.values()].some((user) => user.email === email && user.id !== exceptId);
+    const usersByEmail = new Map([[demoUser.email, demoUser.id]]);
+    const emailExists = (email: string, exceptId?: string) => {
+      const owner = usersByEmail.get(email);
+      return owner !== undefined && owner !== exceptId;
+    };
+
+    function save(user: User): User {
+      const previous = users.get(user.id);
+      if (previous && previous.email !== user.email) usersByEmail.delete(previous.email);
+      users.set(user.id, user);
+      usersByEmail.set(user.email, user.id);
+      return user;
+    }
 
     return {
       find: async (id: string) => users.get(id),
@@ -33,15 +44,12 @@ export const usersRepository = resource({
       // Пошту перевіряємо серед записів. undefined дає операції сигнал повернути EMAIL_EXISTS.
       create: async (profile: UserProfile) => {
         if (emailExists(profile.email)) return undefined;
-        const user = { id: randomUUID(), ...profile };
-        users.set(user.id, user);
-        return user;
+        return save({ id: randomUUID(), ...profile });
       },
       update: async (user: User) => {
         if (!users.has(user.id)) return "USER_NOT_FOUND" as const;
         if (emailExists(user.email, user.id)) return "EMAIL_EXISTS" as const;
-        users.set(user.id, user);
-        return user;
+        return save(user);
       },
     };
   },

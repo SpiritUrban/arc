@@ -6,6 +6,7 @@ import { join } from "node:path";
 import vm from "node:vm";
 import { build } from "esbuild";
 import { parseHTML } from "linkedom";
+import { application } from "../framework/src/core.ts";
 import { importApplication } from "../framework/src/fullstack/reactive-jsx.ts";
 import { buildWeb, staticWeb } from "../framework/src/fullstack/build.ts";
 import { internalTransport } from "../framework/src/fullstack/server.ts";
@@ -14,6 +15,7 @@ import { stand } from "../framework/src/stand.ts";
 import { descriptor, wireContract } from "../framework/src/neutral/descriptor.ts";
 import { CancelOrder } from "../examples/workspace/orders/contracts.ts";
 import { UpdateUser } from "../examples/workspace/users/contracts.ts";
+import { users } from "../examples/workspace/users/server.ts";
 
 async function workspaceScript(outDir: string) {
   // Inline split chunks so this DOM harness can execute the built router.
@@ -25,6 +27,34 @@ async function workspaceScript(outDir: string) {
   });
   return new vm.Script(outputFiles[0]!.text);
 }
+
+test("Workspace profile updates release the old email and claim the new one", async () => {
+  const app = application({ modules: [users] });
+  await app.compile();
+  await app.start();
+  try {
+    const fetch = handler(app);
+    const write = (method: string, path: string, name: string, email: string) =>
+      fetch(new Request(`http://local${path}`, {
+        method,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, email }),
+      }));
+    const created = await write("POST", "/users", "Another User", "original@example.com");
+    assert.equal(created.status, 201);
+    const { id } = await created.json();
+    const profile = `/users/${id}`;
+    assert.equal((await write("PUT", profile, "Renamed User", "original@example.com")).status, 200);
+    const occupied = await write("PUT", profile, "Renamed User", "demo@example.com");
+    assert.equal(occupied.status, 409);
+    assert.equal((await occupied.json()).error, "EMAIL_EXISTS");
+    assert.equal((await write("PUT", profile, "Renamed User", "new@example.com")).status, 200);
+    assert.equal((await write("POST", "/users", "Third User", "new@example.com")).status, 409);
+    assert.equal((await write("POST", "/users", "Third User", "original@example.com")).status, 201);
+  } finally {
+    await app.close();
+  }
+});
 
 function browserWindow(window: ReturnType<typeof parseHTML>["window"], location: URL) {
   return {
