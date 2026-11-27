@@ -31,6 +31,7 @@ function CancelOrderControl({ order }: { order: Order }) {
 }
 
 const visibleOrders = ordersData.dataOr([], "visible");
+const allStatuses = "all";
 const orderSummary = ordersData.select("summary", (orders) => ({
   count: orders?.length ?? 0,
   total: orders?.reduce((sum, order) => sum + order.total, 0) ?? 0,
@@ -38,20 +39,21 @@ const orderSummary = ordersData.select("summary", (orders) => ({
 
 export const OrdersPage = view({
   id: "orders.page",
-  state: { quantity: String(quantityLimits.min), search: "", status: "all" },
+  state: { quantity: String(quantityLimits.min), search: "", status: allStatuses },
   template({ quantity, search, status }, { derive }) {
     const searchTerm = derive([search], (search) => search.trim().toLowerCase());
-    const history = derive([visibleOrders, searchTerm, status], (orders, term, status) =>
+    const statusFilter = derive([status], (status) => status === allStatuses ? undefined : status);
+    const history = derive([visibleOrders, searchTerm, statusFilter], (orders, term, status) =>
       orders.filter((order) =>
         order.product.toLowerCase().includes(term) &&
-        (status === "all" || orderStatus(order) === status),
+        (status === undefined || orderStatus(order) === status),
       ),
     );
     const emptyHistory = derive(
-      [history, ordersData.loading, searchTerm, status],
+      [history, ordersData.loading, searchTerm, statusFilter],
       (orders, loading, term, status) => {
         if (loading || orders.length > 0) return undefined;
-        return term !== "" || status !== "all"
+        return term !== "" || status !== undefined
           ? {
               title: "Замовлень не знайдено",
               description: "Змініть пошук або статус замовлення.",
@@ -137,7 +139,7 @@ export const OrdersPage = view({
             <label>
               Статус
               <select data-order-status bind:value={status}>
-                <option value="all">Усі замовлення</option>
+                <option value={allStatuses}>Усі замовлення</option>
                 {Object.entries(orderStatuses).map(([value, { filterLabel }]) => (
                   <option value={value}>{filterLabel}</option>
                 ))}
