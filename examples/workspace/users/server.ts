@@ -20,13 +20,8 @@ export const usersRepository = resource({
   instrument: ["find", "list", "create", "update"],
   effects: ["memory.read", "memory.write"],
   open: () => {
-    const demoUser: User = {
-      id: demoUserId,
-      name: "Demo User",
-      email: "demo@example.com",
-    };
-    const users = new Map([[demoUser.id, demoUser]]);
-    const usersByEmail = new Map([[demoUser.email, demoUser.id]]);
+    const users = new Map<string, User>();
+    const usersByEmail = new Map<string, string>();
     const emailExists = (email: string, exceptId?: string) => {
       const owner = usersByEmail.get(email);
       return owner !== undefined && owner !== exceptId;
@@ -39,6 +34,12 @@ export const usersRepository = resource({
       usersByEmail.set(user.email, user.id);
       return user;
     }
+
+    save({
+      id: demoUserId,
+      name: "Demo User",
+      email: "demo@example.com",
+    });
 
     return {
       find: async (id: string) => users.get(id),
