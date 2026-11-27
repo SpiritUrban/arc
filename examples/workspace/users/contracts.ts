@@ -8,9 +8,7 @@ export const User = s.object({
   name: s.string({ min: 2, max: 100 }),
   email: s.email(),
 });
-export const UserProfile = User.pick("name", "email");
 export type User = Infer<typeof User>;
-export type UserProfile = Infer<typeof UserProfile>;
 const userNotFound = { USER_NOT_FOUND: 404 } as const;
 // Сервер і браузер використовують ті самі схеми. Реалізація операцій знаходиться в server.ts.
 export const ListUsers = operationContract({
@@ -31,11 +29,12 @@ export const GetUser = operationContract({
 const emailExists = { status: 409, field: "email" } as const;
 export const CreateUser = operationContract({
   id: "users.create",
-  input: UserProfile,
+  input: User.pick("name", "email"),
   output: User,
   errors: { EMAIL_EXISTS: emailExists },
   expose: { web: true },
 });
+export type UserProfile = Infer<typeof CreateUser.input>;
 
 export const UpdateUser = operationContract({
   id: "users.update",

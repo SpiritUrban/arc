@@ -17,9 +17,7 @@ export const Order = s.object({
   total: s.number({ min: 0 }),
   cancelled: s.boolean(),
 });
-export const OrderFormInput = Order.pick("product", "quantity");
 export type Order = Infer<typeof Order>;
-export type OrderFormInput = Infer<typeof OrderFormInput>;
 const orderIdentity = Order.pick("id");
 const orderNotFound = { ORDER_NOT_FOUND: 404 } as const;
 const orderChangeErrors = {
@@ -51,10 +49,11 @@ export const GetOrder = operationContract({
 // Браузер передає товар і кількість. Сервер визначає власника за запитом і обчислює суму.
 export const CreateOrder = operationContract({
   id: "orders.create",
-  input: OrderFormInput,
+  input: Order.pick("product", "quantity"),
   output: Order,
   expose: { web: true },
 });
+export type OrderFormInput = Infer<typeof CreateOrder.input>;
 
 export const UpdateOrder = operationContract({
   id: "orders.update",
