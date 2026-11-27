@@ -1,6 +1,8 @@
 import type { MutationFieldBindings } from "@arc/framework/fullstack";
 import type { Signal } from "@arc/framework/web";
-import { CreateOrder, type OrderFormInput } from "./contracts.ts";
+import { CreateOrder, quantityLimits, type OrderFormInput } from "./contracts.ts";
+
+const quantityError = `Введіть ціле число від ${quantityLimits.min} до ${quantityLimits.max}.`;
 
 interface OrderFieldsProps {
   mutation: MutationFieldBindings<OrderFormInput>;
@@ -10,10 +12,6 @@ interface OrderFieldsProps {
 
 export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
   const { product, quantity: quantityField } = mutation.fieldsFor(CreateOrder.input);
-  const { min, max } = quantityField.input;
-  const quantityError = min !== undefined && max !== undefined
-    ? `Введіть ціле число від ${min} до ${max}.`
-    : "Перевірте кількість товару.";
   return (
     <>
       <label class="product-field">
