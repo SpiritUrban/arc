@@ -44,28 +44,31 @@ const ordersRepository = resource({
   open: () => {
     const ordersByOwner = new Map<string, Map<string, Order>>();
 
-    function changeOrder(id: string, userId: string, changes: OrderPatch): OrderChange {
-      const owned = ordersByOwner.get(userId);
-      const current = owned?.get(id);
-      if (!owned || !current) return { error: "ORDER_NOT_FOUND" };
-      if (!isOrderActive(current)) return { error: "ORDER_ALREADY_CANCELLED", order: current };
-      const order = { ...current, ...changes };
-      owned.set(id, order);
+    function find(id: string, userId: string) {
+      return ordersByOwner.get(userId)?.get(id);
+    }
+
+    function save(order: Order): Order {
+      let owned = ordersByOwner.get(order.userId);
+      if (!owned) {
+        owned = new Map();
+        ordersByOwner.set(order.userId, owned);
+      }
+      owned.set(order.id, order);
       return order;
     }
 
+    function changeOrder(id: string, userId: string, changes: OrderPatch): OrderChange {
+      const current = find(id, userId);
+      if (!current) return { error: "ORDER_NOT_FOUND" };
+      if (!isOrderActive(current)) return { error: "ORDER_ALREADY_CANCELLED", order: current };
+      return save({ ...current, ...changes });
+    }
+
     return {
-      save: async (order: Order) => {
-        let owned = ordersByOwner.get(order.userId);
-        if (!owned) {
-          owned = new Map();
-          ordersByOwner.set(order.userId, owned);
-        }
-        owned.set(order.id, order);
-        return order;
-      },
+      save: async (order: Order) => save(order),
       list: async (userId: string) => Array.from(ordersByOwner.get(userId)?.values() ?? []),
-      find: async (id: string, userId: string) => ordersByOwner.get(userId)?.get(id),
+      find: async (id: string, userId: string) => find(id, userId),
       async update({ id, ...changes }: OrderEdit, userId: string) {
         return changeOrder(id, userId, priceOrderFields(changes));
       },
