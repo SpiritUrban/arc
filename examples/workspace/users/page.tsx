@@ -26,10 +26,9 @@ function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
   const pendingLabel = editing ? "Зберігаємо…" : "Додаємо…";
 
   function message() {
-    if (!editing)
-      return failureMessage((email.failed() ? undefined : form.error()) ?? users.error());
-    if (updateUser.failed("USER_NOT_FOUND")) return "Користувача не знайдено.";
-    return email.failed() || form.invalid() ? "" : failureMessage(form.error());
+    if (editing && updateUser.failed("USER_NOT_FOUND")) return "Користувача не знайдено.";
+    const error = email.failed() || (editing && form.invalid()) ? undefined : form.error();
+    return failureMessage(error ?? (editing ? undefined : users.error()));
   }
 
   return (

@@ -645,6 +645,15 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     assert.equal(document.querySelector("[data-email]")!.getAttribute("aria-invalid"), "false");
     assert.equal(document.querySelector("#users [data-email-error]")!.textContent, "");
     assert.equal(document.querySelectorAll("[data-user]").length, 2);
+    const editProfile = "#users [data-edit-user]";
+    await waitFor(() => !!document.querySelector(editProfile));
+    formFields(editProfile);
+    input(`${editProfile} [data-email]`, "demo@example.com");
+    submit(editProfile);
+    await waitFor(() => document.querySelector(`${editProfile} [data-email-error]`)!
+      .textContent!.includes("вже існує"));
+    assert.equal(document.querySelector(`${editProfile} [data-error]`)!.textContent, "");
+    assert.equal(document.querySelector(`${editProfile} [data-email]`)!.getAttribute("aria-invalid"), "true");
     const newUserRow = document.querySelector('[data-user][aria-pressed="true"]')!;
     const demoUserRow = document.querySelector(
       '[data-user="00000000-0000-4000-8000-000000000001"]',
