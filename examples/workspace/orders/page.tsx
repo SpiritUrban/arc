@@ -9,7 +9,7 @@ import { orderStatus, orderStatuses, orderWriteMessage } from "./messages.ts";
 import { orderDetailPath } from "./paths.ts";
 import { money, failureMessage } from "../ui.ts";
 
-function CancelOrderControl({ order }: { order: ReturnType<typeof Order.parse> }) {
+function CancelOrderControl({ order }: { order: Order }) {
   const cancel = cancelListedOrder.for(order.id);
   return (
     <>

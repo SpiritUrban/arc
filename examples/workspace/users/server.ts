@@ -7,10 +7,8 @@ import {
   http,
   ok,
 } from "@arc/framework";
-import { User, UserProfile, ListUsers, GetUser, CreateUser, UpdateUser, demoUserId } from "./contracts.ts";
+import { ListUsers, GetUser, CreateUser, UpdateUser, demoUserId, type User, type UserProfile } from "./contracts.ts";
 export { User } from "./contracts.ts";
-type User = ReturnType<typeof User.parse>;
-type UserProfile = ReturnType<typeof UserProfile.parse>;
 // Сховище живе в пам’яті одного запуску. Початковий запис дає Workspace демо-користувача.
 export const usersRepository = resource({
   id: "users.repository",

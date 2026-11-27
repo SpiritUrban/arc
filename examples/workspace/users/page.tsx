@@ -17,7 +17,7 @@ const updateUser = mutation(UpdateUser, {
   update: users.replaceBy(),
 });
 
-function ProfileForm({ user }: { user?: ReturnType<typeof User.parse> }) {
+function ProfileForm({ user }: { user?: User }) {
   const editing = user !== undefined;
   const form = editing ? updateUser : addUser;
   const { name, email } = form.fieldsFor(UserProfile);

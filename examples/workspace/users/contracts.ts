@@ -1,4 +1,4 @@
-import { s, operationContract } from "@arc/framework/core";
+import { s, operationContract, type Infer } from "@arc/framework/core";
 
 export const demoUserId = "00000000-0000-4000-8000-000000000001";
 
@@ -9,6 +9,8 @@ export const User = s.object({
   email: s.email(),
 });
 export const UserProfile = User.pick("name", "email");
+export type User = Infer<typeof User>;
+export type UserProfile = Infer<typeof UserProfile>;
 const userNotFound = { USER_NOT_FOUND: 404 } as const;
 // Сервер і браузер використовують ті самі схеми. Реалізація операцій знаходиться в server.ts.
 export const ListUsers = operationContract({

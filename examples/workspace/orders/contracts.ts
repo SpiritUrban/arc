@@ -1,4 +1,4 @@
-import { s, operationContract } from "@arc/framework/core";
+import { s, operationContract, type Infer } from "@arc/framework/core";
 
 export const orderUnitPrice = 25;
 
@@ -18,6 +18,8 @@ export const Order = s.object({
   cancelled: s.boolean(),
 });
 export const OrderFormInput = Order.pick("product", "quantity");
+export type Order = Infer<typeof Order>;
+export type OrderFormInput = Infer<typeof OrderFormInput>;
 const orderIdentity = Order.pick("id");
 const orderNotFound = { ORDER_NOT_FOUND: 404 } as const;
 const orderChangeErrors = {

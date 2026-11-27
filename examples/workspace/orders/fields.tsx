@@ -1,13 +1,10 @@
-import type { Infer } from "@arc/framework/core";
 import type { MutationFieldBindings } from "@arc/framework/fullstack";
 import type { Signal } from "@arc/framework/web";
 import { OrderFormInput } from "./contracts.ts";
 
-type OrderInput = Infer<typeof OrderFormInput>;
-
 interface OrderFieldsProps {
-  mutation: MutationFieldBindings<OrderInput>;
-  order?: () => OrderInput | undefined;
+  mutation: MutationFieldBindings<OrderFormInput>;
+  order?: () => OrderFormInput | undefined;
   quantity?: Signal<string>;
 }
 

@@ -1,6 +1,6 @@
 import type { RouteParamNames } from "@arc/framework/core";
 import { render, type PageContext } from "@arc/framework/web";
-import { CancelOrder, GetOrder, UpdateOrder, isOrderActive } from "../../orders/contracts.ts";
+import { CancelOrder, GetOrder, UpdateOrder, isOrderActive, type Order } from "../../orders/contracts.ts";
 import { orderClient, replaceListedOrder } from "../../orders/client.ts";
 import { OrderFields } from "../../orders/fields.tsx";
 import { orderStatus, orderStatuses, orderWriteMessage } from "../../orders/messages.ts";
@@ -17,7 +17,7 @@ export default function OrderDetail({ bind }: PageContext<RouteParamNames<typeof
   const updateOrder = mutation(UpdateOrder, { ...editFormOptions, update });
   const cancelOrder = mutation(CancelOrder, { update });
 
-  function renderSummary(saved: NonNullable<ReturnType<typeof order.data>>) {
+  function renderSummary(saved: Order) {
     return (
       <div data-order-detail>
         <h2>{saved.product}</h2>

@@ -12,16 +12,14 @@ import {
   type HandlerContext,
 } from "@arc/framework/server";
 import { currentUser } from "../auth.ts";
-import { Order, ListOrders, GetOrder, CreateOrder, UpdateOrder, CancelOrder, isOrderActive, orderTotal, type OrderFormInput } from "./contracts.ts";
+import { ListOrders, GetOrder, CreateOrder, UpdateOrder, CancelOrder, isOrderActive, orderTotal, type Order, type OrderFormInput } from "./contracts.ts";
 import { orderDetailPattern, ordersPath } from "./paths.ts";
 
-// Імпортований Order є схемою перевірки. Локальний тип Order описує дані після parse.
-type Order = ReturnType<typeof Order.parse>;
 type OrderEdit = ReturnType<typeof UpdateOrder.input.parse>;
 type OrderPatch = ReturnType<typeof priceOrderFields> | Pick<Order, "cancelled">;
 type OrderChange = "ORDER_NOT_FOUND" | { order: Order; alreadyCancelled: boolean };
 
-function priceOrderFields(fields: ReturnType<typeof OrderFormInput.parse>) {
+function priceOrderFields(fields: OrderFormInput) {
   return { ...fields, total: orderTotal(fields.quantity) };
 }
 
