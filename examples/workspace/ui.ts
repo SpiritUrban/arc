@@ -1,11 +1,12 @@
 export const editFormOptions = { resetOnSuccess: false } as const;
 
-export const money = (value: number) =>
-  new Intl.NumberFormat("uk-UA", {
-    style: "currency",
-    currency: "UAH",
-    maximumFractionDigits: 0,
-  }).format(value);
+const currency = new Intl.NumberFormat("uk-UA", {
+  style: "currency",
+  currency: "UAH",
+  maximumFractionDigits: 0,
+});
+
+export const money = (value: number) => currency.format(value);
 // ARC передає бізнес-помилки в error, а збої виконання в fault. Тут перетворюємо їх на текст для UI.
 export function failureMessage(failure: any): string {
   if (!failure) return "";

@@ -78,7 +78,7 @@ export const OrdersPage = view({
             <strong data-amount>
               {money(orderSummary().total)}
             </strong>
-            <span class="summary-note">{orderUnitPrice} ₴ за одиницю товару</span>
+            <span class="summary-note">{money(orderUnitPrice)} за одиницю товару</span>
           </div>
         </div>
         <div class="panel">
