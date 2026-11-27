@@ -4,13 +4,14 @@ import { CreateOrder, quantityLimits, type OrderFormInput } from "./contracts.ts
 
 const quantityError = `Введіть ціле число від ${quantityLimits.min} до ${quantityLimits.max}.`;
 
-interface OrderFieldsProps {
+type OrderFieldsProps = {
   mutation: MutationFieldBindings<OrderFormInput>;
-  order?: () => OrderFormInput | undefined;
-  quantity?: Signal<string>;
-}
+} & (
+  | { quantity: Signal<string>; savedValues?: never }
+  | { savedValues: () => OrderFormInput | undefined; quantity?: never }
+);
 
-export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
+export function OrderFields({ mutation, savedValues, quantity }: OrderFieldsProps) {
   const { product, quantity: quantityField } = mutation.fieldsFor(CreateOrder.input);
   return (
     <>
@@ -20,7 +21,7 @@ export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
           data-product
           {...product.input}
           placeholder="Наприклад, блокнот ARC"
-          value={order?.()?.product}
+          value={savedValues?.()?.product}
         />
         <span class="error" role="alert" data-product-error>
           {product.errorMessage("Вкажіть назву товару.")}
@@ -32,7 +33,7 @@ export function OrderFields({ mutation, order, quantity }: OrderFieldsProps) {
           <input
             data-quantity
             {...quantityField.input}
-            value={order?.()?.quantity}
+            value={savedValues?.()?.quantity}
             bind:value={quantity}
           />
         </label>

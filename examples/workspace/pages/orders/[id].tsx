@@ -53,7 +53,7 @@ export default function OrderDetail({ bind }: PageContext<RouteParamNames<typeof
           {isOrderActive(order.data()) && (
             <form data-edit-order novalidate onSubmit={updateOrder}>
               <h2>Редагувати замовлення</h2>
-              <OrderFields mutation={updateOrder} order={order.data} />
+              <OrderFields mutation={updateOrder} savedValues={order.data} />
               <button class="button primary" type="submit">
                 {render.when(updateOrder.running, "Зберігаємо…", "Зберегти зміни")}
               </button>
