@@ -25,7 +25,7 @@ function orderChangeResult(result: OrderChange, fail: Fail<typeof UpdateOrder.er
   return result.alreadyCancelled ? fail("ORDER_ALREADY_CANCELLED", result.order) : ok(result.order);
 }
 
-// Типовий scope ресурсу — application. ARC створює один масив у open,
+// Типовий scope ресурсу — application. ARC створює одне сховище у open,
 // а методи працюють із ним під час усіх запитів цього запуску.
 const ordersRepository = resource({
   id: "orders.repository",
@@ -34,32 +34,36 @@ const ordersRepository = resource({
   // effects описує побічні ефекти в метаданих ARC. Сам запис виконує метод save.
   effects: ["memory.write"],
   open: () => {
-    const orders: Order[] = [];
+    const orders = new Map<string, Order>();
     const belongsToUser = (order: Order, userId: string) => order.userId === userId;
-    const findOrderIndex = (id: string, userId: string) =>
-      orders.findIndex((order) => order.id === id && belongsToUser(order, userId));
+    const findOwnedOrder = (id: string, userId: string) => {
+      const order = orders.get(id);
+      return order && belongsToUser(order, userId) ? order : undefined;
+    };
 
     function changeOrder(id: string, userId: string, apply: (current: Order) => Order): OrderChange {
-      const index = findOrderIndex(id, userId);
-      if (index < 0) return "ORDER_NOT_FOUND";
-      const current = orders[index];
+      const current = findOwnedOrder(id, userId);
+      if (!current) return "ORDER_NOT_FOUND";
       if (!isOrderActive(current)) return { order: current, alreadyCancelled: true };
       const order = apply(current);
-      orders[index] = order;
+      orders.set(id, order);
       return { order, alreadyCancelled: false };
     }
 
     return {
       save: async (order: Order) => {
-        orders.push(order);
+        orders.set(order.id, order);
         return order;
       },
       // Вибірка обмежена власником, якого передає серверна операція.
-      list: async (userId: string) => orders.filter((order) => belongsToUser(order, userId)),
-      find: async (id: string, userId: string) => {
-        const index = findOrderIndex(id, userId);
-        return index < 0 ? undefined : orders[index];
+      list: async (userId: string) => {
+        const owned: Order[] = [];
+        for (const order of orders.values()) {
+          if (belongsToUser(order, userId)) owned.push(order);
+        }
+        return owned;
       },
+      find: async (id: string, userId: string) => findOwnedOrder(id, userId),
       async update({ id, ...changes }: OrderEdit, userId: string) {
         return changeOrder(id, userId, (current) => ({
           ...current,
