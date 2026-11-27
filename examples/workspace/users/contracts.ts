@@ -38,8 +38,8 @@ export type UserProfile = Infer<typeof CreateUser.input>;
 
 export const UpdateUser = operationContract({
   id: "users.update",
-  input: User.pick("id", CreateUser.input),
-  output: User,
+  input: CreateUser.output.pick("id", CreateUser.input),
+  output: CreateUser.output,
   errors: { ...userNotFound, EMAIL_EXISTS: emailExists },
   expose: { web: true },
 });
