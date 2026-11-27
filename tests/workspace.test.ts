@@ -864,6 +864,13 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     const otherOrder = await readOrder(detailPath, demoId);
     assert.equal(otherOrder.status, 404);
     assert.match(await otherOrder.text(), /ORDER_NOT_FOUND/);
+    const otherEdit = await fetch(`${origin}${detailPath}`, {
+      method: "PUT",
+      headers: { authorization: `Bearer ${demoId}`, "content-type": "application/json" },
+      body: JSON.stringify({ product: "Another user's edit", quantity: 3 }),
+    });
+    assert.equal(otherEdit.status, 404);
+    assert.equal((await otherEdit.json()).error, "ORDER_NOT_FOUND");
     const missing = await readOrder("/orders/00000000-0000-4000-8000-000000000099", userId!);
     assert.equal(missing.status, 404);
 

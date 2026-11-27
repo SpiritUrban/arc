@@ -18,6 +18,7 @@ import { orderDetailPattern, ordersPath } from "./paths.ts";
 // Імпортований Order є схемою перевірки. Локальний тип Order описує дані після parse.
 type Order = ReturnType<typeof Order.parse>;
 type OrderEdit = ReturnType<typeof UpdateOrder.input.parse>;
+type OrderPatch = (Omit<OrderEdit, "id"> & Pick<Order, "total">) | Pick<Order, "cancelled">;
 type OrderChange = "ORDER_NOT_FOUND" | { order: Order; alreadyCancelled: boolean };
 
 function orderChangeResult(result: OrderChange, fail: Fail<typeof UpdateOrder.errors>) {
@@ -36,12 +37,12 @@ const ordersRepository = resource({
   open: () => {
     const ordersByOwner = new Map<string, Map<string, Order>>();
 
-    function changeOrder(id: string, userId: string, apply: (current: Order) => Order): OrderChange {
+    function changeOrder(id: string, userId: string, changes: OrderPatch): OrderChange {
       const owned = ordersByOwner.get(userId);
       const current = owned?.get(id);
       if (!owned || !current) return "ORDER_NOT_FOUND";
       if (!isOrderActive(current)) return { order: current, alreadyCancelled: true };
-      const order = apply(current);
+      const order = { ...current, ...changes };
       owned.set(id, order);
       return { order, alreadyCancelled: false };
     }
@@ -59,14 +60,13 @@ const ordersRepository = resource({
       list: async (userId: string) => Array.from(ordersByOwner.get(userId)?.values() ?? []),
       find: async (id: string, userId: string) => ordersByOwner.get(userId)?.get(id),
       async update({ id, ...changes }: OrderEdit, userId: string) {
-        return changeOrder(id, userId, (current) => ({
-          ...current,
+        return changeOrder(id, userId, {
           ...changes,
           total: orderTotal(changes.quantity),
-        }));
+        });
       },
       async cancel(id: string, userId: string) {
-        return changeOrder(id, userId, (current) => ({ ...current, cancelled: true }));
+        return changeOrder(id, userId, { cancelled: true });
       },
     };
   },
