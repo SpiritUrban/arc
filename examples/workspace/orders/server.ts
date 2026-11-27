@@ -12,14 +12,18 @@ import {
   type HandlerContext,
 } from "@arc/framework/server";
 import { currentUser } from "../auth.ts";
-import { Order, ListOrders, GetOrder, CreateOrder, UpdateOrder, CancelOrder, isOrderActive, orderTotal } from "./contracts.ts";
+import { Order, ListOrders, GetOrder, CreateOrder, UpdateOrder, CancelOrder, isOrderActive, orderTotal, type OrderFormInput } from "./contracts.ts";
 import { orderDetailPattern, ordersPath } from "./paths.ts";
 
 // Імпортований Order є схемою перевірки. Локальний тип Order описує дані після parse.
 type Order = ReturnType<typeof Order.parse>;
 type OrderEdit = ReturnType<typeof UpdateOrder.input.parse>;
-type OrderPatch = (Omit<OrderEdit, "id"> & Pick<Order, "total">) | Pick<Order, "cancelled">;
+type OrderPatch = ReturnType<typeof priceOrderFields> | Pick<Order, "cancelled">;
 type OrderChange = "ORDER_NOT_FOUND" | { order: Order; alreadyCancelled: boolean };
+
+function priceOrderFields(fields: ReturnType<typeof OrderFormInput.parse>) {
+  return { ...fields, total: orderTotal(fields.quantity) };
+}
 
 function orderChangeResult(result: OrderChange, fail: Fail<typeof UpdateOrder.errors>) {
   if (typeof result === "string") return fail(result);
@@ -60,10 +64,7 @@ const ordersRepository = resource({
       list: async (userId: string) => Array.from(ordersByOwner.get(userId)?.values() ?? []),
       find: async (id: string, userId: string) => ordersByOwner.get(userId)?.get(id),
       async update({ id, ...changes }: OrderEdit, userId: string) {
-        return changeOrder(id, userId, {
-          ...changes,
-          total: orderTotal(changes.quantity),
-        });
+        return changeOrder(id, userId, priceOrderFields(changes));
       },
       async cancel(id: string, userId: string) {
         return changeOrder(id, userId, { cancelled: true });
@@ -79,10 +80,9 @@ const createOrder = http.post(ordersPath, CreateOrder, {
   status: 201,
   async run({ input, user, orders }) {
     const order = {
-      ...input,
+      ...priceOrderFields(input),
       id: randomUUID(),
       userId: user.id,
-      total: orderTotal(input.quantity),
       cancelled: false,
     };
     return ok(await orders.save(order));

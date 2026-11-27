@@ -128,9 +128,11 @@ test("Workspace order edit carries the submit trace to the server operation in S
     const fields = [...form.querySelectorAll<HTMLInputElement>("input[name]")];
     Object.defineProperty(form, "elements", { value: fields });
     form.querySelector<HTMLInputElement>('input[name="product"]')!.value = "Revised notebook";
+    form.querySelector<HTMLInputElement>('input[name="quantity"]')!.value = "4";
     form.dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
     await waitFor(() => document.querySelector("[data-order-detail] h2")?.textContent === "Revised notebook",
       "detail updated from the mutation response");
+    assert.match(document.querySelector("[data-order-detail]")!.textContent!, /Сума 100/);
     assert.ok(editTrace);
     const mutationEvents = [
       ["binding.event", `${detailPage}.dom.`],
