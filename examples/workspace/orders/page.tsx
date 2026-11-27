@@ -5,7 +5,7 @@ import { isOrderActive, orderTotal, orderUnitPrice, quantityLimits, type Order }
 import { activeUser } from "../user-selection.ts";
 import { cancelListedOrder, createOrder, ordersData } from "./client.ts";
 import { OrderFields } from "./fields.tsx";
-import { orderStatus, orderStatuses, orderWriteMessage } from "./messages.ts";
+import { orderStatus, orderStatuses, orderStatusLabel, orderWriteMessage } from "./messages.ts";
 import { orderDetailPath } from "./paths.ts";
 import { money, failureMessage } from "../ui.ts";
 
@@ -169,7 +169,7 @@ export const OrdersPage = view({
                       <td>{money(order.total)}</td>
                       <td>
                         <span class="order-status">
-                          {orderStatuses[orderStatus(order)].label}
+                          {orderStatusLabel(order)}
                         </span>
                         <CancelOrderControl order={order} />
                       </td>

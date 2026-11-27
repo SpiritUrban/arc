@@ -1,14 +1,20 @@
 import type { RemoteResult } from "@arc/framework/fullstack";
 import { failureMessage } from "../ui.ts";
-import { isOrderActive, type CancelOrder, type UpdateOrder } from "./contracts.ts";
+import { isOrderActive, type CancelOrder, type Order, type UpdateOrder } from "./contracts.ts";
 
 export const orderStatuses = {
   created: { label: "Створено", filterLabel: "Створені" },
   cancelled: { label: "Скасовано", filterLabel: "Скасовані" },
 } as const;
 
-export function orderStatus(order: { cancelled: boolean }): keyof typeof orderStatuses {
+type OrderStatusSource = Pick<Order, "cancelled">;
+
+export function orderStatus(order: OrderStatusSource): keyof typeof orderStatuses {
   return isOrderActive(order) ? "created" : "cancelled";
+}
+
+export function orderStatusLabel(order: OrderStatusSource): string {
+  return orderStatuses[orderStatus(order)].label;
 }
 
 type WriteOutcome = {

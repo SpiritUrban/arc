@@ -3,7 +3,7 @@ import { render, type PageContext } from "@arc/framework/web";
 import { CancelOrder, GetOrder, UpdateOrder, isOrderActive, type Order } from "../../orders/contracts.ts";
 import { orderClient, replaceListedOrder } from "../../orders/client.ts";
 import { OrderFields } from "../../orders/fields.tsx";
-import { orderStatus, orderStatuses, orderWriteMessage } from "../../orders/messages.ts";
+import { orderStatusLabel, orderWriteMessage } from "../../orders/messages.ts";
 import { orderDetailPattern, ordersPath } from "../../orders/paths.ts";
 import { UsersPage } from "../../users/page.tsx";
 import { editFormOptions, money } from "../../ui.ts";
@@ -23,7 +23,7 @@ export default function OrderDetail({ bind }: PageContext<RouteParamNames<typeof
         <h2>{saved.product}</h2>
         <p>Кількість {saved.quantity}</p>
         <p>Сума {money(saved.total)}</p>
-        <p>{orderStatuses[orderStatus(saved)].label}</p>
+        <p>{orderStatusLabel(saved)}</p>
         {isOrderActive(saved) && (
           <form onSubmit={cancelOrder}>
             <button class="button secondary" type="submit">
