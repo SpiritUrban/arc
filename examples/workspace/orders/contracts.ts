@@ -18,12 +18,6 @@ export const Order = s.object({
   cancelled: s.boolean(),
 });
 export type Order = Infer<typeof Order>;
-const orderIdentity = Order.pick("id");
-const orderNotFound = { ORDER_NOT_FOUND: 404 } as const;
-const orderChangeErrors = {
-  ...orderNotFound,
-  ORDER_ALREADY_CANCELLED: { status: 409, details: Order, updateFromDetails: true },
-} as const;
 
 export function isOrderActive(order: { cancelled: boolean } | undefined): boolean {
   return order?.cancelled === false;
@@ -40,11 +34,16 @@ export const ListOrders = operationContract({
 
 export const GetOrder = operationContract({
   id: "orders.get",
-  input: orderIdentity,
+  input: Order.pick("id"),
   output: Order,
-  errors: orderNotFound,
+  errors: { ORDER_NOT_FOUND: 404 },
   expose: { web: true },
 });
+
+const orderChangeErrors = {
+  ...GetOrder.errors,
+  ORDER_ALREADY_CANCELLED: { status: 409, details: GetOrder.output, updateFromDetails: true },
+} as const;
 
 // Браузер передає товар і кількість. Сервер визначає власника за запитом і обчислює суму.
 export const CreateOrder = operationContract({
@@ -65,8 +64,8 @@ export const UpdateOrder = operationContract({
 
 export const CancelOrder = operationContract({
   id: "orders.cancel",
-  input: orderIdentity,
-  output: Order,
+  input: GetOrder.input,
+  output: GetOrder.output,
   errors: orderChangeErrors,
   expose: { web: true },
 });
