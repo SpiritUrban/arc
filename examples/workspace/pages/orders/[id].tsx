@@ -1,7 +1,7 @@
 import type { RouteParamNames } from "@arc/framework/core";
 import { render, type PageContext } from "@arc/framework/web";
 import { CancelOrder, GetOrder, UpdateOrder, isOrderActive, type Order } from "../../orders/contracts.ts";
-import { orderClient, updateOrderLists } from "../../orders/client.ts";
+import { orderClient, orderUpdates, updateOrderLists } from "../../orders/client.ts";
 import { OrderFields } from "../../orders/fields.tsx";
 import { orderStatusLabel, orderWriteMessage } from "../../orders/messages.ts";
 import { orderDetailPattern, ordersPath } from "../../orders/paths.ts";
@@ -14,8 +14,9 @@ export default function OrderDetail({ bind }: PageContext<RouteParamNames<typeof
   const { query, mutation } = bind(orderClient);
   const order = query(GetOrder);
   const update = [order, ...updateOrderLists];
-  const updateOrder = mutation(UpdateOrder, { ...editFormOptions, update });
-  const cancelOrder = mutation(CancelOrder, { update });
+  const entity = orderUpdates;
+  const updateOrder = mutation(UpdateOrder, { ...editFormOptions, entity, update });
+  const cancelOrder = mutation(CancelOrder, { entity, update });
 
   function renderSummary(saved: Order) {
     return (

@@ -386,7 +386,7 @@ test("ARC filters orders on the server within the authenticated owner", async ({
     data: { id: cancelled.id },
   });
   expect(cancellation.ok()).toBeTruthy();
-  const saved = { ...cancelled, cancelled: true };
+  const saved = { ...cancelled, cancelled: true, revision: cancelled.revision + 1 };
 
   for (const [query, expected] of [
     ["", [active, saved]],
@@ -493,6 +493,56 @@ test("ARC applies a late cancellation conflict to the original owner's filtered 
     await cancel.release();
     await originalList.release();
   }
+});
+
+test("ARC keeps a newer cancellation when an older edit arrives last", async ({ page, request }, info) => {
+  test.skip(isReact(info));
+  const product = "Edited before cancellation";
+  const { user, rows: [order] } = await fixture(request, info, "ReversedWrites", [["Original notebook", 1]]);
+  await page.goto("/orders");
+  await userRow(page, user.name).click();
+  await page.getByLabel("Статус").selectOption("created");
+  await orderRow(page, order.product).getByRole("link", { name: order.product }).click();
+  const edit = page.locator("[data-edit-order]");
+  await edit.locator('[name="product"]').fill(product);
+
+  const editPath = transport(info, "orders.update");
+  const olderEdit = await hold(page, editPath, (req) => req.postDataJSON()?.id === order.id,
+    { delayResponse: true });
+  try {
+    await edit.getByRole("button", { name: "Зберегти зміни" }).click();
+    const pendingEdit = await olderEdit.request;
+    await orderDetail(page).getByRole("button", { name: "Скасувати замовлення" }).click();
+    await expect(orderDetail(page)).toContainText("Скасовано");
+    await expect(orderDetail(page)).toContainText(product);
+    const traced = page.waitForResponse((response) => {
+      const request = response.request();
+      return new URL(request.url()).pathname === "/_arc/telemetry" &&
+        request.postDataJSON()?.events?.some((event) =>
+          event.traceId === pendingEdit.headers()["x-arc-trace-id"] &&
+          event.type === "action.update" &&
+          event.data?.reason === "stale_revision" &&
+          event.data.revision === order.revision + 1 &&
+          event.data.confirmedRevision === order.revision + 2);
+    });
+    await olderEdit.release();
+    expect((await traced).ok()).toBeTruthy();
+    await expect(orderDetail(page)).toContainText("Скасовано");
+    await expect(edit).toHaveCount(0);
+  } finally {
+    await olderEdit.release();
+  }
+  await page.getByRole("link", { name: "← Усі замовлення" }).click();
+  await expect(orderRow(page, product)).toHaveCount(0);
+  await page.getByLabel("Статус").selectOption("cancelled");
+  await expect(orderRow(page, product)).toContainText("Скасовано");
+  const saved = await request.get(orderPath(info, `/${order.id}`), { headers: auth(user.id) });
+  expect(saved.ok()).toBeTruthy();
+  expect(await saved.json()).toMatchObject({
+    product,
+    cancelled: true,
+    revision: order.revision + 2,
+  });
 });
 
 test("ARC reloads the user list from its retry button", async ({ page }, info) => {

@@ -12,6 +12,7 @@ export const quantityLimits = { min: 1, max: 100 } as const;
 export const Order = s.object({
   id: s.uuid(),
   userId: s.uuid(),
+  revision: s.int({ min: 1 }),
   product: s.string({ min: 1, max: productMaxLength }),
   quantity: s.int(quantityLimits),
   total: s.number({ min: 0 }),

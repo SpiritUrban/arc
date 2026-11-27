@@ -186,6 +186,8 @@ type RemoteFormOptions<C extends OperationContract> = {
   /** Restore submitted fields to their initial values after success. Defaults to true. */
   resetOnSuccess?: boolean;
   update?: MutationUpdateTarget<Infer<C["output"]>> | readonly MutationUpdateTarget<Infer<C["output"]>>[];
+  /** Share revision checks for update targets across mutations that return the same entity. */
+  entity?: EntityUpdates<Infer<C["output"]>>;
   /** Override the contract errors whose details can drive update. */
   updateOnError?: UpdateErrorCode<NoInfer<C>> | readonly UpdateErrorCode<NoInfer<C>>[];
   baseUrl?: string;
@@ -602,6 +604,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     params,
     onSuccess,
     resetOnSuccess = true,
+    entity,
     updateOnError,
   } = options;
   const refreshOption = options.refresh ?? options.invalidates;
@@ -673,6 +676,7 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     baseUrl,
     fetch,
   });
+  let telemetry = silentTelemetry;
   const definition: ActionOptions<void | DirectSubmission<C> | BoundSubmission<C>, RemoteResult<C>> = {
     id,
     needs: Object.fromEntries(
@@ -686,22 +690,34 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     async run(request, ctx) {
       const apply = updates.map((update) => update.capture());
       async function execute(input: Infer<C["input"]>, reset?: () => void) {
-        const result = await client.call(input, ctx);
-        if (ctx.signal.aborted) return result;
-        if (result.ok) {
-          batch(() => {
-            reset?.();
-            for (const update of apply) update(result.value, ctx.trace);
-            onSuccess?.(result.value, ctx);
-          });
-        } else if (result.kind === "business_error" && updateErrors.has(result.error)) {
-          // The selected error codes declare details compatible with the output.
-          const value = result.details as Infer<C["output"]>;
-          batch(() => {
-            for (const update of apply) update(value, ctx.trace);
-          });
+        const write = entity?.[beginEntityUpdate]();
+        function applyConfirmed(value: Infer<C["output"]>) {
+          const stale = write?.confirm(value);
+          if (stale) {
+            browserEvent(telemetry, id, "action.update", ctx.trace, {
+              data: { applied: false, reason: "stale_revision", ...stale },
+            });
+            return;
+          }
+          for (const update of apply) update(value, ctx.trace);
         }
-        return result;
+        try {
+          const result = await client.call(input, ctx);
+          if (ctx.signal.aborted) return result;
+          if (result.ok) {
+            batch(() => {
+              reset?.();
+              applyConfirmed(result.value);
+              onSuccess?.(result.value, ctx);
+            });
+          } else if (result.kind === "business_error" && updateErrors.has(result.error)) {
+            // The selected error codes declare details compatible with the output.
+            batch(() => applyConfirmed(result.details as Infer<C["output"]>));
+          }
+          return result;
+        } finally {
+          write?.finish();
+        }
       }
       if (request && directInput in request) {
         return execute(contract.input.parse(request[directInput]));
@@ -735,9 +751,10 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
   };
   const submit = callable ? action({ ...definition, callable: true }) : action(definition);
   const activate = submit.activate;
-  submit.activate = (telemetry) => {
-    client.activate(telemetry ?? silentTelemetry);
-    activate(telemetry);
+  submit.activate = (next) => {
+    telemetry = next ?? silentTelemetry;
+    client.activate(telemetry);
+    activate(next);
   };
   if (updates.length) submit.relations = [
     ...(submit.relations ?? []),
@@ -1016,6 +1033,47 @@ function encodeCacheValue(value: unknown, ancestors = new Set<object>()): string
 
 function querySourceKey(values: readonly unknown[]) {
   return JSON.stringify(values.map((value) => encodeCacheValue(value)));
+}
+
+const beginEntityUpdate = Symbol("ARC entity update");
+
+export type EntityUpdates<Row> = {
+  [beginEntityUpdate](): {
+    confirm(row: Row): { revision: number; confirmedRevision: number } | undefined;
+    finish(): void;
+  };
+};
+
+/** Coordinate cache updates from overlapping mutations using server revisions. */
+export function entityUpdates<Row>({
+  key,
+  revision,
+}: {
+  /** Stable identity within the application, including the owner when identities are scoped. */
+  key: (row: Row) => readonly (string | number)[];
+  /** Server revision that increases each time this entity changes. */
+  revision: (row: Row) => number;
+}): EntityUpdates<Row> {
+  let pending = 0;
+  const confirmed = new Map<string, number>();
+  return {
+    [beginEntityUpdate]() {
+      pending++;
+      return {
+        confirm(row) {
+          const id = querySourceKey(key(row));
+          const next = revision(row);
+          const latest = confirmed.get(id);
+          if (latest !== undefined && next < latest)
+            return { revision: next, confirmedRevision: latest };
+          confirmed.set(id, next);
+        },
+        finish() {
+          if (--pending === 0) confirmed.clear();
+        },
+      };
+    },
+  };
 }
 
 function bindQueryKey<Values extends readonly unknown[]>(

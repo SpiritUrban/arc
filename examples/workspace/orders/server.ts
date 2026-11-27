@@ -62,7 +62,7 @@ const ordersRepository = resource({
       const current = find(id, userId);
       if (!current) return { error: "ORDER_NOT_FOUND" };
       if (!isOrderActive(current)) return { error: "ORDER_ALREADY_CANCELLED", order: current };
-      return save({ ...current, ...changes });
+      return save({ ...current, ...changes, revision: current.revision + 1 });
     }
 
     return {
@@ -94,6 +94,7 @@ const createOrder = http.post(ordersPath, CreateOrder, {
       ...priceOrderFields(input),
       id: randomUUID(),
       userId: user.id,
+      revision: 1,
       cancelled: false,
     };
     return ok(await orders.save(order));

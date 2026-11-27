@@ -1,7 +1,7 @@
-import { remoteApi } from "@arc/framework/fullstack";
+import { entityUpdates, remoteApi } from "@arc/framework/fullstack";
 import { state } from "@arc/framework/web";
 import { selectedUser } from "../user-selection.ts";
-import { CancelOrder, CreateOrder, ListOrders, compareOrderIds, matchesOrderStatus } from "./contracts.ts";
+import { CancelOrder, CreateOrder, ListOrders, compareOrderIds, matchesOrderStatus, type Order } from "./contracts.ts";
 import type { orderStatuses } from "./messages.ts";
 
 export const allStatuses = "all";
@@ -13,6 +13,10 @@ export const orderStatusFilter = state<keyof typeof orderStatuses | typeof allSt
 export const orderClient = remoteApi({
   bearer: selectedUser,
   key: true,
+});
+export const orderUpdates = entityUpdates<Order>({
+  key: (order) => [order.userId, order.id],
+  revision: (order) => order.revision,
 });
 
 export const ordersData = orderClient.query(ListOrders, { cache: true });
@@ -37,10 +41,12 @@ const reconcileHistory = ordersHistory.reconcileBy("id", {
 export const updateOrderLists = [ordersData.replaceBy(), reconcileHistory] as const;
 
 export const createOrder = orderClient.mutation(CreateOrder, {
+  entity: orderUpdates,
   update: [ordersData.insertBy(), reconcileHistory],
 });
 
 export const cancelListedOrder = orderClient.mutation(CancelOrder, {
+  entity: orderUpdates,
   key: "id",
   update: updateOrderLists,
 });
