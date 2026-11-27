@@ -3,9 +3,9 @@
 import { each, render, view } from "@arc/framework/web";
 import { isOrderActive, orderTotal, orderUnitPrice, quantityLimits, type Order } from "./contracts.ts";
 import { activeUser } from "../user-selection.ts";
-import { cancelListedOrder, createOrder, ordersData } from "./client.ts";
+import { allStatuses, cancelListedOrder, createOrder, ordersData, ordersHistory, orderStatusFilter } from "./client.ts";
 import { OrderFields } from "./fields.tsx";
-import { orderStatus, orderStatuses, orderStatusLabel, orderWriteMessage } from "./messages.ts";
+import { orderStatuses, orderStatusLabel, orderWriteMessage } from "./messages.ts";
 import { orderDetailPath } from "./paths.ts";
 import { money, failureMessage } from "../ui.ts";
 
@@ -31,7 +31,7 @@ function CancelOrderControl({ order }: { order: Order }) {
 }
 
 const visibleOrders = ordersData.dataOr([], "visible");
-const allStatuses = "all";
+const filteredOrders = ordersHistory.dataOr([], "visible");
 const orderSummary = ordersData.select("summary", (orders) => ({
   count: orders?.length ?? 0,
   total: orders?.reduce((sum, order) => sum + order.total, 0) ?? 0,
@@ -39,21 +39,20 @@ const orderSummary = ordersData.select("summary", (orders) => ({
 
 export const OrdersPage = view({
   id: "orders.page",
-  state: { quantity: String(quantityLimits.min), search: "", status: allStatuses },
-  template({ quantity, search, status }, { derive }) {
+  state: { quantity: String(quantityLimits.min), search: "" },
+  template({ quantity, search }, { derive }) {
     const searchTerm = derive([search], (search) => search.trim().toLowerCase());
-    const statusFilter = derive([status], (status) => status === allStatuses ? undefined : status);
-    const history = derive([visibleOrders, searchTerm, statusFilter], (orders, term, status) =>
-      orders.filter((order) =>
-        order.product.toLowerCase().includes(term) &&
-        (status === undefined || orderStatus(order) === status),
-      ),
+    const history = derive([visibleOrders, filteredOrders, searchTerm, orderStatusFilter], (all, filtered, term, status) =>
+      (status === allStatuses ? all : filtered).filter((order) =>
+        order.product.toLowerCase().includes(term)),
     );
+    const loading = derive([ordersData.loading, ordersHistory.loading, orderStatusFilter],
+      (allLoading, filteredLoading, status) => status === allStatuses ? allLoading : filteredLoading);
     const emptyHistory = derive(
-      [history, ordersData.loading, searchTerm, statusFilter],
+      [history, loading, searchTerm, orderStatusFilter],
       (orders, loading, term, status) => {
         if (loading || orders.length > 0) return undefined;
-        return term !== "" || status !== undefined
+        return term !== "" || status !== allStatuses
           ? {
               title: "Замовлень не знайдено",
               description: "Змініть пошук або статус замовлення.",
@@ -108,7 +107,7 @@ export const OrdersPage = view({
           <p class="error" role="alert" data-error>
             {failureMessage(
               (createOrder.invalid() ? undefined : createOrder.error()) ??
-                ordersData.error(),
+                ordersData.error() ?? (orderStatusFilter() === allStatuses ? undefined : ordersHistory.error()),
             )}
           </p>
         </div>
@@ -124,7 +123,7 @@ export const OrdersPage = view({
               class="muted"
               data-loading
               role="status"
-            >{render.when(ordersData.loading, "Завантажуємо замовлення…")}</span>
+            >{render.when(loading, "Завантажуємо замовлення…")}</span>
           </div>
           <div class="order-filters">
             <label class="search-label">
@@ -138,7 +137,7 @@ export const OrdersPage = view({
             </label>
             <label>
               Статус
-              <select data-order-status bind:value={status}>
+              <select data-order-status bind:value={orderStatusFilter}>
                 <option value={allStatuses}>Усі замовлення</option>
                 {Object.entries(orderStatuses).map(([value, { filterLabel }]) => (
                   <option value={value}>{filterLabel}</option>
@@ -156,7 +155,7 @@ export const OrdersPage = view({
                   <th>Статус</th>
                 </tr>
               </thead>
-              <tbody data-rows aria-busy={ordersData.loading}>
+              <tbody data-rows aria-busy={loading}>
                 {each(history, {
                   needs: cancelListedOrder,
                   render: (order) => (

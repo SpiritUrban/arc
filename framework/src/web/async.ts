@@ -29,6 +29,7 @@ export interface ResourceSnapshot<T> {
   outcome: "idle" | "ok" | "business_error" | "fault" | "cancelled";
 }
 export const captureResourceUpdate = Symbol("ARC resource update");
+export const captureResourceVariants = Symbol("ARC resource variants");
 
 export interface WebResource<T, I = unknown> extends Readable<
   ResourceSnapshot<T>
@@ -44,6 +45,7 @@ export interface WebResource<T, I = unknown> extends Readable<
   relations?: GraphDefinition["relations"];
   [captureResourceUpdate]?: (options?: { refreshWhenMissing?: boolean }) =>
     (update: (data: T) => T, trace: TraceToken) => void;
+  [captureResourceVariants]?: () => (update: (data: T, input: I) => T, trace: TraceToken) => void;
 }
 type WebResourceOptions<T, I> = {
   id: string;
@@ -57,6 +59,8 @@ type WebResourceOptions<T, I> = {
   scope?: "application" | "view";
   callable?: boolean;
   key?: () => string | number;
+  partition?: () => string | number;
+  enabled?: () => boolean;
   cache?: boolean;
 };
 
@@ -95,11 +99,15 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
   const readSnapshot = value.get.bind(value);
   const key = def.key;
   if (def.cache && !key) throw new TypeError("A cached query requires a key");
-  const cache = def.cache ? new Map<string | number, ResourceSnapshot<T>>() : undefined;
-  function remember(requestKey: string | number, snapshot: ResourceSnapshot<T>) {
+  type Variant = { partition: string | number; input: I };
+  const cache = def.cache
+    ? new Map<string | number, { snapshot: ResourceSnapshot<T>; variant?: Variant }>()
+    : undefined;
+  function remember(requestKey: string | number, snapshot: ResourceSnapshot<T>, variant?: Variant) {
     if (!cache) return;
+    const context = variant ?? cache.get(requestKey)?.variant;
     cache.delete(requestKey);
-    cache.set(requestKey, snapshot);
+    cache.set(requestKey, { snapshot, variant: context });
     if (cache.size > queryCacheLimit) {
       const oldest = cache.keys().next().value;
       if (oldest !== undefined) cache.delete(oldest);
@@ -110,6 +118,7 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
     key: typeof snapshotKey;
     updates: ((data: T) => T)[];
     retryAfterFailure?: TraceToken;
+    variant?: Variant;
   } | undefined;
   if (key) {
     const switching = { ...initial, loading: true };
@@ -118,7 +127,7 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
       if (active || snapshotKey !== undefined) {
         const currentKey = key();
         if (!Object.is(snapshotKey, currentKey))
-          return active ? cache?.get(currentKey) ?? switching : initial;
+          return active ? cache?.get(currentKey)?.snapshot ?? switching : initial;
       }
       return snapshot;
     };
@@ -138,6 +147,53 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
     value._trace = trace;
     value.set(next);
   };
+  function captureUpdate(targetKey: typeof snapshotKey, refreshWhenMissing: boolean) {
+    return (update: (data: T) => T, trace: TraceToken) => {
+      if (disposed) return;
+      let cacheChanged = false;
+      let snapshotChanged = false;
+      if (targetKey !== undefined) {
+        const cached = cache?.get(targetKey)?.snapshot;
+        if (cached?.data !== undefined) {
+          const data = update(cached.data);
+          if (!Object.is(data, cached.data)) {
+            remember(targetKey, { ...cached, data });
+            cacheChanged = true;
+          }
+        }
+      }
+      if (Object.is(snapshotKey, targetKey)) {
+        const snapshot = readSnapshot();
+        if (snapshot.data !== undefined) {
+          const data = update(snapshot.data);
+          if (!Object.is(data, snapshot.data)) {
+            set({ ...snapshot, data }, trace);
+            snapshotChanged = true;
+          }
+        }
+      }
+      if (snapshotChanged || cacheChanged)
+        browserEvent(telemetry, def.id, "resource.updated", trace, {
+          data: { snapshot: snapshotChanged, cache: cacheChanged },
+        });
+      const needsRead = refreshWhenMissing && active && Object.is(key?.(), targetKey) &&
+        (targetKey === undefined || cache?.get(targetKey)?.snapshot.data === undefined) &&
+        (!Object.is(snapshotKey, targetKey) || readSnapshot().data === undefined);
+      if (pendingRead && Object.is(pendingRead.key, targetKey)) {
+        pendingRead.updates.push((data) => {
+          const next = update(data);
+          if (!snapshotChanged && !cacheChanged && !Object.is(next, data))
+            browserEvent(telemetry, def.id, "resource.updated", trace, {
+              data: { snapshot: true, cache: cache !== undefined, replayed: true },
+            });
+          return next;
+        });
+        if (needsRead) pendingRead.retryAfterFailure = trace;
+      } else if (needsRead) {
+        void resource.refresh(trace);
+      }
+    };
+  }
   const resource = Object.assign(value, {
     kind: "web-resource" as const,
     runtime: "browser" as const,
@@ -148,50 +204,22 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
     error: projections[2] as Computed<unknown>,
     stale: projections[3] as Computed<boolean>,
     [captureResourceUpdate]({ refreshWhenMissing = false } = {}) {
-      const targetKey = key?.();
-      return (update: (data: T) => T, trace: TraceToken) => {
-        if (disposed) return;
-        let cacheChanged = false;
-        let snapshotChanged = false;
-        if (targetKey !== undefined) {
-          const cached = cache?.get(targetKey);
-          if (cached?.data !== undefined) {
-            const data = update(cached.data);
-            if (!Object.is(data, cached.data)) {
-              remember(targetKey, { ...cached, data });
-              cacheChanged = true;
-            }
-          }
+      return captureUpdate(key?.(), refreshWhenMissing);
+    },
+    [captureResourceVariants]() {
+      const partition = def.partition?.();
+      return (update: (data: T, input: I) => T, trace: TraceToken) => {
+        const targets = new Map<string | number, Variant>();
+        if (partition === undefined) return;
+        for (const [targetKey, entry] of cache ?? []) {
+          if (entry.variant && Object.is(entry.variant.partition, partition))
+            targets.set(targetKey, entry.variant);
         }
-        if (Object.is(snapshotKey, targetKey)) {
-          const snapshot = readSnapshot();
-          if (snapshot.data !== undefined) {
-            const data = update(snapshot.data);
-            if (!Object.is(data, snapshot.data)) {
-              set({ ...snapshot, data }, trace);
-              snapshotChanged = true;
-            }
-          }
-        }
-        if (snapshotChanged || cacheChanged)
-          browserEvent(telemetry, def.id, "resource.updated", trace, {
-            data: { snapshot: snapshotChanged, cache: cacheChanged },
-          });
-        const needsRead = refreshWhenMissing && active && Object.is(key?.(), targetKey) &&
-          (targetKey === undefined || cache?.get(targetKey)?.data === undefined) &&
-          (!Object.is(snapshotKey, targetKey) || readSnapshot().data === undefined);
-        if (pendingRead && Object.is(pendingRead.key, targetKey)) {
-          pendingRead.updates.push((data) => {
-            const next = update(data);
-            if (!snapshotChanged && !cacheChanged && !Object.is(next, data))
-              browserEvent(telemetry, def.id, "resource.updated", trace, {
-                data: { snapshot: true, cache: cache !== undefined, replayed: true },
-              });
-            return next;
-          });
-          if (needsRead) pendingRead.retryAfterFailure = trace;
-        } else if (needsRead) {
-          void resource.refresh(trace);
+        if (pendingRead?.variant && pendingRead.key !== undefined)
+          targets.set(pendingRead.key, pendingRead.variant);
+        for (const [targetKey, variant] of targets) {
+          if (Object.is(variant.partition, partition))
+            captureUpdate(targetKey, true)((data) => update(data, variant.input), trace);
         }
       };
     },
@@ -202,6 +230,12 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
         : currentWriteTrace() ?? { traceId: identity() };
       const current = ++generation;
       controller?.abort();
+      if (def.enabled && !def.enabled()) {
+        pendingRead = undefined;
+        snapshotKey = key?.();
+        set(initial, trace);
+        return;
+      }
       controller = new AbortController();
       const signal = controller.signal,
         spanId = identity(),
@@ -219,7 +253,7 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
         requestKey = key?.();
         keyResolved = true;
         pendingRead = { key: requestKey, updates };
-        const cached = requestKey === undefined ? undefined : cache?.get(requestKey);
+        const cached = requestKey === undefined ? undefined : cache?.get(requestKey)?.snapshot;
         if (cached && requestKey !== undefined) remember(requestKey, cached);
         const previous = Object.is(snapshotKey, requestKey) ? readSnapshot() : cached ?? initial;
         snapshotKey = requestKey;
@@ -227,6 +261,8 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
         input = def.input
           ? def.input(...sources.map((d) => d.get()))
           : ({} as I);
+        const variant = def.partition && { partition: def.partition(), input };
+        pendingRead.variant = variant;
         const loaded: any = await def.load(input, {
           signal,
           trace: childTrace,
@@ -263,7 +299,7 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
             outcome,
           };
           if (requestKey !== undefined)
-            remember(requestKey, { ...next, loading: true, stale: true });
+            remember(requestKey, { ...next, loading: true, stale: true }, variant);
           set(next, trace);
         }
       } catch (error) {

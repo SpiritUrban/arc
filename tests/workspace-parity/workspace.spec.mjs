@@ -402,6 +402,99 @@ test("ARC filters orders on the server within the authenticated owner", async ({
   expect(await otherOwner.json()).not.toContainEqual(saved);
 });
 
+test("ARC reconciles cached status lists during a late cancellation and an older read", async ({
+  page,
+  request,
+}, info) => {
+  test.skip(isReact(info));
+  const product = "Cached notebook";
+  const { user, rows: [order] } = await fixture(request, info, "Cached", [[product, 2]]);
+  await page.goto("/orders");
+  await userRow(page, user.name).click();
+  const status = page.getByLabel("Статус");
+  const row = orderRow(page, product);
+  await status.selectOption("cancelled");
+  await expect(page.getByText("Замовлень не знайдено")).toBeVisible();
+  await status.selectOption("created");
+  await expect(row).toBeVisible();
+
+  const cancel = await hold(page, transport(info, "orders.cancel"),
+    (req) => req.postDataJSON()?.id === order.id);
+  const list = transport(info, "orders.list");
+  const readingCancelled = await hold(page, list, (req) =>
+    req.headers().authorization === `Bearer ${user.id}` && req.postDataJSON()?.cancelled === true,
+  { delayResponse: true });
+  try {
+    await row.getByRole("button", { name: "Скасувати" }).click();
+    await cancel.request;
+    await status.selectOption("cancelled");
+    await readingCancelled.request;
+    await expect(row).toHaveCount(0);
+
+    await cancel.release();
+    await expect(row).toContainText("Скасовано");
+    expect(readingCancelled.count).toBe(1);
+
+    await readingCancelled.release();
+    await expect(history(page).locator("tbody")).toHaveAttribute("aria-busy", "false");
+    await expect(row).toContainText("Скасовано");
+  } finally {
+    await cancel.release();
+    await readingCancelled.release();
+  }
+  await status.selectOption("created");
+  await expect(row).toHaveCount(0);
+  await status.selectOption("cancelled");
+  await row.getByRole("link", { name: product }).click();
+  await expect(orderDetail(page)).toContainText("Скасовано");
+});
+
+test("ARC applies a late cancellation conflict to the original owner's filtered cache", async ({
+  page,
+  request,
+}, info) => {
+  test.skip(isReact(info));
+  const product = "Conflicting notebook";
+  const { user, rows: [order] } = await fixture(request, info, "FilteredConflict", [[product, 1]]);
+  await page.goto("/orders");
+  await userRow(page, user.name).click();
+  const status = page.getByLabel("Статус");
+  const row = orderRow(page, product);
+  await status.selectOption("cancelled");
+  await expect(page.getByText("Замовлень не знайдено")).toBeVisible();
+  await status.selectOption("created");
+  await expect(row).toBeVisible();
+  const external = await request.post(orderPath(info, "/cancel"), {
+    headers: auth(user.id),
+    data: { id: order.id },
+  });
+  expect(external.ok()).toBeTruthy();
+
+  const cancelPath = transport(info, "orders.cancel");
+  const cancel = await hold(page, cancelPath, (req) => req.postDataJSON()?.id === order.id);
+  const originalList = await hold(page, transport(info, "orders.list"), (req) =>
+    req.headers().authorization === `Bearer ${user.id}` && req.postDataJSON()?.cancelled === true,
+  );
+  try {
+    await row.getByRole("button", { name: "Скасувати" }).click();
+    await cancel.request;
+    await userRow(page, "Demo User").click();
+    await status.selectOption("cancelled");
+    const conflict = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === cancelPath && response.status() === 409);
+    await cancel.release();
+    await conflict;
+    await expect(row).toHaveCount(0);
+
+    await userRow(page, user.name).click();
+    await originalList.request;
+    await expect(row).toContainText("Скасовано");
+  } finally {
+    await cancel.release();
+    await originalList.release();
+  }
+});
+
 test("ARC reloads the user list from its retry button", async ({ page }, info) => {
   test.skip(isReact(info), "ARC direct resource refresh binding");
   const list = transport(info, "users.list");

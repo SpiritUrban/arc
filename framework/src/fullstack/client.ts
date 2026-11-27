@@ -19,6 +19,7 @@ import {
 import {
   action,
   captureResourceUpdate,
+  captureResourceVariants,
   webResource,
   type Action,
   type ActionContext,
@@ -1029,6 +1030,13 @@ function bindQueryKey<Values extends readonly unknown[]>(
   };
 }
 
+function bindQuerySource<Values extends readonly unknown[], Result>(
+  project: ((...values: Values) => Result) | undefined,
+  sources: readonly Readable<unknown>[],
+): (() => Result) | undefined {
+  if (project) return () => project(...sources.map((source) => source.get()) as unknown as Values);
+}
+
 export type QueryInputField<Input, Value> = {
   [Name in keyof Input & string]: Record<Name, Value> extends Input ? Name : never;
 }[keyof Input & string];
@@ -1055,6 +1063,10 @@ function directQueryInput<Input>(
 
 type ClientQueryOptions<C extends OperationContract, Sources extends RemoteSources> = {
   id?: string;
+  /** Skip reads while the source values do not describe an active query. */
+  enabled?: (...values: SourceValues<Sources>) => boolean;
+  /** Separate cache entries and reconciliation by a context such as the authenticated owner. */
+  partition?: (...values: SourceValues<Sources>) => string | number;
   /** Override the cache context. By default, cached queries use all `from` values. */
   key?: true | ((...values: SourceValues<Sources>) => string | number);
   cache?: boolean;
@@ -1150,6 +1162,8 @@ function buildRemoteApi<const Sources extends RemoteSources>(options: RemoteApiS
           : query && "params" in query ? () => query.params as Infer<C["input"]>
           : undefined,
         key: bindQueryKey(query?.key ?? options.key, from, query?.cache),
+        enabled: bindQuerySource(query?.enabled, from),
+        partition: bindQuerySource(query?.partition, from),
         cache: query?.cache,
         baseUrl,
         fetch: fetchWithHeaders,
@@ -1239,6 +1253,14 @@ export type RemoteQuery<C extends OperationContract> =
     replaceBy(...[field]: RowKeyArgument<QueryItem<C>>): MutationUpdate<QueryItem<C>>;
     /** Append a confirmed new row to a loaded list, preserving any row with the same key. */
     insertBy(...[field]: RowKeyArgument<QueryItem<C>>): MutationUpdate<QueryItem<C>>;
+    /** Reconcile a confirmed row with every loaded list in the captured cache partition. */
+    reconcileBy<Field extends RowKey<QueryItem<C>>>(
+      field: Field,
+      options: {
+        includes: (row: QueryItem<C>, input: Infer<C["input"]>) => boolean;
+        compare: (left: QueryItem<C>, right: QueryItem<C>) => number;
+      },
+    ): MutationUpdate<QueryItem<C>>;
   };
 
 type RemoteResourceOptions<C extends OperationContract> = {
@@ -1247,6 +1269,8 @@ type RemoteResourceOptions<C extends OperationContract> = {
   input?: (...values: any[]) => Infer<C["input"]>;
   key?: () => string | number;
   cache?: boolean;
+  enabled?: () => boolean;
+  partition?: () => string | number;
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
 };
@@ -1260,9 +1284,11 @@ type QueryProjection<C extends OperationContract, Sources extends RemoteSources>
 };
 
 type QueryOptions<C extends OperationContract, Sources extends RemoteSources> =
-  Omit<RemoteResourceOptions<C>, "id" | "input" | "from" | "key"> & {
+  Omit<RemoteResourceOptions<C>, "id" | "input" | "from" | "key" | "enabled" | "partition"> & {
     id?: string;
     from?: Sources;
+    enabled?: (...values: QuerySourceValues<Sources>) => boolean;
+    partition?: (...values: QuerySourceValues<Sources>) => string | number;
     /** Override the cache context. By default, cached queries use all `from` values. */
     key?: true | ((...values: QuerySourceValues<Sources>) => string | number);
   } & (
@@ -1289,7 +1315,7 @@ export function query<
     ? [options?: QueryOptions<C, Sources>]
     : [options: QueryOptions<C, Sources>]
 ): RemoteQuery<C> {
-  const { params, input, key, from, ...settings } = options ?? {};
+  const { params, input, key, from, enabled, partition, ...settings } = options ?? {};
   const sources = from === undefined ? [] : sourceList(from);
   const project = input === true || typeof input === "string"
     ? directQueryInput<Infer<C["input"]>>(from, input)
@@ -1300,6 +1326,8 @@ export function query<
     from: sources,
     input: project ?? (options && "params" in options ? () => params as Infer<C["input"]> : undefined),
     key: bindQueryKey(key, sources, options?.cache),
+    enabled: bindQuerySource(enabled, sources),
+    partition: bindQuerySource(partition, sources),
   }, true);
 }
 
@@ -1334,8 +1362,10 @@ function createRemoteResource<C extends OperationContract>(
     ...options,
     id: options.id + ".remote",
   });
+  const { key, partition } = options;
   const resource = {
     ...options,
+    key: key && partition ? () => querySourceKey([partition(), key()]) : key,
     result: true,
     load: (input: Infer<C["input"]>, ctx: { signal: AbortSignal; trace: TraceToken }) =>
       client.call(input, ctx) as any,
@@ -1461,6 +1491,36 @@ function createRemoteResource<C extends OperationContract>(
                 data.some((item: QueryItem<C>) => Object.is(item[field], row[field])))
               return data;
             return [...data, row] as Infer<C["output"]>;
+          }, trace);
+        },
+      };
+    },
+    reconcileBy<Field extends RowKey<QueryItem<C>>>(
+      field: Field,
+      { includes, compare }: {
+        includes: (row: QueryItem<C>, input: Infer<C["input"]>) => boolean;
+        compare: (left: QueryItem<C>, right: QueryItem<C>) => number;
+      },
+    ): MutationUpdate<QueryItem<C>> {
+      if (!options.cache || !options.partition)
+        throw new TypeError("reconcileBy requires a cached query with a partition");
+      return {
+        target: result,
+        capture() {
+          const apply = result[captureResourceVariants]?.();
+          return (row, trace) => apply?.((data, input) => {
+            if (!Array.isArray(data)) return data;
+            const index = data.findIndex((item: QueryItem<C>) => Object.is(item[field], row[field]));
+            if (!includes(row, input)) {
+              if (index < 0) return data;
+              const next = data.slice();
+              next.splice(index, 1);
+              return next as Infer<C["output"]>;
+            }
+            const next = data.slice();
+            if (index < 0) next.push(row);
+            else next[index] = row;
+            return next.sort(compare) as Infer<C["output"]>;
           }, trace);
         },
       };

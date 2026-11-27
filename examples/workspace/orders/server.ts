@@ -13,7 +13,7 @@ import {
   type HandlerContext,
 } from "@arc/framework/server";
 import { currentUser } from "../auth.ts";
-import { ListOrders, GetOrder, CreateOrder, UpdateOrder, CancelOrder, isOrderActive, orderTotal, type Order, type OrderFormInput } from "./contracts.ts";
+import { ListOrders, GetOrder, CreateOrder, UpdateOrder, CancelOrder, compareOrderIds, isOrderActive, matchesOrderStatus, orderTotal, type Order, type OrderFormInput } from "./contracts.ts";
 import { orderDetailPattern, ordersPath } from "./paths.ts";
 
 type OrderEdit = Infer<typeof UpdateOrder.input>;
@@ -67,11 +67,11 @@ const ordersRepository = resource({
 
     return {
       save: async (order: Order) => save(order),
-      async list(userId: string, cancelled: boolean | undefined) {
+      async list(userId: string, filter: Infer<typeof ListOrders.input>) {
         const orders = Array.from(ordersByOwner.get(userId)?.values() ?? []);
-        return cancelled === undefined
+        return filter.cancelled === undefined
           ? orders
-          : orders.filter((order) => order.cancelled === cancelled);
+          : orders.filter((order) => matchesOrderStatus(order, filter)).sort(compareOrderIds);
       },
       find: async (id: string, userId: string) => find(id, userId),
       async update({ id, ...changes }: OrderEdit, userId: string) {
@@ -130,7 +130,7 @@ class Orders {
     route: { method: "GET", path: ordersPath },
   })
   static async listOrders({ input, user, orders }: HandlerContext<typeof ListOrders, typeof needs>) {
-    return ok(await orders.list(user.id, input.cancelled));
+    return ok(await orders.list(user.id, input));
   }
 }
 

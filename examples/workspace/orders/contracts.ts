@@ -23,6 +23,14 @@ export function isOrderActive(order: { cancelled: boolean } | undefined): boolea
   return order?.cancelled === false;
 }
 
+export function matchesOrderStatus(order: Order, { cancelled }: { cancelled?: boolean }): boolean {
+  return cancelled === undefined || order.cancelled === cancelled;
+}
+
+export function compareOrderIds(left: Order, right: Order): number {
+  return left.id.localeCompare(right.id);
+}
+
 // ID зв’язує браузерний клієнт із серверною реалізацією. expose.web відкриває
 // операцію для внутрішнього HTTP-транспорту ARC.
 export const ListOrders = operationContract({
