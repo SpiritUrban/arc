@@ -25,12 +25,11 @@ export const GetUser = operationContract({
 });
 // Клієнт передає ім’я й пошту. Під час створення сервер генерує ID
 // і повертає оголошену тут помилку EMAIL_EXISTS із HTTP 409, якщо пошта зайнята.
-const emailExists = { status: 409, field: "email" } as const;
 export const CreateUser = operationContract({
   id: "users.create",
   input: User.pick("name", "email"),
   output: User,
-  errors: { EMAIL_EXISTS: emailExists },
+  errors: { EMAIL_EXISTS: { status: 409, field: "email" } },
   expose: { web: true },
 });
 export type UserProfile = Infer<typeof CreateUser.input>;
@@ -39,6 +38,6 @@ export const UpdateUser = operationContract({
   id: "users.update",
   input: CreateUser.output.pick(GetUser.input, CreateUser.input),
   output: CreateUser.output,
-  errors: { ...GetUser.errors, EMAIL_EXISTS: emailExists },
+  errors: { ...GetUser.errors, ...CreateUser.errors },
   expose: { web: true },
 });
