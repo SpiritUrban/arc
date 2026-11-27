@@ -1,6 +1,7 @@
 // Серверна частина користувачів. Тут зберігаються записи,
 // виконуються операції та визначаються HTTP-маршрути.
 import { randomUUID } from "node:crypto";
+import type { Infer } from "@arc/framework/core";
 import {
   resource,
   module,
@@ -9,6 +10,9 @@ import {
 } from "@arc/framework";
 import { ListUsers, GetUser, CreateUser, UpdateUser, demoUserId, type User, type UserProfile } from "./contracts.ts";
 export { User } from "./contracts.ts";
+
+type UserEdit = Infer<typeof UpdateUser.input>;
+
 // Сховище живе в пам’яті одного запуску. Початковий запис дає Workspace демо-користувача.
 export const usersRepository = resource({
   id: "users.repository",
@@ -44,10 +48,11 @@ export const usersRepository = resource({
         if (emailExists(profile.email)) return undefined;
         return save({ id: randomUUID(), ...profile });
       },
-      update: async (user: User) => {
-        if (!users.has(user.id)) return "USER_NOT_FOUND" as const;
-        if (emailExists(user.email, user.id)) return "EMAIL_EXISTS" as const;
-        return save(user);
+      update: async (input: UserEdit) => {
+        const current = users.get(input.id);
+        if (!current) return "USER_NOT_FOUND" as const;
+        if (emailExists(input.email, input.id)) return "EMAIL_EXISTS" as const;
+        return save({ ...current, ...input });
       },
     };
   },
