@@ -2,6 +2,7 @@
 // Форма в orders/page.tsx надсилає POST /_arc/call/orders.create.
 // ARC знаходить реалізацію за ID зі спільного контракту.
 import { randomUUID } from "node:crypto";
+import type { Infer } from "@arc/framework/core";
 import {
   handlerModule,
   handles,
@@ -15,17 +16,21 @@ import { currentUser } from "../auth.ts";
 import { ListOrders, GetOrder, CreateOrder, UpdateOrder, CancelOrder, isOrderActive, orderTotal, type Order, type OrderFormInput } from "./contracts.ts";
 import { orderDetailPattern, ordersPath } from "./paths.ts";
 
-type OrderEdit = ReturnType<typeof UpdateOrder.input.parse>;
+type OrderEdit = Infer<typeof UpdateOrder.input>;
 type OrderPatch = ReturnType<typeof priceOrderFields> | Pick<Order, "cancelled">;
-type OrderChange = "ORDER_NOT_FOUND" | { order: Order; alreadyCancelled: boolean };
+type OrderChange =
+  | Order
+  | { error: "ORDER_NOT_FOUND" }
+  | { error: "ORDER_ALREADY_CANCELLED"; order: Order };
 
 function priceOrderFields(fields: OrderFormInput) {
   return { ...fields, total: orderTotal(fields.quantity) };
 }
 
 function orderChangeResult(result: OrderChange, fail: Fail<typeof UpdateOrder.errors>) {
-  if (typeof result === "string") return fail(result);
-  return result.alreadyCancelled ? fail("ORDER_ALREADY_CANCELLED", result.order) : ok(result.order);
+  if (!("error" in result)) return ok(result);
+  if (result.error === "ORDER_NOT_FOUND") return fail(result.error);
+  return fail(result.error, result.order);
 }
 
 // Типовий scope ресурсу — application. ARC створює одне сховище у open,
@@ -42,11 +47,11 @@ const ordersRepository = resource({
     function changeOrder(id: string, userId: string, changes: OrderPatch): OrderChange {
       const owned = ordersByOwner.get(userId);
       const current = owned?.get(id);
-      if (!owned || !current) return "ORDER_NOT_FOUND";
-      if (!isOrderActive(current)) return { order: current, alreadyCancelled: true };
+      if (!owned || !current) return { error: "ORDER_NOT_FOUND" };
+      if (!isOrderActive(current)) return { error: "ORDER_ALREADY_CANCELLED", order: current };
       const order = { ...current, ...changes };
       owned.set(id, order);
-      return { order, alreadyCancelled: false };
+      return order;
     }
 
     return {
