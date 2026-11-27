@@ -44,9 +44,8 @@ export const usersRepository = resource({
     return {
       find: async (id: string) => users.get(id),
       list: async () => [...users.values()],
-      // Пошту перевіряємо серед записів. undefined дає операції сигнал повернути EMAIL_EXISTS.
       create: async (profile: UserProfile) => {
-        if (emailExists(profile.email)) return undefined;
+        if (emailExists(profile.email)) return "EMAIL_EXISTS" as const;
         return save({ id: randomUUID(), ...profile });
       },
       update: async (input: UserEdit) => {
@@ -74,9 +73,8 @@ const createUser = http.post(usersPath, CreateUser, {
   status: 201,
   needs,
   run: async ({ input, users, fail }) => {
-    const user = await users.create(input);
-    // Дублікат пошти повертаємо як бізнес-помилку, яку форма може показати користувачу.
-    return user ? ok(user) : fail("EMAIL_EXISTS");
+    const result = await users.create(input);
+    return typeof result === "string" ? fail(result) : ok(result);
   },
 });
 
