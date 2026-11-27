@@ -65,13 +65,14 @@ export function operationContract<
   I,
   O,
   const E extends ErrorContracts = {},
+  Input extends Schema<I> = Schema<I>,
 >(def: {
   id: string;
-  input: Schema<I>;
+  input: Schema<I> & Input;
   output: Schema<O>;
   errors?: OperationErrors<I, O, E>;
   expose?: { web?: boolean };
-}): OperationContract<I, O, E> {
+}): OperationContract<I, O, E> & { readonly input: Input } {
   return Object.freeze({
     kind: "operation",
     runtime: "server",

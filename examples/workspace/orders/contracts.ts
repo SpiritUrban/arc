@@ -58,7 +58,7 @@ export const CreateOrder = operationContract({
 
 export const UpdateOrder = operationContract({
   id: "orders.update",
-  input: Order.pick("id", OrderFormInput),
+  input: Order.pick("id", CreateOrder.input),
   output: Order,
   errors: orderChangeErrors,
   expose: { web: true },

@@ -2,7 +2,7 @@
 // локальний пошук фільтрує їх, а вибір рядка змінює список замовлень.
 import { each, render, view } from "@arc/framework/web";
 import { mutation, setFrom } from "@arc/framework/fullstack";
-import { CreateUser, UpdateUser, UserProfile, type User } from "./contracts.ts";
+import { CreateUser, UpdateUser, type User } from "./contracts.ts";
 import { editFormOptions, failureMessage } from "../ui.ts";
 import { activeUser, selectedUser, users } from "../user-selection.ts";
 
@@ -20,7 +20,7 @@ const updateUser = mutation(UpdateUser, {
 function ProfileForm({ user }: { user?: User }) {
   const editing = user !== undefined;
   const form = editing ? updateUser : addUser;
-  const { name, email } = form.fieldsFor(UserProfile);
+  const { name, email } = form.fieldsFor(CreateUser.input);
   const title = editing ? "Редагувати вибраного користувача" : "Новий користувач";
   const submitLabel = editing ? "Зберегти користувача" : "＋ Додати користувача";
   const pendingLabel = editing ? "Зберігаємо…" : "Додаємо…";
