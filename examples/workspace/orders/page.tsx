@@ -24,7 +24,7 @@ function CancelOrderControl({ order }: { order: Order }) {
         </button>
       )}
       <p class="error" role="alert" data-cancel-error>
-        {orderWriteMessage(cancel.outcome(), "Це замовлення вже скасовано.")}
+        {orderWriteMessage(cancel.outcome(), "cancel")}
       </p>
     </>
   );

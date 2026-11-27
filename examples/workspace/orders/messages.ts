@@ -16,16 +16,29 @@ type WriteOutcome = {
   readonly error: unknown;
 };
 
+const orderWriteMessages = {
+  cancel: {
+    conflict: "Замовлення вже скасовано.",
+    fallback: "Не вдалося скасувати замовлення.",
+  },
+  update: {
+    conflict: "Скасоване замовлення не можна редагувати.",
+    fallback: "Не вдалося зберегти замовлення.",
+  },
+};
+
 export function orderWriteMessage(
   outcome: WriteOutcome | undefined,
-  conflict: string,
-  fallback?: string,
+  action: keyof typeof orderWriteMessages,
 ) {
   const { result, error } = outcome ?? {};
   if (!error) return "";
+  const { conflict, fallback } = orderWriteMessages[action];
   if (result?.kind === "business_error") {
     if (result.error === "ORDER_ALREADY_CANCELLED") return conflict;
     if (result.error === "ORDER_NOT_FOUND") return "Замовлення не знайдено.";
   }
-  return fallback ?? failureMessage(error);
+  return action === "cancel" && result?.kind === "fault" && result.fault.code === "UNAUTHORIZED"
+    ? failureMessage(error)
+    : fallback;
 }

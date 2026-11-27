@@ -48,9 +48,7 @@ export default function OrderDetail({ bind }: PageContext<RouteParamNames<typeof
           )}
           {render.present(order.data, renderSummary)}
           <p class="error" role="alert">
-            {orderWriteMessage(cancelOrder(), "Замовлення вже скасовано.",
-              "Не вдалося скасувати замовлення.",
-            )}
+            {orderWriteMessage(cancelOrder(), "cancel")}
           </p>
           {isOrderActive(order.data()) && (
             <form data-edit-order novalidate onSubmit={updateOrder}>
@@ -62,11 +60,7 @@ export default function OrderDetail({ bind }: PageContext<RouteParamNames<typeof
             </form>
           )}
           <p class="error" role="alert" data-edit-order-error>
-            {order.data() && !updateOrder.invalid() ? orderWriteMessage(
-              updateOrder(),
-              "Скасоване замовлення не можна редагувати.",
-              "Не вдалося зберегти замовлення.",
-            ) : ""}
+            {order.data() && !updateOrder.invalid() ? orderWriteMessage(updateOrder(), "update") : ""}
           </p>
         </section>
       </div>
