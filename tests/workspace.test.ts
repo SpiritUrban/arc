@@ -244,6 +244,13 @@ test("Workspace order update has consistent identities and impact in build and S
     for (const id of [detailQuery, mutation, detailCancel]) {
       assert.equal(graph.nodes.find((node) => node.id === id)?.scope, "view", id);
     }
+    for (const action of [mutation, detailCancel]) {
+      for (const target of [detailQuery, "orders.list.query", "orders.history", "orders.history.page"]) {
+        assert.ok(graph.edges.some(({ from, to, kind }) =>
+          from === action && to === target && kind === "UPDATES",
+        ), `${action} → ${target}`);
+      }
+    }
     assert.ok(manifest.partitions?.browser.includes(mutation));
     assert.ok(manifest.partitions?.server.includes(operation));
     assert.ok(manifest.boundaries?.some(({ from, to }) =>

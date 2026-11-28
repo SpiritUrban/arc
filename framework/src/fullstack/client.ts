@@ -370,6 +370,7 @@ type RemoteFormDefaults = {
   needs?: readonly GraphDefinition[];
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
+  writes?: ReadonlyMap<OperationContract, EntityWrite>;
 };
 
 type NamedFormOptions<C extends OperationContract> =
@@ -605,9 +606,12 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     params,
     onSuccess,
     resetOnSuccess = true,
-    entity,
     updateOnError,
   } = options;
+  const writeDefaults = defaults.writes?.get(contract);
+  if (writeDefaults && options.entity && writeDefaults.entity !== options.entity)
+    throw new TypeError(`Entity write already configured for ${contract.id}`);
+  const entity = options.entity ?? writeDefaults?.entity;
   const refreshOption = options.refresh ?? options.invalidates;
   const refresh: readonly WebResource<any, any>[] = refreshOption === undefined
     ? []
@@ -619,7 +623,8 @@ function buildRemoteForm<C extends OperationContract, Field extends string>(
     : Array.isArray(options.update)
       ? options.update
       : [options.update as MutationUpdateTarget<Infer<C["output"]>>];
-  const updates = updateTargets.map((target) => "capture" in target ? target : target.replace());
+  const updates = [...(writeDefaults?.update ?? []), ...updateTargets]
+    .map((target) => "capture" in target ? target : target.replace());
   const updateErrors = new Set<string>(
     typeof updateOnError === "string" ? [updateOnError] : updateOnError ??
       Object.keys(contract.errors).filter((code) => {
@@ -1037,8 +1042,20 @@ function querySourceKey(values: readonly unknown[]) {
 }
 
 const beginEntityUpdate = Symbol("ARC entity update");
+const entityWrite = Symbol("ARC entity write");
+type EntityWrite = {
+  [entityWrite]: true;
+  contracts: readonly OperationContract[];
+  entity: EntityUpdates<any>;
+  update: readonly MutationUpdateTarget<any>[];
+};
 
 export type EntityUpdates<Row> = {
+  /** Declare the shared update targets for operations that return this entity. */
+  writes(
+    contracts: readonly OperationContract<unknown, Row>[],
+    update: readonly MutationUpdateTarget<Row>[],
+  ): EntityWrite;
   [beginEntityUpdate](): {
     confirm(row: Row): { revision: number; confirmedRevision: number } | undefined;
     finish(): void;
@@ -1049,15 +1066,21 @@ export type EntityUpdates<Row> = {
 export function entityUpdates<Row>({
   key,
   revision,
+  update: sharedUpdates = [],
 }: {
   /** Stable identity within the application, including the owner when identities are scoped. */
   key: (row: Row) => readonly (string | number)[];
   /** Server revision that increases each time this entity changes. */
   revision: (row: Row) => number;
+  /** Update targets shared by every declared write. */
+  update?: readonly MutationUpdateTarget<Row>[];
 }): EntityUpdates<Row> {
   let pending = 0;
   const confirmed = new Map<string, number>();
-  return {
+  const entity: EntityUpdates<Row> = {
+    writes(contracts, update) {
+      return { [entityWrite]: true, contracts, entity, update: [...sharedUpdates, ...update] };
+    },
     [beginEntityUpdate]() {
       pending++;
       return {
@@ -1075,6 +1098,7 @@ export function entityUpdates<Row>({
       };
     },
   };
+  return entity;
 }
 
 function bindQueryKey<Values extends readonly unknown[]>(
@@ -1151,6 +1175,7 @@ type RemoteApiConfig<Sources extends RemoteSources> = {
   key?: true | ((...values: SourceValues<Sources>) => string | number);
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
+  writes?: readonly EntityWrite[];
 };
 
 type RemoteApiOptions<Sources extends RemoteSources> = RemoteApiConfig<Sources> & {
@@ -1203,7 +1228,17 @@ function buildRemoteApi<const Sources extends RemoteSources>(options: RemoteApiS
       }
       return (options.fetch ?? globalThis.fetch)(url, { ...init, headers: merged });
     };
-  const defaults = { needs: from, baseUrl, fetch: fetchWithHeaders };
+  const writes = new Map<OperationContract, EntityWrite>();
+  const registered = new Set<string>();
+  for (const write of options.writes ?? []) {
+    for (const contract of write.contracts) {
+      if (registered.has(contract.id))
+        throw new TypeError(`Duplicate entity write: ${contract.id}`);
+      registered.add(contract.id);
+      writes.set(contract, write);
+    }
+  }
+  const defaults = { needs: from, baseUrl, fetch: fetchWithHeaders, writes };
   return {
     query<C extends OperationContract>(
       contract: C,
