@@ -1,6 +1,6 @@
 import { compileArchitecture, type GraphDefinition } from "../neutral/graph.js";
 import type { OperationContract } from "../neutral/contracts.js";
-import { decodeInputScalar, isScalarInputType } from "../neutral/input-scalar.js";
+import { decodeInputFields } from "../neutral/input-scalar.js";
 import type { Infer } from "../schema.js";
 import type {
   EntityMutation,
@@ -817,14 +817,7 @@ export function pageView<Param extends string = string>(
   ) {
     const operation = contract as Partial<OperationContract> | undefined;
     const fields = operation?.kind === "operation" ? operation.input?.json?.properties : undefined;
-    const routeInput = fields
-      ? Object.fromEntries(Object.entries<string>(params).flatMap(([name, value]) => {
-        if (!Object.hasOwn(fields, name)) return [];
-        const type = fields[name]?.type;
-        if (merge && !isScalarInputType(type)) return [];
-        return [[name, decodeInputScalar(value, type)]];
-      }))
-      : params;
+    const routeInput = fields ? decodeInputFields(Object.entries(params), fields, { route: true }) : params;
     const explicit = options?.params;
     const input = merge && fields && typeof explicit === "object" && explicit !== null && !Array.isArray(explicit)
       ? { ...routeInput, ...explicit }

@@ -550,6 +550,16 @@ test("ARC refills a server page after an order leaves the active filter", async 
   const { user, rows } = await fixture(request, info, "PageRefill",
     Array.from({ length: 7 }, (_, index) => [`Paged notebook ${index + 1}`, 1]));
   const [removed, , , , , replacement, last] = rows.sort((left, right) => left.id.localeCompare(right.id));
+  const pageRequest = await request.get(
+    orderPath(info, "/history/page?cancelled=false&product=&offset=5&limit=5"),
+    { headers: auth(user.id) },
+  );
+  expect(pageRequest.ok()).toBeTruthy();
+  expect(await pageRequest.json()).toEqual({
+    rows: [replacement, last],
+    hasNext: false,
+    summary: { count: 7, total: 175 },
+  });
   await page.goto("/orders");
   await page.getByRole("checkbox", { name: "Показувати по 5 замовлень" }).check();
   await page.getByLabel("Статус").selectOption("created");

@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 import { Application, Fault, errorDetailsSchema, errorStatus } from "./core.js";
 import { decodeRouteParams, mapRoutePath } from "./neutral/route-path.js";
 import { acceptsJsonBody } from "./neutral/http-method.js";
-import { decodeInputScalar } from "./neutral/input-scalar.js";
+import { decodeInputFields } from "./neutral/input-scalar.js";
 
 export function problem(e: unknown): Response {
   return Response.json(
@@ -50,20 +50,14 @@ export function handler(app: Application) {
           }
         }
         const properties = route.operation.input.json.properties ?? {};
-        const query = Object.fromEntries(
-          Array.from(url.searchParams, ([name, value]) => [
-            name, decodeInputScalar(value, properties[name]?.type),
-          ]),
-        );
+        const query = decodeInputFields(url.searchParams, properties);
         let decoded: Record<string, string>;
         try {
           decoded = decodeRouteParams(route.keys.map((name, index) => [name, match[index + 1]]));
         } catch {
           throw new Fault("INVALID_PATH", 400);
         }
-        const params = Object.fromEntries(Object.entries(decoded).map(([name, value]) => [
-          name, decodeInputScalar(value, properties[name]?.type),
-        ]));
+        const params = decodeInputFields(Object.entries(decoded), properties);
         const result = await app.execute(
           route.operation.id,
           { ...body, ...query, ...params },

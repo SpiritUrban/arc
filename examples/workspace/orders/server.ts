@@ -134,7 +134,7 @@ const cancelOrder = http.post(`${ordersPath}/cancel`, CancelOrder, {
 });
 
 class Orders {
-  @handles(ListOrderPage, { needs })
+  @handles(ListOrderPage, { needs, route: { method: "GET", path: `${ordersPath}/history/page` } })
   static async page({ input, user, orders }: HandlerContext<typeof ListOrderPage, typeof needs>) {
     return ok(await orders.page(user.id, input));
   }

@@ -9,7 +9,24 @@ export function isScalarInputType(type: unknown): type is ScalarInputType {
 }
 
 export function decodeInputScalar(value: string, type: unknown): string | number | boolean {
-  if (isNumericInputType(type) && value.trim() !== "") return Number(value);
+  if (isNumericInputType(type) && value.trim() !== "") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
   if (type === "boolean" && (value === "true" || value === "false")) return value === "true";
   return value;
+}
+
+export function decodeInputFields(
+  entries: Iterable<readonly [string, string]>,
+  fields: Readonly<Record<string, { type?: unknown }>>,
+  { route = false } = {},
+): Record<string, string | number | boolean> {
+  const values: Array<readonly [string, string | number | boolean]> = [];
+  for (const [name, value] of entries) {
+    const type = Object.hasOwn(fields, name) ? fields[name]?.type : undefined;
+    if (route && !isScalarInputType(type)) continue;
+    values.push([name, decodeInputScalar(value, type)]);
+  }
+  return Object.fromEntries(values);
 }

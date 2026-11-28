@@ -1,4 +1,5 @@
 import type { OperationContract } from "./contracts.js";
+import { isScalarInputType } from "./input-scalar.js";
 
 type RouteParam<Segment extends string> = Segment extends `:${infer Name}` ? Name : never;
 export type RouteParamNames<Pattern extends string> =
@@ -7,11 +8,14 @@ export type RouteParamNames<Pattern extends string> =
     ? RouteParam<Segment> | RouteParamNames<Rest>
     : RouteParam<Pattern>;
 
+type RouteParamValue = string | number | boolean;
+type ScalarInputKeys<Input> = {
+  [Key in keyof Input]-?: NonNullable<Input[Key]> extends RouteParamValue ? Key : never;
+}[keyof Input];
+
 export type ContractRoutePath<Path extends string, Input> =
   string extends Path ? Path :
-  Exclude<RouteParamNames<Path>, keyof Input> extends never ? Path : never;
-
-type RouteParamValue = string | number | boolean;
+  Exclude<RouteParamNames<Path>, ScalarInputKeys<Input>> extends never ? Path : never;
 
 /** Build a URL path from a route pattern and its raw parameter values. */
 export function routePath<const Pattern extends string>(
@@ -80,6 +84,9 @@ export function validateContractRoutePath(path: string, contract: OperationContr
   for (const name of routeParameterNames(path)) {
     if (!Object.hasOwn(properties, name)) {
       throw new TypeError(`HTTP route ${path} parameter "${name}" is missing from ${contract.id} input`);
+    }
+    if (!isScalarInputType(properties[name]?.type)) {
+      throw new TypeError(`HTTP route ${path} parameter "${name}" must be scalar in ${contract.id} input`);
     }
   }
 }

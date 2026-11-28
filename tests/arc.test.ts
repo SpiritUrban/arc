@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import { operationContract, routePath } from "@arc/framework/core";
 import { handles } from "../framework/src/server-handlers.ts";
 import { matchPagePath } from "../framework/src/neutral/page-path.ts";
+import { remoteApi, type RemoteQuery } from "../framework/src/fullstack/client.ts";
+import { internalTransport } from "../framework/src/fullstack/server.ts";
+import { jsx } from "../framework/src/web/jsx-runtime.ts";
+import { pageView } from "../framework/src/web/view.ts";
 import {
   application,
   operation,
@@ -91,6 +95,17 @@ test("HTTP contract routes validate dynamically supplied parameter names", () =>
     }
     return Orders;
   }, /parameter "wrong" is missing from lookup input/);
+  const array = operationContract({
+    id: "lookup.array",
+    input: s.object({ ids: s.string().array() }),
+    output: s.string(),
+  });
+  const arrayPath: string = "/orders/:ids";
+  assert.throws(() => http.get(arrayPath, array, { run: () => ok("unused") }), /parameter "ids" must be scalar/);
+  if (false) {
+    // @ts-expect-error An array cannot be supplied in a single route segment.
+    http.get("/orders/:ids", array, { run: () => ok("unused") });
+  }
 });
 test("compiler checks business error metadata from dynamic contracts", async () => {
   for (const metadata of [
@@ -320,10 +335,10 @@ test("HTTP adapter validates input, maps errors and exports OpenAPI", async () =
   assert.equal((await literalColon.json()).error, "MISSING");
   await app.close();
 });
-test("HTTP converts scalar path and query parameters using the input schema", async () => {
+test("HTTP, browser routes and Stand decode the same contract input", async () => {
   const pattern = "/search/:id/:active/:id";
   const input = s.object({ id: s.int(), active: s.boolean(), limit: s.int() });
-  const search = operationContract({ id: "search", input, output: input });
+  const search = operationContract({ id: "search", input, output: input, expose: { web: true } });
   const app = application({
     routes: [http.get(pattern, search, { run: ({ input }) => ok(input) })],
   });
@@ -331,10 +346,48 @@ test("HTTP converts scalar path and query parameters using the input schema", as
   await app.start();
   try {
     const fetch = handler(app);
-    const path = routePath(pattern, { id: 12, active: false });
-    const result = await fetch(new Request(`http://local${path}?id=99&limit=3`));
-    assert.equal(result.status, 200);
-    assert.deepEqual(await result.json(), { id: 12, active: false, limit: 3 });
+    const transport = internalTransport(app);
+    const client = remoteApi({
+      fetch: (url, init) => transport(new Request(new URL(String(url), "http://local"), init)),
+    });
+    const runInStand = async (input: unknown) =>
+      stand(app)(new Request("http://localhost/api/run", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ operation: search.id, mode: "http", input }),
+      }));
+    for (const id of ["12", "-4", "Infinity", "abc"]) {
+      const raw = { id, active: "false", limit: "3" };
+      const path = routePath(pattern, raw);
+      const result = await fetch(new Request(`http://local${path}?id=99&limit=3`));
+      const fromStand = await (await runInStand(raw)).json();
+      assert.equal(fromStand.status, result.status);
+      const httpResult = await result.json();
+      assert.deepEqual(fromStand.body, httpResult);
+
+      const params = matchPagePath(`${pattern}/:limit`, `${path}/3`);
+      assert.ok(params);
+      const reads: RemoteQuery<typeof search>[] = [];
+      const view = pageView("search.page", ({ bind }) => {
+        reads.push(bind(client).query(search));
+        return jsx("div", {});
+      }, params);
+      const [read] = reads;
+      try {
+        await read.refresh();
+        if (id === "12" || id === "-4") {
+          assert.deepEqual(httpResult, { id: Number(id), active: false, limit: 3 });
+          assert.deepEqual(read.data(), httpResult);
+        } else {
+          assert.equal(result.status, 400);
+          const rejected = read.result();
+          assert.ok(rejected?.kind === "fault");
+          assert.equal(rejected.fault.status, 400);
+        }
+      } finally {
+        for (const node of view.owned ?? []) node.dispose();
+      }
+    }
     const invalid = await fetch(new Request("http://local/search/%20/no/%20?limit=3"));
     assert.equal(invalid.status, 400);
     const conflictPath = "/search/12/false/13";
