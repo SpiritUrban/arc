@@ -254,7 +254,33 @@ function OrderDetail({ query }: PageContext<"id">) {
 
 ## Дії для локальних деталей
 
-У прототипі ARC 0.10 `entityUpdates({ read, key, revision })` бере тип запису зі схеми відповіді `read`. Через `remoteApi({ writes })` клієнт отримує перелік контрактів, які повертають цей запис, і спільні правила оновлення списків. На сторінці деталей використовуйте той самий контракт читання.
+В ARC 0.10 `entityUpdates({ read, key, revision })` бере тип запису зі схеми відповіді `read`. Через `remoteApi({ writes })` клієнт отримує перелік контрактів, які повертають цей запис, і спільні правила оновлення списків. Workspace оголошує ці правила поруч із запитами.
+
+```ts
+const order = entityUpdates({
+  read: GetOrder,
+  key: ({ userId, id }) => [userId, id],
+  revision: ({ revision }) => revision,
+  update: [
+    ordersHistory.reconcileBy("id", {
+      includes: matchesOrderStatus,
+      compare: compareOrderIds,
+    }),
+    ordersPageData.revalidatePartition(),
+  ],
+});
+
+const orderClient = remoteApi({
+  bearer: selectedUser,
+  key: true,
+  writes: [
+    order.writes([CreateOrder], [ordersData.insertBy()]),
+    order.writes([UpdateOrder, CancelOrder], [ordersData.replaceBy()]),
+  ],
+});
+```
+
+Повна історія може додати, замінити або вилучити запис за спільним правилом належності. Сторінка історії перечитується, бо сервер визначає, який рядок потрапить у звільнене місце. Обидва запити використовують `partition` за власником. На сторінці деталей використовуйте той самий контракт читання.
 
 ```ts
 const { query: order, mutation } = bind(orderClient).entity(GetOrder);

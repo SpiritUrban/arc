@@ -75,13 +75,36 @@ operation({id:'typed',input:s.object({n:s.int()}),output:s.int(),errors:{MISSING
   );
   await writeFile(
     join(temp, "consumer-view.tsx"),
-    `import {binding,state,view} from '@arc/framework/web';
+    `import { operationContract, s } from '@arc/framework/core';
+import { entityUpdates, remoteApi } from '@arc/framework/fullstack';
+import { binding, pageView, state, view } from '@arc/framework/web';
 const name=state({id:'consumer.name',initial:'ARC'});
 const label=binding({id:'consumer.label',type:'text',sources:[name]});
 function Heading({title}: {title: string}) { return <h1>{title}</h1>; }
 export default view({id:'consumer.page',bindings:[label],template:()=>(
   <main><><Heading title="Welcome" /><p bind={label} /></></main>
-)});`,
+)});
+
+const input = s.object({ id: s.string() });
+const output = s.object({ id: s.string(), owner: s.string(), revision: s.int() });
+const read = operationContract({ id: 'item.read', input, output });
+const update = operationContract({ id: 'item.update', input, output });
+const unrelated = operationContract({ id: 'other.update', input, output });
+const item = entityUpdates({
+  read,
+  key: ({ owner, id }) => [owner, id],
+  revision: ({ revision }) => revision,
+});
+export const client = remoteApi({ writes: [item.writes([update], [])] });
+export const detail = pageView('consumer.detail', ({ bind }) => {
+  const { query, mutation } = bind(client).entity(read);
+  const save = mutation(update, { key: 'id' });
+  if (false) {
+    // @ts-expect-error The matching schema does not register the operation.
+    mutation(unrelated);
+  }
+  return <button {...save.for('item').buttonProps}>{query.data()?.id}</button>;
+}, { id: 'item' });`,
   );
   execFileSync(
     process.execPath,
@@ -94,6 +117,7 @@ export default view({id:'consumer.page',bindings:[label],template:()=>(
       "--jsxImportSource",
       "@arc/framework/web",
       "--strict",
+      "--declaration",
       "--target",
       "ES2023",
       "--module",
@@ -112,9 +136,9 @@ export default view({id:'consumer.page',bindings:[label],template:()=>(
     [
       "--input-type=module",
       "--eval",
-      `import page from './dist/consumer-view.js';
+      `import page, { detail } from './dist/consumer-view.js';
 import {jsx} from '@arc/framework/web/jsx-runtime';
-if(page.kind !== 'view' || typeof jsx !== 'function') throw Error('TSX runtime export failure');`,
+if(page.kind !== 'view' || detail.kind !== 'view' || typeof jsx !== 'function') throw Error('TSX runtime export failure');`,
     ],
     { cwd: temp, stdio: "pipe", env: { ...process.env, NODE_OPTIONS: "" } },
   );
