@@ -3,6 +3,9 @@ import type { OperationContract } from "../neutral/contracts.js";
 import { decodeInputScalar, isScalarInputType } from "../neutral/input-scalar.js";
 import type { Infer } from "../schema.js";
 import type {
+  EntityMutation,
+  EntityReads,
+  EntityWrites,
   FieldKeyMutationOptions,
   Mutation,
   MutationFieldKey,
@@ -753,9 +756,9 @@ type BoundPageClient<Client extends PageRemoteClient, Param extends string> = {
   mutation: Client["mutation"];
 } & (Client extends Required<Pick<PageRemoteClient, "entityUpdate">> ? {
   /** Bind a record query and mutations of the same entity to the current page. */
-  entity<C extends OperationContract>(
+  entity<C extends EntityReads<Client>>(
     contract: C, ...args: RouteQueryArgs<Infer<NoInfer<C>["input"]>, Param, Client>
-  ): { query: RemoteQuery<C>; mutation: Client["mutation"] };
+  ): { query: RemoteQuery<C>; mutation: EntityMutation<EntityWrites<Client, C>> };
 } : {});
 
 export interface PageContext<Param extends string = string> {

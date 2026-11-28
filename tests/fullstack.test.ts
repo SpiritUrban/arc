@@ -249,9 +249,17 @@ test("page entity bindings update only the captured record and owner", async () 
   const output = s.object({ id: s.string(), owner: s.string(), revision: s.int() });
   const read = operationContract({ id: "entity.read", input, output });
   const write = operationContract({ id: "entity.write", input, output });
+  const otherRead = operationContract({ id: "other-entity.read", input, output });
+  const otherWrite = operationContract({ id: "other-entity.write", input, output });
+  const unregisteredRead = operationContract({ id: "unregistered-entity.read", input, output });
   const owner = state({ id: "entity.owner", initial: "alice" });
   const entity = entityUpdates({
     read,
+    key: (row) => [row.owner, row.id],
+    revision: (row) => row.revision,
+  });
+  const other = entityUpdates({
+    read: otherRead,
     key: (row) => [row.owner, row.id],
     revision: (row) => row.revision,
   });
@@ -261,7 +269,7 @@ test("page entity bindings update only the captured record and owner", async () 
   const client = remoteApi({
     bearer: owner,
     key: true,
-    writes: [entity.writes([write], [])],
+    writes: [entity.writes([write], []), other.writes([otherWrite], [])],
     async fetch(url, init) {
       const { id } = input.parse(JSON.parse(String(init?.body)));
       const owner = new Headers(init?.headers).get("authorization")?.replace("Bearer ", "");
@@ -275,7 +283,18 @@ test("page entity bindings update only the captured record and owner", async () 
   const queries: RemoteQuery<typeof read>[] = [];
   const writes: Array<{ run(input: { id: string }): Promise<unknown> }> = [];
   const page = pageView("entity.page", ({ bind }) => {
-    const binding = bind(client).entity(read);
+    const scoped = bind(client);
+    const binding = scoped.entity(read);
+    if (false) {
+      // @ts-expect-error The write belongs to the other entity, even with identical schemas.
+      binding.mutation(otherWrite);
+      // @ts-expect-error No entity declares this read operation.
+      scoped.entity(unregisteredRead);
+      const keyed = binding.mutation(write, { key: "id" });
+      keyed.pending("first");
+      // @ts-expect-error The declared key field is a string.
+      keyed.pending(1);
+    }
     queries.push(binding.query);
     writes.push(binding.mutation(write));
     return jsx("div", {});

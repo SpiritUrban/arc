@@ -791,26 +791,26 @@ function bindRemoteForm(defaults: RemoteFormDefaults) {
   return form;
 }
 
-function bindMutation(defaults: RemoteFormDefaults) {
-  function mutate<C extends OperationContract, Field extends MutationKeyField<NoInfer<C>>>(
+function bindMutation<Allowed extends OperationContract = OperationContract>(defaults: RemoteFormDefaults) {
+  function mutate<C extends Allowed, Field extends MutationKeyField<NoInfer<C>>>(
     contract: C, options: FieldKeyMutationOptions<NoInfer<C>, Field>,
   ): Mutation<C, never, MutationFieldKey<C, Field>, Field>;
-  function mutate<C extends OperationContract, Field extends MutationKeyField<NoInfer<C>>>(
+  function mutate<C extends Allowed, Field extends MutationKeyField<NoInfer<C>>>(
     contract: C, options: ReactiveFormOptions<C> & MutationFieldErrors<C> & { key: Field },
   ): Mutation<C, Extract<keyof MutationInput<C>, string>, MutationFieldKey<C, Field>, Field>;
-  function mutate<C extends OperationContract, Field extends string, Name extends MutationKeyField<NoInfer<C>>>(
+  function mutate<C extends Allowed, Field extends string, Name extends MutationKeyField<NoInfer<C>>>(
     contract: C, options: MappedFormOptions<C, Field> & MutationFieldErrors<C> & { key: Name },
   ): Mutation<C, Field, MutationFieldKey<C, Name>, Name>;
-  function mutate<C extends OperationContract, Key extends MutationKey = MutationKey>(
+  function mutate<C extends Allowed, Key extends MutationKey = MutationKey>(
     contract: C, options?: NamedMutationOptions<C, Key>,
   ): Mutation<C, never, Key>;
-  function mutate<C extends OperationContract, Key extends MutationKey = MutationKey>(
+  function mutate<C extends Allowed, Key extends MutationKey = MutationKey>(
     contract: C, options: ReactiveFormOptions<C> & KeyedMutationOptions<C, Key>,
   ): Mutation<C, Extract<keyof Infer<C["input"]>, string>, Key>;
-  function mutate<C extends OperationContract, Field extends string, Key extends MutationKey = MutationKey>(
+  function mutate<C extends Allowed, Field extends string, Key extends MutationKey = MutationKey>(
     contract: C, options: MappedFormOptions<C, Field> & KeyedMutationOptions<C, Key>,
   ): Mutation<C, Field, Key>;
-  function mutate<C extends OperationContract, Field extends string, Key extends MutationKey>(
+  function mutate<C extends Allowed, Field extends string, Key extends MutationKey>(
     contract: C,
     options: FormOptions<C, Field> & MutationFieldErrors<C> &
       { key?: ((input: MutationInput<C>) => Key) | MutationKeyField<C> } = {},
@@ -994,6 +994,8 @@ function matchesBusinessError<C extends OperationContract>(
 export const remoteForm = bindRemoteForm({});
 export const mutation = bindMutation({});
 
+export type EntityMutation<Allowed extends OperationContract> = ReturnType<typeof bindMutation<Allowed>>;
+
 type RemoteSources = Readable<unknown> | readonly Readable<unknown>[];
 function sourceList(from: RemoteSources): readonly Readable<unknown>[] {
   return Array.isArray(from) ? from : [from as Readable<unknown>];
@@ -1044,50 +1046,62 @@ function querySourceKey(values: readonly unknown[]) {
 const beginEntityUpdate = Symbol("ARC entity update");
 const entityWrite = Symbol("ARC entity write");
 const entityKey = Symbol("ARC entity key");
-type EntityWrite = {
+export type EntityWrite<
+  Read extends OperationContract | undefined = OperationContract | undefined,
+  Contracts extends readonly OperationContract[] = readonly OperationContract[],
+> = {
   [entityWrite]: true;
-  contracts: readonly OperationContract[];
+  contracts: Contracts;
+  read: Read;
   entity: EntityUpdates<any>;
   update: readonly MutationUpdateTarget<any>[];
 };
 
-export type EntityUpdates<Row> = {
-  readonly read?: OperationContract<unknown, Row>;
+export type EntityUpdates<Row, Read extends OperationContract<unknown, Row> | undefined =
+  OperationContract<unknown, Row> | undefined> = {
   [entityKey](row: Row): string;
   /** Declare the shared update targets for operations that return this entity. */
-  writes(
-    contracts: readonly OperationContract<unknown, Row>[],
+  writes<const Contracts extends readonly OperationContract<unknown, Row>[]>(
+    contracts: Contracts,
     update: readonly MutationUpdateTarget<Row>[],
-  ): EntityWrite;
+  ): EntityWrite<Read, Contracts>;
   [beginEntityUpdate](): {
     confirm(row: Row): { revision: number; confirmedRevision: number } | undefined;
     finish(): void;
   };
 };
 
+type EntityOptions<Row> = {
+  /** Stable identity within the application, including the owner when identities are scoped. */
+  key: (row: Row) => readonly (string | number)[];
+  /** Server revision that increases each time this entity changes. */
+  revision: (row: Row) => number;
+  /** Update targets shared by every declared write. */
+  update?: readonly MutationUpdateTarget<Row>[];
+};
+
 /** Coordinate cache updates from overlapping mutations using server revisions. */
+export function entityUpdates<const Read extends OperationContract>(
+  options: EntityOptions<Infer<Read["output"]>> & { read: Read },
+): EntityUpdates<Infer<Read["output"]>, Read>;
+export function entityUpdates<Row>(
+  options: EntityOptions<Row> & { read?: undefined },
+): EntityUpdates<Row, undefined>;
+export function entityUpdates<Row>(
+  options: EntityOptions<Row> & { read?: OperationContract<unknown, Row> },
+): EntityUpdates<Row>;
 export function entityUpdates<Row>({
   key,
   revision,
   read,
   update: sharedUpdates = [],
-}: {
-  /** Stable identity within the application, including the owner when identities are scoped. */
-  key: (row: Row) => readonly (string | number)[];
-  /** Server revision that increases each time this entity changes. */
-  revision: (row: Row) => number;
-  /** Read operation for one record of this entity. */
-  read?: OperationContract<unknown, Row>;
-  /** Update targets shared by every declared write. */
-  update?: readonly MutationUpdateTarget<Row>[];
-}): EntityUpdates<Row> {
+}: EntityOptions<Row> & { read?: OperationContract<unknown, Row> }): EntityUpdates<Row> {
   let pending = 0;
   const confirmed = new Map<string, number>();
   const entity: EntityUpdates<Row> = {
-    read,
     [entityKey]: (row) => querySourceKey(key(row)),
     writes(contracts, update) {
-      return { [entityWrite]: true, contracts, entity, update: [...sharedUpdates, ...update] };
+      return { [entityWrite]: true, contracts, read, entity, update: [...sharedUpdates, ...update] };
     },
     [beginEntityUpdate]() {
       pending++;
@@ -1178,38 +1192,51 @@ type BearerOption<Sources extends RemoteSources> =
   | ((...values: SourceValues<Sources>) => string | undefined)
   | ([Sources] extends [Readable<string | undefined>] ? true : never);
 
-type RemoteApiConfig<Sources extends RemoteSources> = {
+type RemoteApiConfig<Sources extends RemoteSources, Writes extends readonly EntityWrite[]> = {
   headers?: HeadersInit | ((...values: SourceValues<Sources>) => HeadersInit);
   key?: true | ((...values: SourceValues<Sources>) => string | number);
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
-  writes?: readonly EntityWrite[];
+  writes?: Writes;
 };
 
-type RemoteApiOptions<Sources extends RemoteSources> = RemoteApiConfig<Sources> & {
+type RemoteApiOptions<Sources extends RemoteSources, Writes extends readonly EntityWrite[]> = RemoteApiConfig<Sources, Writes> & {
   from?: Sources;
   bearer?: BearerOption<Sources>;
 } & (Sources extends readonly [] ? {} : { from: Sources });
 
-type RemoteApiSetup<Sources extends RemoteSources> = RemoteApiConfig<Sources> & {
+type RemoteApiSetup<Sources extends RemoteSources, Writes extends readonly EntityWrite[]> = RemoteApiConfig<Sources, Writes> & {
   from?: Sources;
   bearer?: BearerOption<Sources> | Readable<string | undefined>;
 };
 
 /** Share request headers and their reactive dependencies between queries and forms. */
-export function remoteApi<const Source extends Readable<string | undefined>>(
-  options: RemoteApiConfig<Source> & { bearer: Source; from?: never },
-): ReturnType<typeof buildRemoteApi<Source>>;
-export function remoteApi<const Sources extends RemoteSources = readonly []>(
-  options: RemoteApiOptions<Sources>,
-): ReturnType<typeof buildRemoteApi<Sources>>;
-export function remoteApi<const Sources extends RemoteSources>(
-  options: RemoteApiSetup<Sources>,
+export function remoteApi<const Source extends Readable<string | undefined>, const Writes extends readonly EntityWrite[] = readonly []>(
+  options: RemoteApiConfig<Source, Writes> & { bearer: Source; from?: never },
+): ReturnType<typeof buildRemoteApi<Source, Writes>>;
+export function remoteApi<const Sources extends RemoteSources = readonly [], const Writes extends readonly EntityWrite[] = readonly []>(
+  options: RemoteApiOptions<Sources, Writes>,
+): ReturnType<typeof buildRemoteApi<Sources, Writes>>;
+export function remoteApi<const Sources extends RemoteSources, const Writes extends readonly EntityWrite[]>(
+  options: RemoteApiSetup<Sources, Writes>,
 ) {
   return buildRemoteApi(options);
 }
 
-function buildRemoteApi<const Sources extends RemoteSources>(options: RemoteApiSetup<Sources>) {
+export type EntityReads<Client> = Client extends { entityWrites: infer Writes extends readonly EntityWrite[] | undefined }
+  ? Exclude<NonNullable<Writes>[number]["read"], undefined>
+  : never;
+type WritesFor<Write extends EntityWrite, Read extends OperationContract> = Write extends EntityWrite
+  ? Read extends NonNullable<Write["read"]> ? Write["contracts"][number] : never
+  : never;
+export type EntityWrites<Client, Read extends OperationContract> =
+  Client extends { entityWrites: infer Writes extends readonly EntityWrite[] | undefined }
+    ? WritesFor<NonNullable<Writes>[number], Read>
+    : never;
+
+function buildRemoteApi<const Sources extends RemoteSources, const Writes extends readonly EntityWrite[]>(
+  options: RemoteApiSetup<Sources, Writes>,
+) {
   const { bearer, headers, baseUrl } = options;
   const bearerSource = options.from === undefined && bearer &&
     (typeof bearer === "object" || typeof bearer === "function") && "get" in bearer
@@ -1248,6 +1275,7 @@ function buildRemoteApi<const Sources extends RemoteSources>(options: RemoteApiS
   }
   const defaults = { needs: from, baseUrl, fetch: fetchWithHeaders, writes };
   return {
+    entityWrites: options.writes,
     query<C extends OperationContract>(
       contract: C,
       ...[query]: {} extends Infer<C["input"]>
@@ -1278,9 +1306,10 @@ function buildRemoteApi<const Sources extends RemoteSources>(options: RemoteApiS
       query: RemoteQuery<OperationContract>,
       write: OperationContract,
     ): MutationUpdate<unknown> {
-      const entity = writes.get(write)?.entity;
-      if (!entity || entity.read !== read)
+      const registration = writes.get(write);
+      if (!registration || registration.read !== read)
         throw new TypeError(`Entity read ${read.id} is not configured for write ${write.id}`);
+      const { entity } = registration;
       return {
         target: query,
         capture() {

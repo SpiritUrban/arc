@@ -252,6 +252,18 @@ function OrderDetail({ query }: PageContext<"id">) {
 </button>
 ```
 
+## Дії для локальних деталей
+
+У прототипі ARC 0.10 `entityUpdates({ read, key, revision })` бере тип запису зі схеми відповіді `read`. Через `remoteApi({ writes })` клієнт отримує перелік контрактів, які повертають цей запис, і спільні правила оновлення списків. На сторінці деталей використовуйте той самий контракт читання.
+
+```ts
+const { query: order, mutation } = bind(orderClient).entity(GetOrder);
+const updateOrder = mutation(UpdateOrder, editFormOptions);
+const cancelOrder = mutation(CancelOrder);
+```
+
+Параметри маршруту застосовуються до локального запиту й дій. TypeScript дозволяє в цій прив’язці лише контракти, оголошені для `GetOrder`. Ідентифікатори контрактів розрізняють операції з однаковими схемами. Після підтвердженої відповіді ARC оновлює локальні деталі за ідентичністю запису й застосовує спільні правила для списків. [Оголошення Workspace](../../examples/workspace/orders/client.ts)
+
 ## HTTP-транспорт
 
 Server `internalTransport(app)` обслуговує POST /_arc/call/:operation. Операція повинна явно мати `expose:{web:true}` на server. Browser descriptor не надає дозволу. Input/output/error details перевіряються сервером; client також перевіряє output. Internal exception не передає stack чи raw message. AbortSignal передається fetch і request executor настільки, наскільки дозволяє HTTP disconnect.
