@@ -4,6 +4,7 @@ export const styles = `
 .sidebar nav{display:flex;flex-direction:column}@media(max-width:820px){.sidebar nav{flex-direction:row;flex-wrap:wrap;gap:8px}}
 .order-filters{display:grid;grid-template-columns:minmax(0,1fr) 220px;align-items:end;gap:12px;margin:0 0 18px}
 .order-filters label{display:flex;flex-direction:column;gap:8px}
+.order-pages{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:12px}
 .order-filters input,.order-filters select{width:100%;height:40px;margin:0;padding:0 12px;border:1px solid #e1e6ee;border-radius:6px;background-color:#f7f9fc;color:#35435c;font:inherit;font-size:11px}
 .order-filters select{appearance:none;padding-right:34px;background-image:linear-gradient(45deg,transparent 50%,#8490a3 50%),linear-gradient(135deg,#8490a3 50%,transparent 50%);background-position:calc(100% - 16px) 17px,calc(100% - 11px) 17px;background-size:5px 5px;background-repeat:no-repeat;cursor:pointer}
 .order-filters input:focus,.order-filters select:focus{border-color:#6993f5;outline:none;box-shadow:0 0 0 3px #4475ef10}

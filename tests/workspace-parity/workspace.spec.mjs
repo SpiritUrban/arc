@@ -545,6 +545,63 @@ test("ARC keeps a newer cancellation when an older edit arrives last", async ({ 
   });
 });
 
+test("ARC refills a server page after an order leaves the active filter", async ({ page, request }, info) => {
+  test.skip(isReact(info));
+  const { user, rows } = await fixture(request, info, "PageRefill",
+    Array.from({ length: 7 }, (_, index) => [`Paged notebook ${index + 1}`, 1]));
+  const [removed, , , , , replacement, last] = rows.sort((left, right) => left.id.localeCompare(right.id));
+  await page.goto("/orders");
+  await page.getByRole("checkbox", { name: "Показувати по 5 замовлень" }).check();
+  await page.getByLabel("Статус").selectOption("created");
+  const listPath = transport(info, "orders.list");
+  const pagePath = transport(info, "orders.listPage");
+  const fullReads = [];
+  page.on("request", (req) => {
+    if (new URL(req.url()).pathname === listPath && req.headers().authorization === `Bearer ${user.id}`)
+      fullReads.push(req);
+  });
+  await userRow(page, user.name).click();
+  const previous = page.getByRole("button", { name: "Попередня" });
+  const next = page.getByRole("button", { name: "Наступна" });
+  const tableRows = history(page).locator("tbody tr");
+  await expect(tableRows).toHaveCount(5);
+  await next.click();
+  await expect(tableRows).toHaveCount(2);
+  await expect(orderRow(page, replacement.product)).toBeVisible();
+  await previous.click();
+  await expect(tableRows).toHaveCount(5);
+  await expect(history(page).locator("tbody")).toHaveAttribute("aria-busy", "false");
+
+  const reads = [];
+  page.on("request", (req) => {
+    if (new URL(req.url()).pathname === pagePath) reads.push(req.postDataJSON());
+  });
+  await orderRow(page, removed.product).getByRole("button", { name: "Скасувати" }).click();
+  await expect(orderRow(page, replacement.product)).toBeVisible();
+  await expect(orderRow(page, removed.product)).toHaveCount(0);
+  await expect(tableRows).toHaveCount(5);
+  expect(reads).toEqual([{ cancelled: false, product: "", offset: 0, limit: 5 }]);
+
+  const backPage = await hold(page, pagePath, (req) => req.postDataJSON()?.offset === 5);
+  try {
+    await next.click();
+    await backPage.request;
+    await expect(tableRows).toHaveCount(0);
+  } finally {
+    await backPage.release();
+  }
+  await expect(tableRows).toHaveCount(1);
+  await expect(orderRow(page, last.product)).toBeVisible();
+  await expect(page.locator(".summary-grid")).toContainText("07");
+  expect(fullReads).toHaveLength(0);
+
+  await page.getByPlaceholder("Назва товару").fill(last.product);
+  await expect(page.getByText("Сторінка 1")).toBeVisible();
+  await expect(tableRows).toHaveCount(1);
+  await expect(orderRow(page, last.product)).toBeVisible();
+  expect(reads.at(-1)).toMatchObject({ product: last.product.toLowerCase(), offset: 0 });
+});
+
 test("ARC reloads the user list from its retry button", async ({ page }, info) => {
   test.skip(isReact(info), "ARC direct resource refresh binding");
   const list = transport(info, "users.list");

@@ -13,7 +13,7 @@ import {
   type HandlerContext,
 } from "@arc/framework/server";
 import { currentUser } from "../auth.ts";
-import { ListOrders, GetOrder, CreateOrder, UpdateOrder, CancelOrder, compareOrderIds, isOrderActive, matchesOrderStatus, orderTotal, type Order, type OrderFormInput } from "./contracts.ts";
+import { ListOrders, ListOrderPage, GetOrder, CreateOrder, UpdateOrder, CancelOrder, compareOrderIds, isOrderActive, matchesOrderStatus, orderTotal, type Order, type OrderFormInput } from "./contracts.ts";
 import { orderDetailPattern, ordersPath } from "./paths.ts";
 
 type OrderEdit = Infer<typeof UpdateOrder.input>;
@@ -38,11 +38,15 @@ function orderChangeResult(result: OrderChange, fail: Fail<typeof UpdateOrder.er
 const ordersRepository = resource({
   id: "orders.repository",
   // ARC записує виклики цих методів у трасу. Їх можна побачити в Stand.
-  instrument: ["save", "list", "find", "update", "cancel"],
+  instrument: ["save", "list", "page", "find", "update", "cancel"],
   // effects описує побічні ефекти в метаданих ARC. Сам запис виконує метод save.
   effects: ["memory.write"],
   open: () => {
     const ordersByOwner = new Map<string, Map<string, Order>>();
+
+    function forOwner(userId: string) {
+      return Array.from(ordersByOwner.get(userId)?.values() ?? []);
+    }
 
     function find(id: string, userId: string) {
       return ordersByOwner.get(userId)?.get(id);
@@ -68,10 +72,23 @@ const ordersRepository = resource({
     return {
       save: async (order: Order) => save(order),
       async list(userId: string, filter: Infer<typeof ListOrders.input>) {
-        const orders = Array.from(ordersByOwner.get(userId)?.values() ?? []);
+        const orders = forOwner(userId);
         return filter.cancelled === undefined
           ? orders
           : orders.filter((order) => matchesOrderStatus(order, filter)).sort(compareOrderIds);
+      },
+      async page(userId: string, filter: Infer<typeof ListOrderPage.input>) {
+        const orders = forOwner(userId);
+        const term = filter.product.trim().toLowerCase();
+        const matching = orders.filter((order) =>
+          matchesOrderStatus(order, filter) && order.product.toLowerCase().includes(term),
+        ).sort(compareOrderIds);
+        const end = filter.offset + filter.limit;
+        return {
+          rows: matching.slice(filter.offset, end),
+          hasNext: end < matching.length,
+          summary: { count: orders.length, total: orders.reduce((sum, order) => sum + order.total, 0) },
+        };
       },
       find: async (id: string, userId: string) => find(id, userId),
       async update({ id, ...changes }: OrderEdit, userId: string) {
@@ -117,6 +134,11 @@ const cancelOrder = http.post(`${ordersPath}/cancel`, CancelOrder, {
 });
 
 class Orders {
+  @handles(ListOrderPage, { needs })
+  static async page({ input, user, orders }: HandlerContext<typeof ListOrderPage, typeof needs>) {
+    return ok(await orders.page(user.id, input));
+  }
+
   @handles(GetOrder, {
     needs,
     route: { method: "GET", path: orderDetailPattern },

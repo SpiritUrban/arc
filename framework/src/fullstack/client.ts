@@ -20,6 +20,7 @@ import {
   action,
   captureResourceUpdate,
   captureResourceVariants,
+  captureResourceRevalidation,
   webResource,
   type Action,
   type ActionContext,
@@ -1319,6 +1320,8 @@ export type RemoteQuery<C extends OperationContract> =
         compare: (left: QueryItem<C>, right: QueryItem<C>) => number;
       },
     ): MutationUpdate<QueryItem<C>>;
+    /** Discard cached variants in the captured partition and reread its active query. */
+    revalidatePartition(): MutationUpdate<unknown>;
   };
 
 type RemoteResourceOptions<C extends OperationContract> = {
@@ -1580,6 +1583,17 @@ function createRemoteResource<C extends OperationContract>(
             else next[index] = row;
             return next.sort(compare) as Infer<C["output"]>;
           }, trace);
+        },
+      };
+    },
+    revalidatePartition(): MutationUpdate<unknown> {
+      if (!options.cache || !options.partition)
+        throw new TypeError("revalidatePartition requires a cached query with a partition");
+      return {
+        target: result,
+        capture() {
+          const revalidate = result[captureResourceRevalidation]?.();
+          return (_output, trace) => revalidate?.(trace);
         },
       };
     },

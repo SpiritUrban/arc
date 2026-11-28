@@ -320,11 +320,16 @@ test("Workspace browser creates users/orders, handles business errors and isolat
       edges.filter((edge) =>
         edge.to.startsWith("orders.page.dom.") &&
         edge.to.endsWith(".render") &&
-        edge.from === "orders.list.query.select.summary" &&
+        edge.from === "orders.page.derived.orderSummary" &&
         edge.kind === "BINDS",
       ).length,
       2,
     );
+    for (const source of ["orders.list.query.select.summary", "orders.history.page.data"]) {
+      assert.ok(edges.some(({ from, to, kind }) =>
+        from === source && to === "orders.page.derived.orderSummary" && kind === "DERIVES",
+      ));
+    }
     assert.ok(edges.some((e) =>
       e.from === "orders.create.submit.remote" && e.to === "orders.create" && e.kind === "REMOTE_CALLS",
     ));
@@ -333,6 +338,9 @@ test("Workspace browser creates users/orders, handles business errors and isolat
     ));
     assert.ok(edges.some((e) =>
       e.from === "orders.cancel.submit" && e.to === "orders.list.query" && e.kind === "UPDATES",
+    ));
+    assert.ok(edges.some((e) =>
+      e.from === "orders.cancel.submit" && e.to === "orders.history.page" && e.kind === "UPDATES",
     ));
     assert.ok(edges.some((e) =>
       e.from === "users.create.submit" && e.to === "users.list.query" && e.kind === "UPDATES",

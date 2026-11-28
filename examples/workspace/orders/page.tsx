@@ -3,7 +3,10 @@
 import { each, render, view } from "@arc/framework/web";
 import { isOrderActive, orderTotal, orderUnitPrice, quantityLimits, type Order } from "./contracts.ts";
 import { activeUser } from "../user-selection.ts";
-import { allStatuses, cancelListedOrder, createOrder, ordersData, ordersHistory, orderStatusFilter } from "./client.ts";
+import {
+  allStatuses, cancelListedOrder, createOrder, moveOrderPage, orderPageIndex, orderPageSize,
+  orderSearch, orderSearchTerm, ordersData, ordersHistory, ordersPageData, orderStatusFilter, paginatedOrders,
+} from "./client.ts";
 import { OrderFields } from "./fields.tsx";
 import { orderStatuses, orderStatusLabel, orderWriteMessage } from "./messages.ts";
 import { orderDetailPath } from "./paths.ts";
@@ -32,26 +35,34 @@ function CancelOrderControl({ order }: { order: Order }) {
 
 const visibleOrders = ordersData.dataOr([], "visible");
 const filteredOrders = ordersHistory.dataOr([], "visible");
-const orderSummary = ordersData.select("summary", (orders) => ({
+const listSummary = ordersData.select("summary", (orders) => ({
   count: orders?.length ?? 0,
   total: orders?.reduce((sum, order) => sum + order.total, 0) ?? 0,
 }));
 
 export const OrdersPage = view({
   id: "orders.page",
-  state: { quantity: String(quantityLimits.min), search: "" },
-  template({ quantity, search }, { derive }) {
-    const searchTerm = derive([search], (search) => search.trim().toLowerCase());
-    const history = derive([visibleOrders, filteredOrders, searchTerm, orderStatusFilter], (all, filtered, term, status) =>
-      (status === allStatuses ? all : filtered).filter((order) =>
-        order.product.toLowerCase().includes(term)),
+  state: { quantity: String(quantityLimits.min) },
+  template({ quantity }, { derive }) {
+    const orderSummary = derive([listSummary, ordersPageData.data, paginatedOrders],
+      (list, page, paginated) => paginated ? page?.summary : list);
+    const history = derive(
+      [visibleOrders, filteredOrders, ordersPageData.data, orderSearchTerm, orderStatusFilter, paginatedOrders],
+      (all, filtered, page, term, status, paginated) => paginated
+        ? page?.rows ?? []
+        : (status === allStatuses ? all : filtered).filter((order) =>
+          order.product.toLowerCase().includes(term)),
     );
-    const loading = derive([ordersData.loading, ordersHistory.loading, orderStatusFilter],
-      (allLoading, filteredLoading, status) => status === allStatuses ? allLoading : filteredLoading);
+    const loading = derive(
+      [ordersData.loading, ordersHistory.loading, ordersPageData.loading, orderStatusFilter, paginatedOrders],
+      (all, filtered, page, status, paginated) => paginated ? page : status === allStatuses ? all : filtered,
+    );
     const emptyHistory = derive(
-      [history, loading, searchTerm, orderStatusFilter],
-      (orders, loading, term, status) => {
+      [history, loading, orderSearchTerm, orderStatusFilter, paginatedOrders, orderPageIndex],
+      (orders, loading, term, status, paginated, index) => {
         if (loading || orders.length > 0) return undefined;
+        if (paginated && index > 0)
+          return { title: "Сторінка порожня", description: "Поверніться на попередню сторінку." };
         return term !== "" || status !== allStatuses
           ? {
               title: "Замовлень не знайдено",
@@ -70,14 +81,14 @@ export const OrdersPage = view({
           <div class="summary-card">
             <span class="muted">Замовлень користувача</span>
             <strong data-count>
-              {String(orderSummary().count).padStart(2, "0")}
+              {String(orderSummary()?.count ?? 0).padStart(2, "0")}
             </strong>
             <span class="summary-note">У поточній сесії</span>
           </div>
           <div class="summary-card accent">
             <span>Загальна сума</span>
             <strong data-amount>
-              {money(orderSummary().total)}
+              {money(orderSummary()?.total ?? 0)}
             </strong>
             <span class="summary-note">{money(orderUnitPrice)} за одиницю товару</span>
           </div>
@@ -107,7 +118,7 @@ export const OrdersPage = view({
           <p class="error" role="alert" data-error>
             {failureMessage(
               (createOrder.invalid() ? undefined : createOrder.error()) ??
-                ordersData.error() ?? (orderStatusFilter() === allStatuses ? undefined : ordersHistory.error()),
+                ordersData.error() ?? (paginatedOrders() ? ordersPageData.error() : ordersHistory.error()),
             )}
           </p>
         </div>
@@ -132,7 +143,7 @@ export const OrdersPage = view({
                 data-order-search
                 type="search"
                 placeholder="Назва товару"
-                bind:value={search}
+                bind:value={orderSearch}
               />
             </label>
             <label>
@@ -145,6 +156,10 @@ export const OrdersPage = view({
               </select>
             </label>
           </div>
+          <label>
+            <input type="checkbox" bind:checked={paginatedOrders} />
+            Показувати по {orderPageSize} замовлень
+          </label>
           <div class="table-scroll">
             <table>
               <thead>
@@ -178,6 +193,15 @@ export const OrdersPage = view({
               </tbody>
             </table>
           </div>
+          {render.when(paginatedOrders, (
+            <nav class="order-pages" aria-label="Сторінки замовлень">
+              <button class="button secondary" type="button" disabled={orderPageIndex() === 0}
+                onClick={() => moveOrderPage(-1)}>Попередня</button>
+              <span>Сторінка {orderPageIndex() + 1}</span>
+              <button class="button secondary" type="button" disabled={loading() || !ordersPageData.data()?.hasNext}
+                onClick={() => moveOrderPage(1)}>Наступна</button>
+            </nav>
+          ))}
           {render.present(emptyHistory, ({ title, description }) => (
             <div class="empty order-empty" data-empty>
               <span class="empty-symbol">▤</span>

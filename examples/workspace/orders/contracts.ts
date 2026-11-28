@@ -34,10 +34,28 @@ export function compareOrderIds(left: Order, right: Order): number {
 
 // ID зв’язує браузерний клієнт із серверною реалізацією. expose.web відкриває
 // операцію для внутрішнього HTTP-транспорту ARC.
+const orderFilters = { cancelled: s.boolean().optional() };
+
 export const ListOrders = operationContract({
   id: "orders.list",
-  input: s.object({ cancelled: s.boolean().optional() }),
+  input: s.object(orderFilters),
   output: Order.array(),
+  expose: { web: true },
+});
+
+export const ListOrderPage = operationContract({
+  id: "orders.listPage",
+  input: s.object({
+    ...orderFilters,
+    product: s.string(),
+    offset: s.int({ min: 0, max: Number.MAX_SAFE_INTEGER }),
+    limit: s.int({ min: 1, max: 100 }),
+  }),
+  output: s.object({
+    rows: Order.array(),
+    hasNext: s.boolean(),
+    summary: s.object({ count: s.int({ min: 0 }), total: s.number({ min: 0 }) }),
+  }),
   expose: { web: true },
 });
 

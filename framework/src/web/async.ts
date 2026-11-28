@@ -30,6 +30,7 @@ export interface ResourceSnapshot<T> {
 }
 export const captureResourceUpdate = Symbol("ARC resource update");
 export const captureResourceVariants = Symbol("ARC resource variants");
+export const captureResourceRevalidation = Symbol("ARC resource revalidation");
 
 export interface WebResource<T, I = unknown> extends Readable<
   ResourceSnapshot<T>
@@ -46,6 +47,7 @@ export interface WebResource<T, I = unknown> extends Readable<
   [captureResourceUpdate]?: (options?: { refreshWhenMissing?: boolean }) =>
     (update: (data: T) => T, trace: TraceToken) => void;
   [captureResourceVariants]?: () => (update: (data: T, input: I) => T, trace: TraceToken) => void;
+  [captureResourceRevalidation]?: () => (trace: TraceToken) => void;
 }
 type WebResourceOptions<T, I> = {
   id: string;
@@ -221,6 +223,25 @@ export function webResource<T, I = unknown>(def: WebResourceOptions<T, I>): WebR
           if (Object.is(variant.partition, partition))
             captureUpdate(targetKey, true)((data) => update(data, variant.input), trace);
         }
+      };
+    },
+    [captureResourceRevalidation]() {
+      const partition = def.partition?.();
+      return (trace: TraceToken) => {
+        if (disposed || partition === undefined) return;
+        let invalidated = 0;
+        for (const [targetKey, entry] of cache ?? []) {
+          if (entry.variant && Object.is(entry.variant.partition, partition)) {
+            cache?.delete(targetKey);
+            invalidated++;
+          }
+        }
+        const reread = active && Object.is(def.partition?.(), partition) && (def.enabled?.() ?? true);
+        if (invalidated || reread)
+          browserEvent(telemetry, def.id, "resource.invalidated", trace, {
+            data: { cachedVariants: invalidated, reread },
+          });
+        if (reread) void resource.refresh(trace);
       };
     },
     async refresh(trigger?: TraceToken | Event) {
