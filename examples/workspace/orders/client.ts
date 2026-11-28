@@ -1,7 +1,7 @@
 import { entityUpdates, remoteApi } from "@arc/framework/fullstack";
 import { derive, state } from "@arc/framework/web";
 import { selectedUser } from "../user-selection.ts";
-import { CancelOrder, CreateOrder, ListOrderPage, ListOrders, UpdateOrder, compareOrderIds, matchesOrderStatus, type Order } from "./contracts.ts";
+import { CancelOrder, CreateOrder, GetOrder, ListOrderPage, ListOrders, UpdateOrder, compareOrderIds, matchesOrderStatus, type Order } from "./contracts.ts";
 import type { orderStatuses } from "./messages.ts";
 
 export const allStatuses = "all";
@@ -69,6 +69,7 @@ export const ordersPageData = remoteApi({
   input: ({ input }) => input,
 });
 const order = entityUpdates<Order>({
+  read: GetOrder,
   key: ({ userId, id }) => [userId, id],
   revision: ({ revision }) => revision,
   update: [

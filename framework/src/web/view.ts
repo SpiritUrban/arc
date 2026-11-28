@@ -7,6 +7,7 @@ import type {
   Mutation,
   MutationFieldKey,
   MutationKeyField,
+  MutationUpdateTarget,
   NamedMutationOptions,
   QueryInputField,
   RemoteQuery,
@@ -708,6 +709,8 @@ function ownedNodes(owned?: OwnedNodes): OwnedNode[] {
 type PageRemoteClient = {
   query<C extends OperationContract>(contract: C, ...args: any[]): RemoteQuery<C>;
   mutation<C extends OperationContract>(contract: C, ...args: any[]): Mutation<C>;
+  entityUpdate?(read: OperationContract, query: RemoteQuery<OperationContract>, write: OperationContract):
+    MutationUpdateTarget<unknown>;
 };
 
 type ScalarRouteFields<Input, Param extends string> = {
@@ -748,7 +751,12 @@ type BoundPageClient<Client extends PageRemoteClient, Param extends string> = {
     contract: C, ...args: RouteQueryArgs<Infer<NoInfer<C>["input"]>, Param, Client>
   ) => RemoteQuery<C>);
   mutation: Client["mutation"];
-};
+} & (Client extends Required<Pick<PageRemoteClient, "entityUpdate">> ? {
+  /** Bind a record query and mutations of the same entity to the current page. */
+  entity<C extends OperationContract>(
+    contract: C, ...args: RouteQueryArgs<Infer<NoInfer<C>["input"]>, Param, Client>
+  ): { query: RemoteQuery<C>; mutation: Client["mutation"] };
+} : {});
 
 export interface PageContext<Param extends string = string> {
   params: Readonly<Record<Param, string>>;
@@ -829,39 +837,60 @@ export function pageView<Param extends string = string>(
     derive,
     own,
     bind<Client extends PageRemoteClient>(client: Client): BoundPageClient<Client, Param> {
-      return {
-        query: ((contract: OperationContract, options?: {
-          id?: string; params?: unknown; input?: true | string | ((...values: unknown[]) => unknown);
-        }) => {
-          const queryId = options?.id ?? `${id}.${contract.id}.query`;
-          const { input: project, ...queryOptions } = options ?? {};
-          const projection = typeof project === "string" ? (value: unknown) => ({ [project]: value }) : project;
-          if (projection === true || (typeof project === "string" &&
-              !contract.input.json.required?.some((field: unknown) => field !== project))) {
-            return own(client.query(contract, { ...queryOptions, input: projection, id: queryId }));
+      const query = (contract: OperationContract, options?: {
+        id?: string; params?: unknown; input?: true | string | ((...values: unknown[]) => unknown);
+      }) => {
+        const queryId = options?.id ?? `${id}.${contract.id}.query`;
+        const { input: project, ...queryOptions } = options ?? {};
+        const projection = typeof project === "string" ? (value: unknown) => ({ [project]: value }) : project;
+        if (projection === true || (typeof project === "string" &&
+            !contract.input.json.required?.some((field: unknown) => field !== project))) {
+          return own(client.query(contract, { ...queryOptions, input: projection, id: queryId }));
+        }
+        const bound = withRouteParams(contract, queryOptions, true);
+        const input = projection && contract.input.json.type === "object"
+          ? (...values: unknown[]) => {
+            const explicit = projection(...values);
+            return explicit && typeof explicit === "object" && !Array.isArray(explicit)
+              ? { ...bound.params, ...explicit }
+              : explicit;
           }
-          const bound = withRouteParams(contract, queryOptions, true);
-          const input = projection && contract.input.json.type === "object"
-            ? (...values: unknown[]) => {
-              const explicit = projection(...values);
-              return explicit && typeof explicit === "object" && !Array.isArray(explicit)
-                ? { ...bound.params, ...explicit }
-                : explicit;
-            }
-            : projection;
-          return own(client.query(contract, {
-            ...bound,
-            ...(input ? { input } : {}),
-            id: queryId,
-          }));
-        }) as BoundPageClient<Client, Param>["query"],
-        mutation: ((contract: OperationContract, options?: { id?: string; params?: unknown }) =>
-          own(client.mutation(contract, {
-            ...withRouteParams(contract, options, true),
-            id: options?.id ?? `${id}.${contract.id}.submit`,
-          }))
-        ) as Client["mutation"],
+          : projection;
+        return own(client.query(contract, {
+          ...bound,
+          ...(input ? { input } : {}),
+          id: queryId,
+        }));
       };
+      type MutationOptions = {
+        id?: string;
+        params?: unknown;
+        update?: MutationUpdateTarget<unknown> | readonly MutationUpdateTarget<unknown>[];
+      };
+      const mutation = (contract: OperationContract, options?: MutationOptions) =>
+        own(client.mutation(contract, {
+          ...withRouteParams(contract, options, true),
+          id: options?.id ?? `${id}.${contract.id}.submit`,
+        }));
+      return {
+        query,
+        mutation,
+        entity(read: OperationContract, options?: Parameters<typeof query>[1]) {
+          const entityUpdate = client.entityUpdate?.bind(client);
+          if (!entityUpdate) throw new TypeError("Client does not support entity bindings");
+          const record = query(read, options);
+          return {
+            query: record,
+            mutation(write: OperationContract, options?: MutationOptions) {
+              const target = entityUpdate(read, record, write);
+              const extra = options?.update;
+              const update = extra === undefined ? [target]
+                : Array.isArray(extra) ? [target, ...extra] : [target, extra];
+              return mutation(write, { ...options, update });
+            },
+          };
+        },
+      } as unknown as BoundPageClient<Client, Param>;
     },
     query: ((client: { query(...args: any[]): OwnedNode }, ...args: unknown[]) =>
       own(client.query(args[0], withRouteParams(args[0], args[1] as { params?: unknown } | undefined)))

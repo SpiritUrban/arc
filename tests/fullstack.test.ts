@@ -10,6 +10,7 @@ import {
 } from "../framework/src/index.ts";
 import { internalTransport } from "../framework/src/fullstack/server.ts";
 import {
+  entityUpdates,
   mutation,
   query,
   remoteClient,
@@ -241,6 +242,70 @@ test("page operations use only route parameters declared by the contract", async
   ]);
   for (const node of page.owned ?? []) node.dispose();
   source.dispose();
+});
+
+test("page entity bindings update only the captured record and owner", async () => {
+  const input = s.object({ id: s.string() });
+  const output = s.object({ id: s.string(), owner: s.string(), revision: s.int() });
+  const read = operationContract({ id: "entity.read", input, output });
+  const write = operationContract({ id: "entity.write", input, output });
+  const owner = state({ id: "entity.owner", initial: "alice" });
+  const entity = entityUpdates({
+    read,
+    key: (row) => [row.owner, row.id],
+    revision: (row) => row.revision,
+  });
+  let release: (() => void) | undefined;
+  let releaseRead: (() => void) | undefined;
+  let delay = false;
+  const client = remoteApi({
+    bearer: owner,
+    key: true,
+    writes: [entity.writes([write], [])],
+    async fetch(url, init) {
+      const { id } = input.parse(JSON.parse(String(init?.body)));
+      const owner = new Headers(init?.headers).get("authorization")?.replace("Bearer ", "");
+      const reading = String(url).endsWith(read.id);
+      if (reading && owner === "alice")
+        await new Promise<void>((resolve) => { releaseRead = resolve; });
+      if (!reading && delay) await new Promise<void>((resolve) => { release = resolve; });
+      return Response.json({ ok: true, value: { id, owner, revision: reading ? 1 : 2 } });
+    },
+  });
+  const queries: RemoteQuery<typeof read>[] = [];
+  const writes: Array<{ run(input: { id: string }): Promise<unknown> }> = [];
+  const page = pageView("entity.page", ({ bind }) => {
+    const binding = bind(client).entity(read);
+    queries.push(binding.query);
+    writes.push(binding.mutation(write));
+    return jsx("div", {});
+  }, { id: "first" });
+  const [detail] = queries;
+  const [save] = writes;
+  try {
+    const firstRead = detail.refresh();
+    await save.run({ id: "first" });
+    assert.ok(releaseRead);
+    releaseRead();
+    await firstRead;
+    assert.deepEqual(detail.data(), { id: "first", owner: "alice", revision: 2 });
+    await save.run({ id: "other" });
+    assert.deepEqual(detail.data(), { id: "first", owner: "alice", revision: 2 });
+
+    delay = true;
+    const originalOwnerWrite = save.run({ id: "first" });
+    owner.set("bob");
+    await detail.refresh();
+    assert.ok(release);
+    release();
+    await originalOwnerWrite;
+    assert.deepEqual(detail.data(), { id: "first", owner: "bob", revision: 1 });
+  } finally {
+    releaseRead?.();
+    release?.();
+    for (const node of page.owned ?? []) node.dispose();
+    owner.dispose();
+  }
 });
 
 test("mutation updates can copy a response field into state", async () => {

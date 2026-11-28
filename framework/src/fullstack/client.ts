@@ -1043,6 +1043,7 @@ function querySourceKey(values: readonly unknown[]) {
 
 const beginEntityUpdate = Symbol("ARC entity update");
 const entityWrite = Symbol("ARC entity write");
+const entityKey = Symbol("ARC entity key");
 type EntityWrite = {
   [entityWrite]: true;
   contracts: readonly OperationContract[];
@@ -1051,6 +1052,8 @@ type EntityWrite = {
 };
 
 export type EntityUpdates<Row> = {
+  readonly read?: OperationContract<unknown, Row>;
+  [entityKey](row: Row): string;
   /** Declare the shared update targets for operations that return this entity. */
   writes(
     contracts: readonly OperationContract<unknown, Row>[],
@@ -1066,18 +1069,23 @@ export type EntityUpdates<Row> = {
 export function entityUpdates<Row>({
   key,
   revision,
+  read,
   update: sharedUpdates = [],
 }: {
   /** Stable identity within the application, including the owner when identities are scoped. */
   key: (row: Row) => readonly (string | number)[];
   /** Server revision that increases each time this entity changes. */
   revision: (row: Row) => number;
+  /** Read operation for one record of this entity. */
+  read?: OperationContract<unknown, Row>;
   /** Update targets shared by every declared write. */
   update?: readonly MutationUpdateTarget<Row>[];
 }): EntityUpdates<Row> {
   let pending = 0;
   const confirmed = new Map<string, number>();
   const entity: EntityUpdates<Row> = {
+    read,
+    [entityKey]: (row) => querySourceKey(key(row)),
     writes(contracts, update) {
       return { [entityWrite]: true, contracts, entity, update: [...sharedUpdates, ...update] };
     },
@@ -1085,7 +1093,7 @@ export function entityUpdates<Row>({
       pending++;
       return {
         confirm(row) {
-          const id = querySourceKey(key(row));
+          const id = entity[entityKey](row);
           const next = revision(row);
           const latest = confirmed.get(id);
           if (latest !== undefined && next < latest)
@@ -1265,6 +1273,25 @@ function buildRemoteApi<const Sources extends RemoteSources>(options: RemoteApiS
     },
     form: bindRemoteForm(defaults),
     mutation: bindMutation(defaults),
+    entityUpdate(
+      read: OperationContract,
+      query: RemoteQuery<OperationContract>,
+      write: OperationContract,
+    ): MutationUpdate<unknown> {
+      const entity = writes.get(write)?.entity;
+      if (!entity || entity.read !== read)
+        throw new TypeError(`Entity read ${read.id} is not configured for write ${write.id}`);
+      return {
+        target: query,
+        capture() {
+          const apply = query[captureResourceUpdate]?.();
+          return (value, trace) => {
+            const confirmed = entity[entityKey](value);
+            apply?.((current) => entity[entityKey](current) === confirmed ? value : current, trace);
+          };
+        },
+      };
+    },
   };
 }
 
@@ -1297,7 +1324,7 @@ type MutationUpdate<Row> = {
   capture(): (row: Row, trace: TraceToken) => void;
 };
 
-type MutationUpdateTarget<Output> = MutationUpdate<Output> | (GraphDefinition & {
+export type MutationUpdateTarget<Output> = MutationUpdate<Output> | (GraphDefinition & {
   replace(): MutationUpdate<Output>;
 });
 

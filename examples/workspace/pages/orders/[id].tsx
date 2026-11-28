@@ -11,11 +11,9 @@ import { editFormOptions, money } from "../../ui.ts";
 export const title = "Деталі замовлення — ARC Workspace";
 
 export default function OrderDetail({ bind }: PageContext<RouteParamNames<typeof orderDetailPattern>>) {
-  const { query, mutation } = bind(orderClient);
-  const order = query(GetOrder);
-  const detail = { update: order };
-  const updateOrder = mutation(UpdateOrder, { ...editFormOptions, ...detail });
-  const cancelOrder = mutation(CancelOrder, detail);
+  const { query: order, mutation } = bind(orderClient).entity(GetOrder);
+  const updateOrder = mutation(UpdateOrder, editFormOptions);
+  const cancelOrder = mutation(CancelOrder);
 
   function renderSummary(saved: Order) {
     return (
